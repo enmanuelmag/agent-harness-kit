@@ -348,4 +348,5 @@ export const GITIGNORE_ENTRIES = `
 .harness/harness.db
 .harness/harness.db-shm
 .harness/harness.db-wal
+.harness/current.md
 `

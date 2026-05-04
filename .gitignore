@@ -37,6 +37,9 @@ coverage/
 *.db-shm
 *.db-wal
 
+# Auto-generated harness runtime files (local state, not shared)
+.harness/current.md
+
 # Pack artifacts
 *.tgz
 
