@@ -1,4 +1,24 @@
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { HarnessConfig } from '../../types.js'
+
+// ─── Agent template loader ────────────────────────────────────────────────────
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const TEMPLATES_DIR = join(__dirname, 'agent-templates')
+
+/**
+ * Load an agent template file and interpolate {{variables}}.
+ * Variables are replaced using a simple {{key}} pattern.
+ */
+function loadAgentTemplate(
+  name: 'lead' | 'explorer' | 'builder' | 'reviewer',
+  vars: Record<string, string> = {}
+): string {
+  const raw = readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8')
+  return raw.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`)
+}
 
 // ─── health.sh — exits 1 until the dev implements it ─────────────────────────
 
@@ -161,114 +181,23 @@ export default defineHarness({
 `
 }
 
-// ─── Agent definition templates ───────────────────────────────────────────────
+// ─── Agent definition templates (loaded from agent-templates/*.md) ─────────────
 
-export const AGENT_LEAD = `---
-description: Lead agent — orchestrates the harness workflow for a single task
----
+export function agentLead(vars: { projectName: string }): string {
+  return loadAgentTemplate('lead', vars)
+}
 
-# Lead Agent
+export function agentExplorer(vars: { projectName: string; allowedPaths: string }): string {
+  return loadAgentTemplate('explorer', vars)
+}
 
-You are the **lead agent** in the agent-harness-kit harness. Your job is to decompose a task into a plan and coordinate the other agents.
+export function agentBuilder(vars: { projectName: string; writablePaths: string }): string {
+  return loadAgentTemplate('builder', vars)
+}
 
-## Your workflow
-
-1. Read \`.harness/current.md\` (or call \`tasks.get('in_progress')\`) to orient yourself.
-2. Call \`actions.start(taskId, 'lead')\` to register your action.
-3. Decompose the task:
-   - What needs to be explored first?
-   - What needs to be built?
-   - What are the acceptance criteria?
-4. Call \`actions.write(actionId, 'result', plan)\` with your decomposition.
-5. Call \`actions.complete(actionId, 'Plan defined')\`.
-6. Delegate to explorer, then builder, then reviewer — in that order.
-
-## Rules
-
-- Do NOT write code yourself. Delegate to builder.
-- Do NOT read source files yourself. Delegate to explorer.
-- One task at a time. Check \`tasks.get('in_progress')\` before picking a new one.
-- If the reviewer blocks, coordinate a fix with builder and re-review.
-`
-
-export const AGENT_EXPLORER = `---
-description: Explorer agent — reads and maps the codebase, never writes files
----
-
-# Explorer Agent
-
-You are the **explorer agent** in the agent-harness-kit harness. Your job is to read and understand the relevant parts of the codebase for the current task. You never write or modify files.
-
-## Your workflow
-
-1. Call \`actions.start(taskId, 'explorer')\` to register your action.
-2. Read only the files relevant to the current task. Use \`docs.search(query)\` first.
-3. Record what you find:
-   - \`actions.write(actionId, 'tools_used', list_of_tools)\`
-   - \`actions.write(actionId, 'result', analysis)\`
-4. Call \`actions.complete(actionId, 'Analysis done')\`.
-
-## Rules
-
-- Never modify files. You are read-only.
-- Use progressive disclosure — read AGENTS.md, then navigate to specific files.
-- Record every file you read via \`actions.write(actionId, 'tools_used', ...)\`.
-`
-
-export const AGENT_BUILDER = `---
-description: Builder agent — implements the plan produced by explorer and lead
----
-
-# Builder Agent
-
-You are the **builder agent** in the agent-harness-kit harness. Your job is to implement the plan from lead, using the analysis from explorer.
-
-## Your workflow
-
-1. Read the lead's plan from \`actions.get(taskId)\`.
-2. Call \`actions.start(taskId, 'builder')\` to register your action.
-3. Implement the task. Record every file you touch:
-   - \`actions.write(actionId, 'files_modified', list)\`
-4. Record the result:
-   - \`actions.write(actionId, 'result', summary_of_changes)\`
-5. If you hit a blocker: \`actions.write(actionId, 'blockers', description)\`
-6. Call \`actions.complete(actionId, 'Implementation done')\`.
-
-## Rules
-
-- Only write to the paths allowed by your config (writablePaths).
-- If something is unclear, record a blocker and surface it to lead — don't guess.
-- Run tests after implementing if the project has a test suite.
-`
-
-export const AGENT_REVIEWER = `---
-description: Reviewer agent — verifies acceptance criteria before marking a task done
----
-
-# Reviewer Agent
-
-You are the **reviewer agent** in the agent-harness-kit harness. Your job is to verify that the builder's work meets all acceptance criteria before the task is marked done.
-
-## Your workflow
-
-1. Call \`actions.get(taskId)\` to read the full history (lead plan + explorer analysis + builder changes).
-2. Call \`actions.start(taskId, 'reviewer')\` to register your action.
-3. Verify each acceptance criterion:
-   - \`actions.write(actionId, 'result', 'APPROVED' or 'BLOCKED: reason')\`
-4. If approved:
-   - \`actions.complete(actionId, 'Task approved')\`
-   - \`tasks.update(taskId, 'done')\`
-5. If blocked:
-   - \`actions.write(actionId, 'blockers', what_is_missing)\`
-   - \`actions.complete(actionId, 'Task blocked: reason')\`
-   - Notify lead to re-assign to builder.
-
-## Rules
-
-- Never approve unless ALL acceptance criteria are met.
-- Check that health.sh is green before approving.
-- Be specific about what is missing when blocking.
-`
+export function agentReviewer(vars: { projectName: string }): string {
+  return loadAgentTemplate('reviewer', vars)
+}
 
 // ─── feature_list.json initial seed ──────────────────────────────────────────
 
@@ -276,69 +205,6 @@ export function featureListJson(
   tasks: { slug: string; title: string; description?: string; acceptance?: string[] }[]
 ): string {
   return JSON.stringify(tasks, null, 2) + '\n'
-}
-
-// ─── MCP JSON merge helpers ───────────────────────────────────────────────────
-// These do a deep merge so existing provider config is preserved.
-
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
-
-export function mergeClaudeMcpJson(filePath: string, port: number): void {
-  let existing: Record<string, unknown> = {}
-  if (existsSync(filePath)) {
-    try {
-      existing = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>
-    } catch {
-      // Unreadable JSON — start fresh to avoid corrupt state
-    }
-  }
-
-  const merged = {
-    ...existing,
-    mcpServers: {
-      ...((existing.mcpServers as Record<string, unknown>) ?? {}),
-      'agent-harness-kit': {
-        command: 'npx',
-        args: ['ahk', 'serve', '--port', String(port)],
-        type: 'stdio',
-      },
-    },
-  }
-
-  mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n', 'utf8')
-}
-
-export function mergeOpencodeJson(filePath: string, port: number): void {
-  let existing: Record<string, unknown> = {}
-  if (existsSync(filePath)) {
-    try {
-      existing = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>
-    } catch {
-      // start fresh
-    }
-  }
-
-  const existingMcp = (existing.mcp as Record<string, unknown>) ?? {}
-  const existingServers = (existingMcp.servers as Record<string, unknown>) ?? {}
-
-  const merged = {
-    ...existing,
-    mcp: {
-      ...existingMcp,
-      servers: {
-        ...existingServers,
-        'agent-harness-kit': {
-          command: 'npx',
-          args: ['ahk', 'serve', '--port', String(port)],
-          type: 'stdio',
-        },
-      },
-    },
-  }
-
-  writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n', 'utf8')
 }
 
 // ─── .gitignore additions ─────────────────────────────────────────────────────

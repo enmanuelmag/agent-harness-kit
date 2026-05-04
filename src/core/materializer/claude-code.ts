@@ -1,18 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '../../types.js'
 import type { Materializer } from './index.js'
-import {
-  HEALTH_SH,
-  GITIGNORE_ENTRIES,
-  agentsMd,
-  mergeClaudeMcpJson,
-  featureListJson,
-  AGENT_LEAD,
-  AGENT_EXPLORER,
-  AGENT_BUILDER,
-  AGENT_REVIEWER,
-} from './templates.js'
+import { HEALTH_SH, agentsMd, featureListJson, agentLead, agentExplorer, agentBuilder, agentReviewer } from './templates.js'
+import { mergeClaudeMcpJson } from './mcp-merge.js'
+import { writeAgentFile, appendGitignore, slugify } from './scaffold-utils.js'
 
 export class ClaudeCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
@@ -47,10 +39,13 @@ export class ClaudeCodeMaterializer implements Materializer {
     }
 
     // .claude/agents/ — skip files the dev may have customized
-    writeAgentFile(cwd, '.claude/agents/lead.md', AGENT_LEAD)
-    writeAgentFile(cwd, '.claude/agents/explorer.md', AGENT_EXPLORER)
-    writeAgentFile(cwd, '.claude/agents/builder.md', AGENT_BUILDER)
-    writeAgentFile(cwd, '.claude/agents/reviewer.md', AGENT_REVIEWER)
+    const projectName = config.project.name
+    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
+    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
+    writeAgentFile(cwd, '.claude/agents/lead.md', agentLead({ projectName }))
+    writeAgentFile(cwd, '.claude/agents/explorer.md', agentExplorer({ projectName, allowedPaths }))
+    writeAgentFile(cwd, '.claude/agents/builder.md', agentBuilder({ projectName, writablePaths }))
+    writeAgentFile(cwd, '.claude/agents/reviewer.md', agentReviewer({ projectName }))
 
     // .claude/mcp.json — MERGE, never overwrite whole file
     mergeClaudeMcpJson(join(cwd, '.claude', 'mcp.json'), config.tools.mcp.port)
@@ -70,10 +65,13 @@ export class ClaudeCodeMaterializer implements Materializer {
     write('AGENTS.md', agentsMd(config))
 
     // Agent files: skip if customized, write if missing
-    writeAgentFile(cwd, '.claude/agents/lead.md', AGENT_LEAD)
-    writeAgentFile(cwd, '.claude/agents/explorer.md', AGENT_EXPLORER)
-    writeAgentFile(cwd, '.claude/agents/builder.md', AGENT_BUILDER)
-    writeAgentFile(cwd, '.claude/agents/reviewer.md', AGENT_REVIEWER)
+    const projectName = config.project.name
+    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
+    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
+    writeAgentFile(cwd, '.claude/agents/lead.md', agentLead({ projectName }))
+    writeAgentFile(cwd, '.claude/agents/explorer.md', agentExplorer({ projectName, allowedPaths }))
+    writeAgentFile(cwd, '.claude/agents/builder.md', agentBuilder({ projectName, writablePaths }))
+    writeAgentFile(cwd, '.claude/agents/reviewer.md', agentReviewer({ projectName }))
 
     // MCP config: always merge
     mergeClaudeMcpJson(join(cwd, '.claude', 'mcp.json'), config.tools.mcp.port)
@@ -85,32 +83,3 @@ export class ClaudeCodeMaterializer implements Materializer {
   }
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-
-function writeAgentFile(cwd: string, relPath: string, content: string): void {
-  const abs = join(cwd, relPath)
-  if (existsSync(abs)) return  // preserve dev customizations
-  mkdirSync(resolve(abs, '..'), { recursive: true })
-  writeFileSync(abs, content, 'utf8')
-}
-
-function appendGitignore(cwd: string): void {
-  const giPath = join(cwd, '.gitignore')
-  const existing = existsSync(giPath) ? readFileSync(giPath, 'utf8') : ''
-
-  const toAdd = GITIGNORE_ENTRIES.split('\n')
-    .filter((line) => line && !existing.includes(line))
-    .join('\n')
-
-  if (toAdd.trim()) {
-    writeFileSync(giPath, existing + (existing.endsWith('\n') ? '' : '\n') + toAdd + '\n', 'utf8')
-  }
-}
-
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64)
-}
