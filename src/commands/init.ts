@@ -6,6 +6,7 @@ import type { Provider } from '../types.js'
 import { getMaterializer } from '../core/materializer/index.js'
 import { openDB } from '../core/db.js'
 import { configTs } from '../core/materializer/templates.js'
+import { slugify } from '../core/materializer/scaffold-utils.js'
 import { applyConfigDefaults } from './init-helpers.js'
 
 interface InitOptions {
@@ -197,10 +198,3 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   )
 }
 
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64)
-}
