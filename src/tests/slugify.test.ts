@@ -1,14 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-
-// Inline slugify — mirrors the logic in both materializers
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64)
-}
+import { slugify } from '../core/materializer/scaffold-utils.js'
 
 describe('slugify', () => {
   test('lowercases and replaces spaces', () => {

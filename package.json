@@ -15,7 +15,8 @@
     "ahk": "./bin/ahk.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "node scripts/copy-assets.mjs",
     "dev": "tsc --watch",
     "test": "node --test dist/tests/*.test.js",
     "prepublishOnly": "npm run build && npm test",
