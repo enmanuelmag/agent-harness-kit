@@ -1,0 +1,163 @@
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
+export type Provider = 'claude-code' | 'opencode'
+
+// ─── Config types ─────────────────────────────────────────────────────────────
+
+export interface ProjectConfig {
+  name: string
+  description: string
+  docsPath: string
+  agentsMd?: string | null
+}
+
+export interface AgentConfig {
+  instructionsPath: string | null
+  context?: string
+  allowedPaths?: string[]
+  writablePaths?: string[]
+}
+
+export interface CustomAgentConfig {
+  name: string
+  instructionsPath: string
+}
+
+export interface AgentsConfig {
+  lead: AgentConfig
+  explorer: AgentConfig
+  builder: AgentConfig
+  reviewer: AgentConfig
+  custom?: CustomAgentConfig[]
+}
+
+export type TasksAdapter = 'local' | 'jira' | 'linear' | 'mcp'
+
+export interface ActionSections {
+  toolsUsed: boolean
+  filesModified: boolean
+  result: boolean
+  blockers: boolean
+  nextSteps: boolean
+}
+
+export interface StorageConfig {
+  dir: string
+  dbPath: string
+  tasks: { adapter: TasksAdapter; [key: string]: unknown }
+  sections: ActionSections
+  markdownFallback: { enabled: boolean; path: string }
+}
+
+export interface HealthConfig {
+  scriptPath: string
+  required: boolean
+}
+
+export interface ToolsConfig {
+  mcp: { enabled: boolean; port: number }
+  scripts: { enabled: boolean; outputDir: string }
+}
+
+export interface HarnessConfig {
+  project: ProjectConfig
+  provider: Provider
+  agents: AgentsConfig
+  storage: StorageConfig
+  health: HealthConfig
+  tools: ToolsConfig
+}
+
+// ─── SQLite row types ─────────────────────────────────────────────────────────
+
+export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked'
+
+export interface TaskRow {
+  id: number
+  slug: string
+  title: string
+  description: string | null
+  status: TaskStatus
+  assigned_to: string | null
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+}
+
+export interface TaskAcceptanceRow {
+  id: number
+  task_id: number
+  criterion: string
+  met: number
+}
+
+export type AgentName = 'lead' | 'explorer' | 'builder' | 'reviewer' | `custom:${string}`
+
+export type ActionStatus = 'in_progress' | 'completed' | 'blocked'
+
+export interface ActionRow {
+  id: string
+  task_id: number
+  agent: AgentName
+  status: ActionStatus
+  created_at: string
+  completed_at: string | null
+  summary: string | null
+}
+
+export interface ActionSectionRow {
+  id: number
+  action_id: string
+  section_type: string
+  content: string
+  created_at: string
+}
+
+export interface ActionFileRow {
+  id: number
+  action_id: string
+  file_path: string
+  operation: 'read' | 'created' | 'modified' | 'deleted'
+  notes: string | null
+}
+
+export interface ActionToolRow {
+  id: number
+  action_id: string
+  tool_name: string
+  args_json: string | null
+  result_summary: string | null
+  called_at: string
+}
+
+// ─── feature_list.json seed format ───────────────────────────────────────────
+
+export interface TaskSeed {
+  slug: string
+  title: string
+  description?: string
+  acceptance?: string[]
+}
+
+// ─── MCP tool result helpers ──────────────────────────────────────────────────
+
+export interface McpContent {
+  type: 'text'
+  text: string
+}
+
+export interface McpToolResult {
+  content: McpContent[]
+  isError?: boolean
+}
+
+// ─── Materializer interface ───────────────────────────────────────────────────
+
+export interface ScaffoldOptions {
+  cwd: string
+  firstTask?: {
+    title: string
+    description: string
+    acceptance: string[]
+  }
+}
