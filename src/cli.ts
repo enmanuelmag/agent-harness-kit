@@ -9,6 +9,7 @@ import { runServe } from './commands/serve.js'
 import { runMigrate } from './commands/migrate.js'
 import { runExport } from './commands/export.js'
 import { runTaskAdd, runTaskList, runTaskDone } from './commands/task/index.js'
+import { runDashboard } from './commands/dashboard.js'
 
 const require = createRequire(import.meta.url)
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -104,6 +105,16 @@ task
   .description('Mark a task as done')
   .action(async (idOrSlug: string) => {
     await runTaskDone(cwd, idOrSlug)
+  })
+
+// ─── dashboard ────────────────────────────────────────────────────────────────
+program
+  .command('dashboard')
+  .description('Open web dashboard to visualize harness data')
+  .option('-p, --port <port>', 'Port to listen on', '4242')
+  .option('--no-open', 'Do not open browser automatically')
+  .action(async (opts: { port: string; open: boolean }) => {
+    await runDashboard(cwd, { port: parseInt(opts.port), open: opts.open })
   })
 
 // ─── migrate ──────────────────────────────────────────────────────────────────

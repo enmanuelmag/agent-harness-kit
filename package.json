@@ -1,6 +1,6 @@
 {
   "name": "@cardor/agent-harness-kit",
-  "version": "0.10.4",
+  "version": "0.12.1",
   "description": "CLI scaffolding for multi-agent harness systems",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,7 +15,8 @@
     "ahk": "./bin/ahk.js"
   },
   "scripts": {
-    "build": "tsc && npm run copy-assets",
+    "build": "npm run build:ui && tsc && npm run copy-assets",
+    "build:ui": "cd dashboard && npm install --prefer-offline && npm run build",
     "copy-assets": "node scripts/copy-assets.mjs",
     "dev": "tsc --watch",
     "test": "node --test dist/tests/*.test.js",
@@ -38,16 +39,21 @@
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^0.9.0",
+    "@hono/node-server": "^1.13.0",
     "@modelcontextprotocol/sdk": "^1.10.2",
     "cli-table3": "^0.6.5",
     "commander": "^12.1.0",
+    "hono": "^4.6.0",
     "jiti": "^2.4.2",
-    "picocolors": "^1.1.1"
+    "open": "^10.1.0",
+    "picocolors": "^1.1.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
     "@types/node": "^22.19.17",
+    "@types/ws": "^8.5.0",
     "husky": "^9.1.7",
     "typescript": "^5.5.0"
   },

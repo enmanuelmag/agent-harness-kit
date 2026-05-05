@@ -1,0 +1,6 @@
+- [] Sort for agent calculate from server, not frontend
+- [] Define type on type folder or use Valibot
+- [] AVOID define more than one component in one page file. The page file or called route file should only contain one component, and the rest should be moved to a separate file in the components folder. This will help to keep the code organized and maintainable.
+- [] create loading and error state shared component and use it in all page that need them.
+- [] Add sort import con eslint, tnato en cli pkg como el dashboard
+- [] Se puede unificar los types de dahs y sever? para que este defnidos en el cli y el dash pkg lo pueda usar?

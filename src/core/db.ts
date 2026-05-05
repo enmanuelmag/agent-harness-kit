@@ -387,6 +387,12 @@ export class HarnessDB {
     writeFileSync(mdPath, md, 'utf8')
   }
 
+  // ─── Raw query (dashboard / analytics) ───────────────────────────────────
+
+  queryRaw<T = Record<string, unknown>>(sql: string, ...params: unknown[]): T[] {
+    return this.db.prepare(sql).all(...params) as unknown as T[]
+  }
+
   // ─── Export helpers ───────────────────────────────────────────────────────
 
   exportJson(): { tasks: TaskRow[]; actions: ActionRow[]; sections: ActionSectionRow[] } {
