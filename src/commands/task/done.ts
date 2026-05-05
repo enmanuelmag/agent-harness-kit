@@ -1,9 +1,10 @@
-import pc from 'picocolors'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { loadConfig } from '../../core/config.js'
-import { openDB } from '../../core/db.js'
+import pc from 'picocolors'
+
+import { loadConfig } from '@/core/config'
+import { openDB } from '@/core/db'
 
 export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> {
   const config = await loadConfig(cwd)

@@ -1,8 +1,10 @@
 import Table from 'cli-table3'
 import pc from 'picocolors'
-import { loadConfig } from '../../core/config.js'
-import { openDB } from '../../core/db.js'
-import type { TaskStatus } from '../../types.js'
+
+import { loadConfig } from '@/core/config'
+import { openDB } from '@/core/db'
+
+import type { TaskStatus } from '@/types'
 
 interface TaskListOptions {
   status?: string

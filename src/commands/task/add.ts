@@ -1,8 +1,9 @@
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { loadConfig } from '../../core/config.js'
-import { openDB } from '../../core/db.js'
-import { slugify } from '../../core/materializer/scaffold-utils.js'
+
+import { loadConfig } from '@/core/config'
+import { openDB } from '@/core/db'
+import { slugify } from '@/core/materializer/scaffold-utils'
 
 export async function runTaskAdd(cwd: string): Promise<void> {
   p.intro(pc.bold('agent-harness-kit — add task'))

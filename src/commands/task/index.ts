@@ -1,3 +1,3 @@
-export { runTaskAdd } from './add.js'
-export { runTaskList } from './list.js'
-export { runTaskDone } from './done.js'
+export { runTaskAdd } from './add'
+export { runTaskDone } from './done'
+export { runTaskList } from './list'
