@@ -1,6 +1,7 @@
-import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { slugify } from '../core/materializer/scaffold-utils.js'
+import { describe, test } from 'node:test'
+
+import { slugify } from '@/core/materializer/scaffold-utils'
 
 describe('slugify', () => {
   test('lowercases and replaces spaces', () => {

@@ -1,9 +1,10 @@
-import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { mergeClaudeMcpJson, mergeOpencodeJson } from '../core/materializer/mcp-merge.js'
-import { featureListJson } from '../core/materializer/templates.js'
+import { describe, test } from 'node:test'
+
+import { mergeClaudeMcpJson, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import { featureListJson } from '@/core/materializer/templates'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 

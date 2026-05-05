@@ -1,9 +1,11 @@
-import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { rmSync, mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { HarnessDB } from '../core/db.js'
-import type { HarnessConfig } from '../types.js'
+import { afterEach, beforeEach, describe, test } from 'node:test'
+
+import { HarnessDB } from '@/core/db'
+
+import type { HarnessConfig } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-test')
 
@@ -11,11 +13,11 @@ const config: HarnessConfig = {
   project: { name: 'test', description: 'test project', docsPath: './docs' },
   provider: 'claude-code',
   agents: {
-    lead:     { instructionsPath: null },
+    lead: { instructionsPath: null },
     explorer: { instructionsPath: null, allowedPaths: [] },
-    builder:  { instructionsPath: null, writablePaths: [] },
+    builder: { instructionsPath: null, writablePaths: [] },
     reviewer: { instructionsPath: null },
-    custom:   [],
+    custom: [],
   },
   storage: {
     dir: '.harness',
@@ -26,7 +28,7 @@ const config: HarnessConfig = {
   },
   health: { scriptPath: './health.sh', required: false },
   tools: {
-    mcp:     { enabled: false, port: 3456 },
+    mcp: { enabled: false, port: 3456 },
     scripts: { enabled: false, outputDir: '.harness/scripts' },
   },
 }
