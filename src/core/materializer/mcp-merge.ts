@@ -16,9 +16,10 @@ export function mergeClaudeMcpJson(filePath: string, port: number): void {
     mcpServers: {
       ...((existing.mcpServers as Record<string, unknown>) ?? {}),
       'agent-harness-kit': {
+        enable: true,
+        type: 'local',
         command: 'npx',
         args: ['ahk', 'serve', '--port', String(port)],
-        type: 'stdio',
       },
     },
   }
@@ -38,19 +39,15 @@ export function mergeOpencodeJson(filePath: string, port: number): void {
   }
 
   const existingMcp = (existing.mcp as Record<string, unknown>) ?? {}
-  const existingServers = (existingMcp.servers as Record<string, unknown>) ?? {}
 
   const merged = {
     ...existing,
     mcp: {
       ...existingMcp,
-      servers: {
-        ...existingServers,
-        'agent-harness-kit': {
-          command: 'npx',
-          args: ['ahk', 'serve', '--port', String(port)],
-          type: 'stdio',
-        },
+      'agent-harness-kit': {
+        command: 'npx',
+        args: ['ahk', 'serve', '--port', String(port)],
+        type: 'stdio',
       },
     },
   }

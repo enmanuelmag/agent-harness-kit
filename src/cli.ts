@@ -1,7 +1,5 @@
 import { Command } from 'commander'
 import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { runInit } from './commands/init.js'
 import { runBuild } from './commands/build.js'
 import { runHealth } from './commands/health.js'
