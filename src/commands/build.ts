@@ -1,8 +1,9 @@
+import { watch } from 'node:fs'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { watch } from 'node:fs'
-import { loadConfig } from '../core/config.js'
-import { getMaterializer } from '../core/materializer/index.js'
+
+import { loadConfig } from '@/core/config'
+import { getMaterializer } from '@/core/materializer/index'
 
 interface BuildOptions {
   watch?: boolean

@@ -1,9 +1,11 @@
-import pc from 'picocolors'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { loadConfig } from '../core/config.js'
-import { openDB } from '../core/db.js'
-import type { TaskSeed } from '../types.js'
+import pc from 'picocolors'
+
+import { loadConfig } from '@/core/config'
+import { openDB } from '@/core/db'
+
+import type { TaskSeed } from '@/types'
 
 interface SyncOptions {
   dryRun?: boolean

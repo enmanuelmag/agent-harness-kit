@@ -1,8 +1,9 @@
-import pc from 'picocolors'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { loadConfig } from '../core/config.js'
+import pc from 'picocolors'
+
+import { loadConfig } from '@/core/config'
 
 function checkLine(label: string | null, ok: boolean, message: string, indent = 0): void {
   const prefix = label ? pc.cyan(`[${label}] `) : ' '.repeat(indent)

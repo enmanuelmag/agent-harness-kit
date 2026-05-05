@@ -1,7 +1,8 @@
 import Table from 'cli-table3'
 import pc from 'picocolors'
-import { loadConfig } from '../core/config.js'
-import { openDB } from '../core/db.js'
+
+import { loadConfig } from '@/core/config'
+import { openDB } from '@/core/db'
 
 interface StatusOptions {
   json?: boolean

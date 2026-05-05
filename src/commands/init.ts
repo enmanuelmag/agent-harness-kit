@@ -1,13 +1,15 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
-import type { Provider } from '../types.js'
-import { getMaterializer } from '../core/materializer/index.js'
-import { openDB } from '../core/db.js'
-import { configTs } from '../core/materializer/templates.js'
-import { slugify } from '../core/materializer/scaffold-utils.js'
-import { applyConfigDefaults } from './init-helpers.js'
+
+import { openDB } from '@/core/db'
+import { getMaterializer } from '@/core/materializer/index'
+import { slugify } from '@/core/materializer/scaffold-utils'
+import { configTs } from '@/core/materializer/templates'
+import { applyConfigDefaults } from './init-helpers'
+
+import type { Provider } from '@/types'
 
 interface InitOptions {
   name?: string

@@ -1,4 +1,4 @@
-import type { HarnessConfig, Provider } from '../types.js'
+import type { HarnessConfig, Provider } from '@/types'
 
 export function applyConfigDefaults(params: {
   name: string

@@ -1,5 +1,5 @@
-import { loadConfig } from '../core/config.js'
-import { startMcpServer } from '../core/mcp-server.js'
+import { loadConfig } from '@/core/config'
+import { startMcpServer } from '@/core/mcp-server'
 
 interface ServeOptions {
   port?: number

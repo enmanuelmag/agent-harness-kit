@@ -1,8 +1,10 @@
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { loadConfig } from '../core/config.js'
-import { getMaterializer } from '../core/materializer/index.js'
-import type { Provider } from '../types.js'
+
+import { loadConfig } from '@/core/config'
+import { getMaterializer } from '@/core/materializer/index'
+
+import type { Provider } from '@/types'
 
 interface MigrateOptions {
   to?: string

@@ -1,7 +1,8 @@
-import pc from 'picocolors'
 import { writeFileSync } from 'node:fs'
-import { loadConfig } from '../core/config.js'
-import { openDB } from '../core/db.js'
+import pc from 'picocolors'
+
+import { loadConfig } from '@/core/config'
+import { openDB } from '@/core/db'
 
 interface ExportOptions {
   sql?: boolean

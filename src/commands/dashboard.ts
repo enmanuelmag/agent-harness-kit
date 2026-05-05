@@ -1,9 +1,10 @@
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
-import { loadConfig } from '../core/config.js'
-import { openDB } from '../core/db.js'
-import { startDashboardServer } from '../core/dashboard-server.js'
+
+import { loadConfig } from '@/core/config'
+import { startDashboardServer } from '@/core/dashboard-server'
+import { openDB } from '@/core/db'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -16,7 +17,7 @@ export async function runDashboard(cwd: string, opts: DashboardOptions): Promise
   const config = await loadConfig(cwd)
   const db = openDB(config, cwd)
   const dbPath = resolve(cwd, config.storage.dbPath)
-  const staticPath = join(__dirname, '..', 'dashboard-dist')
+  const staticPath = join(__dirname, 'dashboard-dist')
 
   const { url } = startDashboardServer(db, dbPath, staticPath, opts.port)
 
@@ -34,5 +35,5 @@ export async function runDashboard(cwd: string, opts: DashboardOptions): Promise
   })
 
   // Keep process alive until SIGINT
-  await new Promise<void>(() => {})
+  await new Promise<void>(() => { })
 }
