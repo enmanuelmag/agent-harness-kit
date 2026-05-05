@@ -7,6 +7,17 @@ import { join, extname } from 'node:path'
 import type { IncomingMessage } from 'node:http'
 import type { Socket } from 'node:net'
 import type { HarnessDB } from './db.js'
+import type {
+  AgentStatRow,
+  CountRow,
+  RecentFileRow,
+  RecentToolRow,
+  TaskListRow,
+  TimelineRow,
+  TopFileRow,
+} from './server-types.js'
+
+const AGENT_ORDER = ['lead', 'explorer', 'builder', 'reviewer']
 
 // ─── Static file serving ──────────────────────────────────────────────────────
 
@@ -58,10 +69,10 @@ export function startDashboardServer(
     const byStatus: Record<string, number> = { pending: 0, in_progress: 0, done: 0, blocked: 0 }
     for (const { status, total } of summary) byStatus[status] = total
 
-    const [{ total: totalActions }] = db.queryRaw<{ total: number }>(`SELECT COUNT(*) as total FROM actions`)
-    const [{ total: totalFiles }] = db.queryRaw<{ total: number }>(`SELECT COUNT(*) as total FROM action_files`)
-    const [{ total: uniqueTools }] = db.queryRaw<{ total: number }>(`SELECT COUNT(DISTINCT tool_name) as total FROM action_tools`)
-    const [{ total: activeAgents }] = db.queryRaw<{ total: number }>(
+    const [{ total: totalActions }] = db.queryRaw<CountRow>(`SELECT COUNT(*) as total FROM actions`)
+    const [{ total: totalFiles }] = db.queryRaw<CountRow>(`SELECT COUNT(*) as total FROM action_files`)
+    const [{ total: uniqueTools }] = db.queryRaw<CountRow>(`SELECT COUNT(DISTINCT tool_name) as total FROM action_tools`)
+    const [{ total: activeAgents }] = db.queryRaw<CountRow>(
       `SELECT COUNT(DISTINCT agent) as total FROM actions WHERE status = 'in_progress'`,
     )
 
@@ -75,12 +86,7 @@ export function startDashboardServer(
 
   // ─── Tasks list ───────────────────────────────────────────────────────────
   app.get('/api/tasks', (c) => {
-    const rows = db.queryRaw<{
-      id: number; slug: string; title: string; description: string | null
-      status: string; assigned_to: string | null
-      created_at: string; started_at: string | null; completed_at: string | null
-      acceptance_total: number; acceptance_met: number
-    }>(`
+    const rows = db.queryRaw<TaskListRow>(`
       SELECT t.*,
         COUNT(ta.id) as acceptance_total,
         COALESCE(SUM(ta.met), 0) as acceptance_met
@@ -118,10 +124,7 @@ export function startDashboardServer(
   // ─── Tools recent ─────────────────────────────────────────────────────────
   app.get('/api/tools/recent', (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50')
-    const rows = db.queryRaw<{
-      id: number; tool_name: string; args_json: string | null; result_summary: string | null
-      called_at: string; task_id: number; task_title: string; task_slug: string; agent: string
-    }>(`
+    const rows = db.queryRaw<RecentToolRow>(`
       SELECT at.*, t.id as task_id, t.title as task_title, t.slug as task_slug, a.agent
       FROM action_tools at
       JOIN actions a ON at.action_id = a.id
@@ -135,10 +138,7 @@ export function startDashboardServer(
   // ─── Files top ────────────────────────────────────────────────────────────
   app.get('/api/files/top', (c) => {
     const limit = parseInt(c.req.query('limit') ?? '20')
-    const rows = db.queryRaw<{
-      file_path: string; total: number
-      read: number; created: number; modified: number; deleted: number
-    }>(`
+    const rows = db.queryRaw<TopFileRow>(`
       SELECT
         file_path,
         COUNT(*) as total,
@@ -157,10 +157,7 @@ export function startDashboardServer(
   // ─── Files recent ─────────────────────────────────────────────────────────
   app.get('/api/files/recent', (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50')
-    const rows = db.queryRaw<{
-      id: number; file_path: string; operation: string; notes: string | null
-      task_id: number; task_title: string; task_slug: string; agent: string; called_at: string
-    }>(`
+    const rows = db.queryRaw<RecentFileRow>(`
       SELECT af.*, t.id as task_id, t.title as task_title, t.slug as task_slug,
         a.agent, a.created_at as called_at
       FROM action_files af
@@ -174,10 +171,7 @@ export function startDashboardServer(
 
   // ─── Agents stats ─────────────────────────────────────────────────────────
   app.get('/api/agents/stats', (c) => {
-    const rows = db.queryRaw<{
-      agent: string; actions_total: number; actions_done: number
-      actions_blocked: number; tasks_worked: number; files_touched: number
-    }>(`
+    const rows = db.queryRaw<AgentStatRow>(`
       SELECT
         a.agent,
         COUNT(*)                                                    as actions_total,
@@ -190,17 +184,21 @@ export function startDashboardServer(
       GROUP BY a.agent
       ORDER BY actions_total DESC
     `)
-    return c.json(rows)
+    const sorted = rows.sort((a, b) => {
+      const ai = AGENT_ORDER.indexOf(a.agent)
+      const bi = AGENT_ORDER.indexOf(b.agent)
+      if (ai === -1 && bi === -1) return 0
+      if (ai === -1) return 1
+      if (bi === -1) return -1
+      return ai - bi
+    })
+    return c.json(sorted)
   })
 
   // ─── Timeline ─────────────────────────────────────────────────────────────
   app.get('/api/timeline', (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50')
-    const rows = db.queryRaw<{
-      id: string; agent: string; status: string; summary: string | null
-      created_at: string; completed_at: string | null
-      task_id: number; task_title: string; task_slug: string; task_status: string
-    }>(`
+    const rows = db.queryRaw<TimelineRow>(`
       SELECT a.*, t.title as task_title, t.slug as task_slug, t.status as task_status
       FROM actions a
       JOIN tasks t ON a.task_id = t.id
