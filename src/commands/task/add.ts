@@ -25,7 +25,7 @@ export async function runTaskAdd(cwd: string): Promise<void> {
   p.log.info('Acceptance criteria — one per line, empty line to finish')
   while (true) {
     const val = await p.text({ message: '>', placeholder: 'Criterion (or press Enter to finish)' })
-    if (p.isCancel(val) || !(val as string).trim()) break
+    if (p.isCancel(val) || !val || !(val as string).trim()) break
     acceptance.push((val as string).trim())
   }
 
@@ -42,10 +42,8 @@ export async function runTaskAdd(cwd: string): Promise<void> {
     db.close()
 
     spinner.stop('')
-    p.outro(
-      pc.green(`✓  Task #${task.id} added — ${task.slug} (pending)`) +
-      '\n  → ' + pc.cyan('ahk status') + '  to see all tasks'
-    )
+    console.log(pc.green(`✓ Task #${task.id} added — ${task.slug} (pending)`))
+    console.log(pc.cyan('→') + ' ' + pc.cyan('ahk status') + ' to see all tasks')
   } catch (err) {
     spinner.stop(pc.red('Failed'))
     p.log.error(err instanceof Error ? err.message : String(err))
