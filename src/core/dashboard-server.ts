@@ -1,12 +1,11 @@
-import { Hono } from 'hono'
-import { serve } from '@hono/node-server'
-import { WebSocketServer } from 'ws'
 import { watch } from 'node:fs'
 import { existsSync, readFileSync } from 'node:fs'
-import { join, extname } from 'node:path'
-import type { IncomingMessage } from 'node:http'
-import type { Socket } from 'node:net'
-import type { HarnessDB } from './db.js'
+import { extname,join } from 'node:path'
+import { serve } from '@hono/node-server'
+import { Hono } from 'hono'
+import { WebSocketServer } from 'ws'
+
+import type { HarnessDB } from './db'
 import type {
   AgentStatRow,
   CountRow,
@@ -15,7 +14,9 @@ import type {
   TaskListRow,
   TimelineRow,
   TopFileRow,
-} from './server-types.js'
+} from './server-types'
+import type { IncomingMessage } from 'node:http'
+import type { Socket } from 'node:net'
 
 const AGENT_ORDER = ['lead', 'explorer', 'builder', 'reviewer']
 
@@ -23,8 +24,9 @@ const AGENT_ORDER = ['lead', 'explorer', 'builder', 'reviewer']
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
+  '.js':   'application/javascript; charset=utf-8',
+  '.mjs':  'application/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',

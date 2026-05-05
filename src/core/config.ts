@@ -1,11 +1,12 @@
-import { createJiti } from 'jiti'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { HarnessConfig } from '../types.js'
+import { createJiti } from 'jiti'
+
+import type { HarnessConfig } from '@/types'
 
 const CONFIG_NAMES = [
   'agent-harness-kit.config.ts',
-  'agent-harness-kit.config.js',
+  'agent-harness-kit.config',
   'agent-harness-kit.config.mjs',
 ]
 

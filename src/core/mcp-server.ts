@@ -1,14 +1,16 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { Server } from '@modelcontextprotocol/sdk/server'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
-  ListToolsRequestSchema,
   type CallToolResult,
+  ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
-import type { HarnessConfig, AgentName } from '../types.js'
-import { openDB, type HarnessDB } from './db.js'
+
+import { type HarnessDB, openDB } from './db'
+
+import type { AgentName, HarnessConfig, TaskStatus } from '@/types'
 
 const VERSION = '0.1.0'
 
@@ -198,7 +200,7 @@ async function dispatch(
     case 'tasks.get': {
       const status = args['status'] as string | undefined
       const tasks = status
-        ? db.getTasks(status as import('../types.js').TaskStatus)
+        ? db.getTasks(status as TaskStatus)
         : db.getTasks()
       return ok(JSON.stringify(tasks, null, 2))
     }
@@ -215,7 +217,7 @@ async function dispatch(
 
     case 'tasks.update': {
       const id = num(args, 'id')
-      const status = str(args, 'status') as import('../types.js').TaskStatus
+      const status = str(args, 'status') as TaskStatus
       const task = db.updateTaskStatus(id, status)
       return ok(JSON.stringify(task))
     }

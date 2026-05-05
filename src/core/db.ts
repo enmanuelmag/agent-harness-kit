@@ -1,18 +1,19 @@
+import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
-import { openSQLite, lastInsertId, type SQLiteDB } from './sqlite-adapter.js'
+
+import { lastInsertId, openSQLite, type SQLiteDB } from './sqlite-adapter'
+
 import type {
-  TaskRow,
-  TaskAcceptanceRow,
+  ActionFileRow,
   ActionRow,
   ActionSectionRow,
-  ActionFileRow,
-  ActionToolRow,
-  TaskStatus,
   AgentName,
   HarnessConfig,
-} from '../types.js'
+  TaskAcceptanceRow,
+  TaskRow,
+  TaskStatus,
+} from '@/types'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
