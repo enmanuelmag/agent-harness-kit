@@ -46,7 +46,7 @@ export class OpenCodeMaterializer implements Materializer {
     writeAgentFile(cwd, '.opencode/agents/reviewer.md', agentReviewer({ projectName }))
 
     // opencode.json — MERGE, never overwrite whole file
-    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port)
+    mergeOpencodeJson(join(cwd, './opencode/opencode.json'), config.tools.mcp.port)
 
     appendGitignore(cwd)
   }

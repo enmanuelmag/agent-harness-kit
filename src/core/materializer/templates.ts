@@ -135,7 +135,7 @@ export function configTs(params: {
   tasksAdapter: string
   port: number
 }): string {
-  return `import { defineHarness } from 'agent-harness-kit'
+  return `import { defineHarness } from '@cardor/agent-harness-kit'
 
 export default defineHarness({
   project: {

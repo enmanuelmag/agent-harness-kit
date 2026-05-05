@@ -45,9 +45,10 @@ export function mergeOpencodeJson(filePath: string, port: number): void {
     mcp: {
       ...existingMcp,
       'agent-harness-kit': {
+        enabled: true,
+        type: 'local',
         command: 'npx',
         args: ['ahk', 'serve', '--port', String(port)],
-        type: 'stdio',
       },
     },
   }
