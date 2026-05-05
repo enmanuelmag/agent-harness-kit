@@ -1,8 +1,10 @@
-import { formatDate, formatDuration } from '@/lib/api';
-import { ActionDetail, ActionSection } from '@/schema/api';
 import { useState } from 'react';
-import { AgentBadge } from '../shared/agent-badge';
-import { StatusBadge } from '../shared/status-badge';
+
+import { AgentBadge } from '@/components/shared/agent-badge';
+import { StatusBadge } from '@/components/shared/status-badge';
+import { formatDate, formatDuration } from '@/lib/api';
+
+import type { ActionDetail, ActionSection } from '@/schema/api';
 
 export function ActionCard({ action }: { action: ActionDetail }) {
   const [expanded, setExpanded] = useState(false);
