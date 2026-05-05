@@ -1,6 +1,6 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { api, qk, formatDate, formatDuration } from '@/lib/api';
+import { createFileRoute } from '@tanstack/react-router';
+
 import { AgentBadge } from '@/components/shared/agent-badge';
 import { ErrorState } from '@/components/shared/error-state';
 import { LoadingState } from '@/components/shared/loading-state';
@@ -12,6 +12,7 @@ import {
   SectionTitle,
   TimestampItem,
 } from '@/components/task-detail/indx';
+import { api, formatDate, formatDuration,qk } from '@/lib/api';
 
 export const Route = createFileRoute('/tasks/$id')({
   component: TaskDetailPage,

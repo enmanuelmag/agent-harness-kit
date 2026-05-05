@@ -1,12 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { api, qk, formatDate } from '@/lib/api';
+import { createFileRoute } from '@tanstack/react-router';
+
 import { AgentBadge } from '@/components/shared/agent-badge';
 import { EmptyTableRow } from '@/components/shared/empty-table-row';
 import { LoadingTableRow } from '@/components/shared/loading-state';
 import { OperationBadge } from '@/components/shared/operation-badge';
 import { PageHeader } from '@/components/shared/page-header';
-import { RecentFile } from '@/schema/api';
+import { api, formatDate,qk } from '@/lib/api';
+
+import type { RecentFile } from '@/schema/api';
 
 export const Route = createFileRoute('/files')({
   component: FilesPage,

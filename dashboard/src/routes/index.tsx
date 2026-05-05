@@ -1,10 +1,12 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { api, qk, formatDate } from '@/lib/api';
-import { StatusBadge } from '@/components/shared/status-badge';
+import { createFileRoute, Link } from '@tanstack/react-router';
+
 import { AgentBadge } from '@/components/shared/agent-badge';
 import { PageHeader } from '@/components/shared/page-header';
-import { TimelineEntry } from '@/schema/api';
+import { StatusBadge } from '@/components/shared/status-badge';
+import { api, formatDate,qk } from '@/lib/api';
+
+import type { TimelineEntry } from '@/schema/api';
 
 export const Route = createFileRoute('/')({
   component: Overview,

@@ -1,10 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { api, qk } from '@/lib/api';
+import { createFileRoute } from '@tanstack/react-router';
+
 import { AgentBadge } from '@/components/shared/agent-badge';
 import { LoadingState } from '@/components/shared/loading-state';
 import { PageHeader } from '@/components/shared/page-header';
-import { AgentStat } from '@/schema/api';
+import { api, qk } from '@/lib/api';
+
+import type { AgentStat } from '@/schema/api';
 
 export const Route = createFileRoute('/agents')({
   component: AgentsPage,
