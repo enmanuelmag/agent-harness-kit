@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk, formatDate } from '@/lib/api';
-import { AgentBadge } from '@/components/AgentBadge';
-import { PageHeader } from '@/components/PageHeader';
+import { AgentBadge } from '@/components/shared/agent-badge';
+import { PageHeader } from '@/components/shared/page-header';
 import { RecentTool } from '@/schema/api';
 
 export const Route = createFileRoute('/tools')({

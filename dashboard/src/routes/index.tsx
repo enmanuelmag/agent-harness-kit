@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk, formatDate } from '@/lib/api';
-import { StatusBadge } from '@/components/StatusBadge';
-import { AgentBadge } from '@/components/AgentBadge';
-import { PageHeader } from '@/components/PageHeader';
+import { StatusBadge } from '@/components/shared/status-badge';
+import { AgentBadge } from '@/components/shared/agent-badge';
+import { PageHeader } from '@/components/shared/page-header';
 import { TimelineEntry } from '@/schema/api';
 
 export const Route = createFileRoute('/')({

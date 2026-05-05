@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk, formatDate } from '@/lib/api';
-import { AgentBadge } from '@/components/AgentBadge';
-import { OperationBadge } from '@/components/OperationBadge';
-import { PageHeader } from '@/components/PageHeader';
+import { AgentBadge } from '@/components/shared/agent-badge';
+import { OperationBadge } from '@/components/shared/operation-badge';
+import { PageHeader } from '@/components/shared/page-header';
 import { RecentFile } from '@/schema/api';
 
 export const Route = createFileRoute('/files')({
