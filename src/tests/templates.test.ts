@@ -40,19 +40,19 @@ describe('mergeOpencodeJson', () => {
     const path = join(TMP, 'opencode.json')
     mergeOpencodeJson(path, 3456)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
-    assert.ok(parsed.mcp.servers['agent-harness-kit'])
+    assert.ok(parsed.mcp['agent-harness-kit'])
     teardown()
   })
 
-  test('preserves existing mcp.servers entries', () => {
+  test('preserves existing mcp.entries', () => {
     setup()
     const path = join(TMP, 'opencode2.json')
-    const initial = { mcp: { servers: { 'other': { command: 'bar', args: [] } } } }
+    const initial = { mcp: { 'other': { command: 'bar', args: [] } } }
     writeFileSync(path, JSON.stringify(initial))
     mergeOpencodeJson(path, 3456)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
-    assert.ok(parsed.mcp.servers['other'])
-    assert.ok(parsed.mcp.servers['agent-harness-kit'])
+    assert.ok(parsed.mcp['other'])
+    assert.ok(parsed.mcp['agent-harness-kit'])
     teardown()
   })
 })
