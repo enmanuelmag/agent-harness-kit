@@ -1,6 +1,6 @@
 {
   "name": "@cardor/agent-harness-kit",
-  "version": "0.14.0",
+  "version": "0.16.0",
   "description": "CLI scaffolding for multi-agent harness systems",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,11 +15,12 @@
     "ahk": "./bin/ahk.js"
   },
   "scripts": {
-    "build": "npm run build:ui && tsc && npm run copy-assets",
+    "build": "npm run build:ui && tsup && npm run copy-assets",
     "build:ui": "cd dashboard && npm install --prefer-offline && npm run build",
     "copy-assets": "node scripts/copy-assets.mjs",
-    "dev": "tsc --watch",
-    "test": "node --test dist/tests/*.test.js",
+    "dev": "tsup --watch",
+    "test": "node --test --import tsx/esm src/tests/*.test.ts",
+    "lint": "eslint . --fix",
     "prepublishOnly": "npm run build && npm test",
     "prepare": "husky"
   },
@@ -52,10 +53,16 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
+    "@eslint-react/eslint-plugin": "^5.7.1",
     "@types/node": "^22.19.17",
     "@types/ws": "^8.5.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-simple-import-sort": "^13.0.0",
     "husky": "^9.1.7",
-    "typescript": "^5.5.0"
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.59.1"
   },
   "engines": {
     "node": ">=20.0.0"
