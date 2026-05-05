@@ -1,6 +1,6 @@
 // ─── Response types ───────────────────────────────────────────────────────────
 
-import { AgentStat, RecentFile, RecentTool, StatsOverview, TaskDetail, TaskSummary, TimelineEntry, TopFile, TopTool } from "@/schema/api"
+import type { AgentStat, RecentFile, RecentTool, StatsOverview, TaskDetail, TaskSummary, TimelineEntry, TopFile, TopTool } from "@/schema/api"
 
 
 
