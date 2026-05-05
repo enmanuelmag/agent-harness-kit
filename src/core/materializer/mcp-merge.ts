@@ -21,8 +21,7 @@ export function mergeClaudeMcpJson(filePath: string, port: number): void {
     mcpServers: {
       ...((existing.mcpServers as Record<string, unknown>) ?? {}),
       'agent-harness-kit': {
-        enable: true,
-        type: 'local',
+        type: 'stdio',
         command: 'npx',
         args: ['ahk', 'serve', '--port', String(port)],
       },
