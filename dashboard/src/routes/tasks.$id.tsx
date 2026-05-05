@@ -1,10 +1,12 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk, formatDate, formatDuration } from '@/lib/api';
-import { StatusBadge } from '@/components/shared/status-badge';
 import { AgentBadge } from '@/components/shared/agent-badge';
+import { ErrorState } from '@/components/shared/error-state';
+import { LoadingState } from '@/components/shared/loading-state';
 import { OperationBadge } from '@/components/shared/operation-badge';
 import { PageHeader } from '@/components/shared/page-header';
+import { StatusBadge } from '@/components/shared/status-badge';
 import {
   ActionCard,
   SectionTitle,
@@ -27,7 +29,7 @@ function TaskDetailPage() {
   });
 
   if (isLoading) return <LoadingState />;
-  if (isError || !task) return <ErrorState />;
+  if (isError || !task) return <ErrorState message="Task not found" backTo="/tasks" backLabel="← Back to tasks" />;
 
   const doneCount = task.acceptance.filter((a) => a.met).length;
 
@@ -168,20 +170,3 @@ function TaskDetailPage() {
   );
 }
 
-function LoadingState() {
-  return <div className="p-6 font-mono text-xs text-neutral-600">Loading…</div>;
-}
-
-function ErrorState() {
-  return (
-    <div className="p-6">
-      <Link
-        to="/tasks"
-        className="font-mono text-xs text-neutral-600 hover:text-neutral-400"
-      >
-        ← Back to tasks
-      </Link>
-      <p className="font-mono text-xs text-red-400 mt-4">Task not found</p>
-    </div>
-  );
-}

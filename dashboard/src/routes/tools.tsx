@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk, formatDate } from '@/lib/api';
 import { AgentBadge } from '@/components/shared/agent-badge';
+import { EmptyTableRow } from '@/components/shared/empty-table-row';
+import { LoadingTableRow } from '@/components/shared/loading-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { RecentTool } from '@/schema/api';
 
@@ -37,6 +39,7 @@ function ToolsPage() {
           {topTools.isLoading && (
             <p className="font-mono text-xs text-neutral-600">Loading…</p>
           )}
+
           <div className="space-y-1.5">
             {(topTools.data ?? []).map(({ tool_name, uses }) => (
               <div key={tool_name} className="flex items-center gap-3">
@@ -85,28 +88,12 @@ function ToolsPage() {
               </tr>
             </thead>
             <tbody>
-              {recentTools.isLoading && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center font-mono text-xs text-neutral-600"
-                  >
-                    Loading…
-                  </td>
-                </tr>
-              )}
+              {recentTools.isLoading && <LoadingTableRow cols={6} />}
               {(recentTools.data ?? []).map((t) => (
                 <RecentToolRow key={t.id} tool={t} />
               ))}
               {!recentTools.isLoading && recentTools.data?.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center font-mono text-xs text-neutral-600"
-                  >
-                    No recent calls
-                  </td>
-                </tr>
+                <EmptyTableRow cols={6} message="No recent calls" />
               )}
             </tbody>
           </table>

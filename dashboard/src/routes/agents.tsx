@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk } from '@/lib/api';
 import { AgentBadge } from '@/components/shared/agent-badge';
+import { LoadingState } from '@/components/shared/loading-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { AgentStat } from '@/schema/api';
 
@@ -9,21 +10,10 @@ export const Route = createFileRoute('/agents')({
   component: AgentsPage,
 });
 
-const AGENT_ORDER = ['lead', 'explorer', 'builder', 'reviewer'];
-
 function AgentsPage() {
   const { data: agents = [], isLoading } = useQuery({
     queryKey: qk.agentStats,
     queryFn: api.agentStats,
-  });
-
-  const sorted = [...agents].sort((a, b) => {
-    const ai = AGENT_ORDER.indexOf(a.agent);
-    const bi = AGENT_ORDER.indexOf(b.agent);
-    if (ai === -1 && bi === -1) return 0;
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
   });
 
   return (
@@ -31,24 +21,22 @@ function AgentsPage() {
       <PageHeader title="Agents" subtitle="Activity breakdown per agent role" />
 
       <div className="p-6 space-y-4">
-        {isLoading && (
-          <p className="font-mono text-xs text-neutral-600">Loading…</p>
-        )}
+        {isLoading && <LoadingState />}
 
         <div className="grid grid-cols-2 gap-4">
-          {sorted.map((a) => (
+          {agents.map((a) => (
             <AgentCard key={a.agent} stat={a} />
           ))}
         </div>
 
-        {sorted.length === 0 && !isLoading && (
+        {agents.length === 0 && !isLoading && (
           <p className="font-mono text-xs text-neutral-600">
             No agent activity yet.
           </p>
         )}
 
         {/* All actions table */}
-        {sorted.length > 0 && (
+        {agents.length > 0 && (
           <div className="mt-6">
             <h2 className="font-mono text-xs text-neutral-500 uppercase tracking-wider mb-3">
               Summary Table
@@ -74,7 +62,7 @@ function AgentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((a) => (
+                {agents.map((a) => (
                   <tr
                     key={a.agent}
                     className="border-b border-[#1f1f1f] hover:bg-[#0a0a0a] transition-colors"

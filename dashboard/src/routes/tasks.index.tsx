@@ -2,9 +2,11 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, qk, formatDate } from '@/lib/api';
-import { StatusBadge } from '@/components/shared/status-badge';
 import { AgentBadge } from '@/components/shared/agent-badge';
+import { EmptyTableRow } from '@/components/shared/empty-table-row';
+import { LoadingTableRow } from '@/components/shared/loading-state';
 import { PageHeader } from '@/components/shared/page-header';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { TaskSummary } from '@/schema/api';
 
 export const Route = createFileRoute('/tasks/')({
@@ -78,29 +80,11 @@ function Tasks() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-8 text-center font-mono text-xs text-neutral-600"
-                >
-                  Loading…
-                </td>
-              </tr>
-            )}
+            {isLoading && <LoadingTableRow cols={7} />}
             {filtered.map((t) => (
               <TaskRow key={t.id} task={t} />
             ))}
-            {!isLoading && filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-8 text-center font-mono text-xs text-neutral-600"
-                >
-                  No tasks
-                </td>
-              </tr>
-            )}
+            {!isLoading && filtered.length === 0 && <EmptyTableRow cols={7} message="No tasks" />}
           </tbody>
         </table>
       </div>

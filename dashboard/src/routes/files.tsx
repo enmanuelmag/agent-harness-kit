@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, qk, formatDate } from '@/lib/api';
 import { AgentBadge } from '@/components/shared/agent-badge';
+import { EmptyTableRow } from '@/components/shared/empty-table-row';
+import { LoadingTableRow } from '@/components/shared/loading-state';
 import { OperationBadge } from '@/components/shared/operation-badge';
 import { PageHeader } from '@/components/shared/page-header';
 import { RecentFile } from '@/schema/api';
@@ -54,16 +56,7 @@ function FilesPage() {
               </tr>
             </thead>
             <tbody>
-              {topFiles.isLoading && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center font-mono text-xs text-neutral-600"
-                  >
-                    Loading…
-                  </td>
-                </tr>
-              )}
+              {topFiles.isLoading && <LoadingTableRow cols={6} />}
               {(topFiles.data ?? []).map((f) => (
                 <tr
                   key={f.file_path}
@@ -90,14 +83,7 @@ function FilesPage() {
                 </tr>
               ))}
               {!topFiles.isLoading && topFiles.data?.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center font-mono text-xs text-neutral-600"
-                  >
-                    No file activity yet
-                  </td>
-                </tr>
+                <EmptyTableRow cols={6} message="No file activity yet" />
               )}
             </tbody>
           </table>
@@ -124,28 +110,12 @@ function FilesPage() {
               </tr>
             </thead>
             <tbody>
-              {recentFiles.isLoading && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center font-mono text-xs text-neutral-600"
-                  >
-                    Loading…
-                  </td>
-                </tr>
-              )}
+              {recentFiles.isLoading && <LoadingTableRow cols={6} />}
               {(recentFiles.data ?? []).map((f) => (
                 <RecentFileRow key={f.id} file={f} />
               ))}
               {!recentFiles.isLoading && recentFiles.data?.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center font-mono text-xs text-neutral-600"
-                  >
-                    No recent operations
-                  </td>
-                </tr>
+                <EmptyTableRow cols={6} message="No recent operations" />
               )}
             </tbody>
           </table>
