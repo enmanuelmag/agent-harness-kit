@@ -503,6 +503,7 @@ Types: `feat fix chore refactor docs test perf style build ci revert`
 ## Roadmap
 
 - ✅ **`ahk dashboard`** — local web UI with real-time WebSocket updates. Shows tasks, action timelines, file activity, tool usage, and per-agent breakdowns. Run `ahk dashboard` in any initialized project.
+- **Open Telemetry integration** — emit OpenTelemetry spans for all agent actions, file operations, and tool calls. Enables distributed tracing and integration with any OT-compatible observability platform.
 - **Jira task adapter** — pull tasks directly from Jira instead of maintaining `feature_list.json` manually. The `tasks.adapter` config key is already wired for this.
 - **Linear task adapter** — same as Jira, for Linear.
 - **GitHub Issues adapter** — same, for GitHub Issues.
