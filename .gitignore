@@ -46,3 +46,6 @@ coverage/
 
 # agent-harness-kit runtime dirs (if testing locally inside this repo)
 .harness/
+.harness/harness.db
+.harness/harness.db-shm
+.harness/harness.db-wal
