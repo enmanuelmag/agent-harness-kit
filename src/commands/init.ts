@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
@@ -58,6 +59,17 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     })
     if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
     provider = val as Provider
+  }
+
+  // ─── Global installation option ──────────────────────────────────────────
+  let globalInstallation = false
+  const globalVal = await p.confirm({
+    message: 'Install globally (to home directory)?',
+    initialValue: false,
+  })
+  if (p.isCancel(globalVal)) { p.cancel('Cancelled.'); process.exit(0) }
+  if (globalVal) {
+    globalInstallation = true
   }
 
   // ─── Docs path ────────────────────────────────────────────────────────────
@@ -133,7 +145,16 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     const config = applyConfigDefaults({ name, description, provider, docsPath, tasksAdapter })
     const materializer = getMaterializer(provider)
 
-    // Write config file
+    // Write config file - determine if we're installing globally
+    let installDir = cwd
+    if (globalInstallation) {
+      if (provider === 'claude-code') {
+        installDir = join(homedir(), '.claude')
+      } else {
+        installDir = join(homedir(), '.config', 'opencode')
+      }
+    }
+
     const configContent = configTs({
       name,
       description,
@@ -142,16 +163,16 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       tasksAdapter,
       port: config.tools.mcp.port,
     })
-    writeFileSync(join(cwd, 'agent-harness-kit.config.ts'), configContent, 'utf8')
+    writeFileSync(join(installDir, 'agent-harness-kit.config.ts'), configContent, 'utf8')
 
     // Create .harness dir
-    mkdirSync(join(cwd, config.storage.dir), { recursive: true })
+    mkdirSync(join(installDir, config.storage.dir), { recursive: true })
 
     // Initialize SQLite DB
-    const db = openDB(config, cwd)
+    const db = openDB(config, installDir)
 
     // Scaffold provider-specific files
-    await materializer.scaffold(config, { cwd, firstTask })
+    await materializer.scaffold(config, { cwd: installDir, firstTask })
 
     // Seed first task into DB if provided
     if (firstTask) {
@@ -172,7 +193,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     process.exit(1)
   }
 
-  // ─── Summary ──────────────────────────────────────────────────────────────
+  const agentHarnessKitDir = globalInstallation ? 'home directory' : 'current directory'
+  console.log(pc.green(`✓ Scaffolded harness in ${agentHarnessKitDir}`))
+
+  // ─── Summary ─────────────────────────────────────────────────────────────-
   const agentsDir = provider === 'claude-code' ? '.claude/agents/' : '.opencode/agents/'
   const mcpFile = provider === 'claude-code' ? '.claude/mcp.json' : './opencode.json'
 
@@ -192,4 +216,3 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.cyan('→') + ` Edit ${pc.cyan('health.sh')} with your project checks`)
   console.log(pc.cyan('→') + ` ${pc.cyan('ahk task add')} to queue work for agents`)
 }
-
