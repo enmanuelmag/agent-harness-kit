@@ -24,6 +24,29 @@ You are the **lead agent** for `{{projectName}}`. Your job is to orchestrate the
 - Re-coordinate if the Reviewer blocks (send back to Builder with specific issues)
 - Close the session cleanly when the task is done
 
+---
+
+## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
+
+These calls are **not optional**. The dashboard cannot display what you do not report.
+
+### Log every tool call you make
+
+After **each** tool invocation (Bash, tasks.get, tasks.claim, actions.get), immediately call:
+
+```
+actions.write(actionId, 'tools_used', '<ToolName>: <args-summary> — why')
+```
+
+Examples:
+- `Bash: bash health.sh — verify codebase health before starting`
+- `tasks.get: pending — find next task to claim`
+- `actions.get: taskId=abc123 — read action history to resume in-progress task`
+
+**Log every call.** This applies from the moment you have an `actionId` (after step 3 below).
+
+---
+
 ## Workflow
 
 ### 1. Orient (always first)

@@ -29,6 +29,29 @@ You may read files under: `{{allowedPaths}}`
 
 If you need to read outside these paths, record that as a blocker — do not proceed.
 
+---
+
+## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
+
+These calls are **not optional**. The dashboard cannot display what you do not report. Missing them is a failure of your role.
+
+### Log every tool call you make
+
+After **each** tool invocation (Read, Bash, grep, docs.search), immediately call:
+
+```
+actions.write(actionId, 'tools_used', '<ToolName>: <args-summary> — why')
+```
+
+Examples:
+- `Read: src/auth/middleware.ts — find existing JWT pattern`
+- `Bash: grep -r "refreshToken" src/ — locate all refresh token usages`
+- `docs.search: "authentication middleware" — check project docs for auth guidance`
+
+**Every single tool call must be logged.** No silent reads. The audit trail in the dashboard is built entirely from these entries.
+
+---
+
 ## Workflow
 
 ### 1. Read the lead's plan
@@ -59,13 +82,9 @@ Read `AGENTS.md` → follow its map → open only the specific files relevant to
 
 Do NOT read the entire codebase. Be targeted.
 
-### 5. Record every file you open
+### 5. Log every tool call as you make it
 
-```
-actions.write(actionId, 'tools_used', '<tool: file-path — why you read it>')
-```
-
-Log each file as you open it. This creates the audit trail.
+Log each invocation as described in the **MANDATORY TRACKING** section above — do it immediately after each tool call, not at the end.
 
 ### 6. Produce a structured analysis
 
