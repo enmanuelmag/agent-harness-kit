@@ -1,6 +1,6 @@
 {
   "name": "@cardor/agent-harness-kit",
-  "version": "0.16.8",
+  "version": "0.16.10",
   "description": "CLI scaffolding for multi-agent harness systems",
   "type": "module",
   "main": "./dist/index.js",
@@ -51,7 +51,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@cardor/agent-harness-kit": "^0.16.8",
+    "@cardor/agent-harness-kit": "^0.16.10",
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
     "@eslint-react/eslint-plugin": "^5.7.1",
