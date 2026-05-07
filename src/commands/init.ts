@@ -9,7 +9,7 @@ import { getMaterializer } from '@/core/materializer/index'
 import { slugify } from '@/core/materializer/scaffold-utils'
 import { configTs } from '@/core/materializer/templates'
 
-import { applyConfigDefaults } from './init-helpers'
+import { applyConfigDefaults, printWelcomeMessage } from './init-helpers'
 
 import type { Provider } from '@/types'
 
@@ -21,7 +21,8 @@ interface InitOptions {
 }
 
 export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
-  p.intro(pc.bold('agent-harness-kit — harness scaffolding'))
+  const projectName = flags.name || 'my-project'
+  printWelcomeMessage(projectName)
 
   // ─── Project name ────────────────────────────────────────────────────────
   let name: string
@@ -98,13 +99,13 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         { value: 'linear', label: 'Linear (coming soon)' },
       ],
     })
-    if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
+    if (p.isCancel(val)) { p.cancel('Cancelled'); process.exit(0) }
     tasksAdapter = val as string
   }
 
   // ─── Optional first task ──────────────────────────────────────────────────
   const addFirstTask = await p.confirm({ message: 'Add your first task now?', initialValue: true })
-  if (p.isCancel(addFirstTask)) { p.cancel('Cancelled.'); process.exit(0) }
+  if (p.isCancel(addFirstTask)) { p.cancel('Cancelled'); process.exit(0) }
 
   let firstTask: { title: string; description: string; acceptance: string[] } | undefined
 
@@ -113,14 +114,14 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       message: 'Task title',
       validate: (v) => (v.trim() ? undefined : 'Title is required'),
     })
-    if (p.isCancel(titleVal)) { p.cancel('Cancelled.'); process.exit(0) }
+    if (p.isCancel(titleVal)) { p.cancel('Cancelled'); process.exit(0) }
     const taskTitle = (titleVal as string).trim()
 
     const taskDescVal = await p.text({
       message: 'Task description',
       placeholder: 'What and why',
     })
-    if (p.isCancel(taskDescVal)) { p.cancel('Cancelled.'); process.exit(0) }
+    if (p.isCancel(taskDescVal)) { p.cancel('Cancelled'); process.exit(0) }
     const taskDesc = (taskDescVal as string).trim()
 
     const acceptance: string[] = []
