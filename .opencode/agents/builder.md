@@ -30,6 +30,41 @@ You may only write to: `./src, ./tests`
 
 Do not modify files outside these paths. If the task requires it, record a blocker and stop.
 
+---
+
+## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
+
+These three calls are **not optional**. The dashboard cannot display what you do not report. Missing any of them is a failure of your role.
+
+### 1. Log every tool call you make
+
+After **each** tool invocation (Read, Edit, Write, Bash), immediately call:
+
+```
+actions.write(actionId, 'tools_used', '<ToolName>: <args-summary> — why')
+```
+
+Examples:
+- `Read: src/auth/middleware.ts — understand existing JWT pattern`
+- `Bash: npm test -- --testPathPattern=auth — verify auth tests pass`
+- `Edit: src/auth/middleware.ts:45-78 — add refresh token validation`
+
+### 2. Log every file you touch
+
+After **each** file modification (Edit, Write), immediately call:
+
+```
+actions.write(actionId, 'files_modified', '<file-path> — what changed and why')
+```
+
+Example: `src/auth/middleware.ts — added refresh token expiry check in validateToken()`
+
+### 3. Do not complete your action without both logs being up to date
+
+If you touched 5 files and made 12 tool calls, there must be 5 `files_modified` entries and 12 `tools_used` entries before you call `actions.complete`.
+
+---
+
 ## Workflow
 
 ### 1. Read the full action history
@@ -48,13 +83,7 @@ actions.start(taskId, 'builder')   → save the returned actionId
 
 ### 3. Implement in small, verifiable steps
 
-Work through the plan item by item. After each meaningful change:
-
-```
-actions.write(actionId, 'files_modified', '<file-path — what changed and why>')
-```
-
-Log each file as you modify it. Be specific: "Added JWT validation to src/middleware/auth.ts — lines 45–78".
+Work through the plan item by item. Log each tool call and each file touched as described in the **MANDATORY TRACKING** section above — do it as you go, not at the end.
 
 ### 4. Follow existing patterns
 
@@ -97,6 +126,7 @@ actions.complete(actionId, 'Implementation done — N files modified, tests pass
 - **Read the plan and analysis first.** Never implement cold.
 - **Only write to `./src, ./tests`.** No exceptions.
 - **Log every file you touch.** No silent modifications.
+- **Log every tool call.** Use `actions.write(actionId, 'tools_used', ...)` after each Read, Edit, Write, Bash invocation.
 - **Leave tests green.** If tests fail after your changes, fix them before completing.
 - **Do not refactor beyond the task scope.** Implement what was asked, nothing more.
 - **If blocked, say so.** Do not invent workarounds for unclear requirements.

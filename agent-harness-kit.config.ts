@@ -3,7 +3,7 @@ import { defineHarness } from '@cardor/agent-harness-kit'
 export default defineHarness({
   project: {
     name: 'agent-harness-kit',
-    description: 'CLI Tool to define agents role, harness pattern and MCP tools to orchestrate agent to take task in tandem',
+    description: 'A CLI tool to setup agent harness scafollding',
     docsPath: './docs',
   },
 

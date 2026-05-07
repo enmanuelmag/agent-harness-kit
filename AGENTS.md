@@ -4,7 +4,7 @@
 
 ## Project
 
-**agent-harness-kit** — CLI Tool to define agents role, harness pattern and MCP tools to orchestrate agent to take task in tandem
+**agent-harness-kit** — A CLI tool to setup agent harness scafollding
 
 ## Health check (run before starting)
 

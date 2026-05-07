@@ -12,6 +12,7 @@ import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskList } from '@/commands/task/index'
 import { pkg } from '@/core/package-data'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
+import { runReset } from '@/commands/reset'
 
 const cwd = process.cwd()
 
@@ -135,6 +136,17 @@ program
   .option('--output <path>', 'Output file path (default: stdout)')
   .action(async (opts) => {
     await runExport(cwd, opts)
+  })
+
+
+// ─── reset ────────────────────────────────────────────────────────────────────
+program
+  .command('reset')
+  .description('Reset/clear harness data (DB, feature list, agent files)')
+  .option('--force', 'Skip confirmation prompts')
+  .option('--provider <claude-code|opencode>', 'Reset agent MD files for specified provider')
+  .action(async (opts) => {
+    await runReset(cwd, opts)
   })
 
 program.hook('postAction', async () => {
