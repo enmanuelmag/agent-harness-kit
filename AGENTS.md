@@ -27,15 +27,21 @@ If it exits non-zero, stop and report the issue. Do not proceed with tasks until
 The harness exposes tools via MCP server on port 3742. Use these instead of reading files directly.
 
 ```
-actions.start      taskId agent          → start an action, returns actionId
-actions.write      actionId section text → record a section (result, tools_used, ...)
-actions.complete   actionId summary      → close the action
-actions.get        taskId               → full action history for a task
-tasks.get          [status]             → list tasks (pending | in_progress | done | blocked)
-tasks.claim        id                   → atomically claim a pending task
-tasks.update       id status            → change task status
-docs.search        query                → search ./docs for relevant content
+actions.start        taskId agent            → start an action, returns actionId
+actions.write        actionId section text   → record a section (result, tools_used, ...)
+actions.complete     actionId summary        → close the action
+actions.get          taskId                  → full action history for a task
+actions.record_tool  actionId toolName       → record a tool call (populates Tools dashboard)
+actions.record_file  actionId filePath op    → record a file touched (populates Files dashboard)
+tasks.get            [status]               → list tasks (pending | in_progress | done | blocked)
+tasks.claim          id                     → atomically claim a pending task
+tasks.update         id status              → change task status
+docs.search          query                  → search ./docs for relevant content
 ```
+
+> **Important:** `actions.record_tool` and `actions.record_file` are the **only** ways to populate
+> the Tools and Files dashboards. Call `record_tool` for every significant tool invocation and
+> `record_file` for every file you read, create, modify, or delete.
 
 ## Workflow
 

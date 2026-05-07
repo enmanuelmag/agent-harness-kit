@@ -250,6 +250,17 @@ export class HarnessDB {
     return this.getAction(actionId)!
   }
 
+  closeOrphanedActions(taskId: number): number {
+    const now = new Date().toISOString()
+    const result = this.db
+      .prepare(
+        `UPDATE actions SET status = 'completed', completed_at = ?, summary = 'Auto-closed: task marked done'
+         WHERE task_id = ? AND status = 'in_progress'`
+      )
+      .run(now, taskId)
+    return (result as { changes: number }).changes
+  }
+
   getAction(actionId: string): ActionRow | null {
     return (
       (this.db.prepare(`SELECT * FROM actions WHERE id = ?`).get(actionId) as unknown as ActionRow) ?? null

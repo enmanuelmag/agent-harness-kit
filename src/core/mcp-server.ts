@@ -155,6 +155,21 @@ const TOOLS = [
       required: ['criterionId'],
     },
   },
+  {
+    name: 'actions.record_tool',
+    description:
+      'Record a tool call made during an action. This is the only way to populate the Tools dashboard. Call once per tool invocation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actionId: { type: 'string', description: 'UUID returned by actions.start' },
+        toolName: { type: 'string', description: 'Name of the tool that was called (e.g. Read, Bash, Edit)' },
+        argsJson: { type: 'string', description: 'Optional JSON string of the arguments passed to the tool' },
+        resultSummary: { type: 'string', description: 'Optional short summary of the tool result' },
+      },
+      required: ['actionId', 'toolName'],
+    },
+  },
 ] as const
 
 // ─── Server ───────────────────────────────────────────────────────────────────
@@ -248,6 +263,9 @@ async function dispatch(
     case 'tasks.update': {
       const id = num(args, 'id')
       const status = str(args, 'status') as TaskStatus
+      if (status === 'done') {
+        db.closeOrphanedActions(id)
+      }
       const task = db.updateTaskStatus(id, status)
       return ok(JSON.stringify(task))
     }
@@ -271,6 +289,15 @@ async function dispatch(
       const criterionId = num(args, 'criterionId')
       db.markAcceptanceMet(criterionId)
       return ok(JSON.stringify({ criterionId, met: true }))
+    }
+
+    case 'actions.record_tool': {
+      const actionId = str(args, 'actionId')
+      const toolName = str(args, 'toolName')
+      const argsJson = args['argsJson'] as string | undefined
+      const resultSummary = args['resultSummary'] as string | undefined
+      db.recordTool(actionId, toolName, argsJson, resultSummary)
+      return ok(JSON.stringify({ actionId, toolName, recorded: true }))
     }
 
     default:
