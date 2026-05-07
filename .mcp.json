@@ -1,0 +1,20 @@
+{
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  "default_agent": "lead",
+  "mcpServers": {
+    "agent-harness-kit": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "ahk",
+        "serve",
+        "--port",
+        "3742"
+      ]
+    }
+  }
+}
