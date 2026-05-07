@@ -5,8 +5,8 @@ import { mergeClaudeMcpJson } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile } from './scaffold-utils'
 import { agentBuilder, agentExplorer, agentLead, agentReviewer, agentsMd, featureListJson, HEALTH_SH } from './templates'
 
-import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 import type { Materializer } from './index'
+import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 
 export class ClaudeCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
