@@ -6,13 +6,13 @@ import { runExport } from '@/commands/export'
 import { runHealth } from '@/commands/health'
 import { runInit } from '@/commands/init'
 import { runMigrate } from '@/commands/migrate'
+import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
 import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskList } from '@/commands/task/index'
 import { pkg } from '@/core/package-data'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
-import { runReset } from '@/commands/reset'
 
 const cwd = process.cwd()
 
