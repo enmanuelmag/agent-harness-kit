@@ -9,7 +9,7 @@ import { getMaterializer } from '@/core/materializer/index'
 import { slugify } from '@/core/materializer/scaffold-utils'
 import { configTs } from '@/core/materializer/templates'
 
-import { applyConfigDefaults, printWelcomeMessage } from './init-helpers'
+import { applyConfigDefaults, printWelcomeMessage, readProjectNameFromPackageJson } from './init-helpers'
 
 import type { Provider } from '@/types'
 
@@ -21,7 +21,8 @@ interface InitOptions {
 }
 
 export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
-  const projectName = flags.name || 'my-project'
+  const detectedName = flags.name ?? readProjectNameFromPackageJson(cwd)
+  const projectName = detectedName || 'my-project'
   printWelcomeMessage(projectName)
 
   // ─── Project name ────────────────────────────────────────────────────────

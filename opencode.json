@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  "default_agent": "lead",
+  "mcp": {
+    "agent-harness-kit": {
+      "enabled": true,
+      "type": "local",
+      "command": [
+        "npx",
+        "ahk",
+        "serve",
+        "--port",
+        "3742"
+      ]
+    }
+  }
+}

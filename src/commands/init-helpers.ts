@@ -1,6 +1,26 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import pc from 'picocolors'
 
 import type { HarnessConfig, Provider } from '@/types'
+
+/**
+ * Read the `name` field from a `package.json` in the given directory.
+ * Returns `null` if the file doesn't exist, is malformed, or lacks a valid `name`.
+ */
+export function readProjectNameFromPackageJson(cwd: string): string | null {
+  try {
+    const pkgPath = join(cwd, 'package.json')
+    if (!existsSync(pkgPath)) return null
+    const content = readFileSync(pkgPath, 'utf8')
+    const pkg = JSON.parse(content)
+    const name = pkg?.name
+    if (typeof name === 'string' && name.trim()) return name.trim()
+    return null
+  } catch {
+    return null
+  }
+}
 
 export function applyConfigDefaults(params: {
   name: string

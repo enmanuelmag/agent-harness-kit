@@ -79,14 +79,17 @@ If it exits non-zero, stop and report the issue. Do not proceed with tasks until
 The harness exposes tools via MCP server on port ${port}. Use these instead of reading files directly.
 
 \`\`\`
-actions.start      taskId agent          → start an action, returns actionId
-actions.write      actionId section text → record a section (result, tools_used, ...)
-actions.complete   actionId summary      → close the action
-actions.get        taskId               → full action history for a task
-tasks.get          [status]             → list tasks (pending | in_progress | done | blocked)
-tasks.claim        id                   → atomically claim a pending task
-tasks.update       id status            → change task status
-docs.search        query                → search ${docsPath} for relevant content
+actions.start        taskId agent                           → start an action, returns actionId
+actions.write        actionId section text                  → record a section (result, blockers, ...)
+actions.record_tool  actionId toolName [argsJson] [summary] → log a tool call to the Tools dashboard
+actions.record_file  actionId filePath operation [notes]   → log a file touch to the Files dashboard
+actions.complete     actionId summary                       → close the action
+actions.get          taskId                                 → full action history for a task
+tasks.get            [status]                               → list tasks (pending | in_progress | done | blocked)
+tasks.claim          id                                     → atomically claim a pending task
+tasks.update         id status                              → change task status
+tasks.acceptance.update criterionId                        → mark an acceptance criterion as met
+docs.search          query                                  → search ${docsPath} for relevant content
 \`\`\`
 
 ## Workflow
@@ -99,7 +102,8 @@ docs.search        query                → search ${docsPath} for relevant cont
 
 2. WORK  (lead → explorer → builder → reviewer)
    - Each agent calls actions.start(taskId, agentName) → actionId
-   - Records work with actions.write(actionId, section, content)
+   - After EVERY tool call: actions.record_tool(actionId, toolName, args, summary)
+   - After EVERY file change: actions.record_file(actionId, filePath, operation, notes)
    - Closes with actions.complete(actionId, summary)
 
 3. CLOSE
