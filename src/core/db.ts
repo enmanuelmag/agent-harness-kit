@@ -297,7 +297,7 @@ export class HarnessDB {
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 export async function openDB(config: HarnessConfig, cwd: string): Promise<HarnessDB> {
-  const dbConfig = config.database ?? { type: 'sqlite' as const }
+  const dbConfig = config.database
   let driver: DBDriver
 
   if (dbConfig.type === 'postgres') {
@@ -308,8 +308,10 @@ export async function openDB(config: HarnessConfig, cwd: string): Promise<Harnes
     driver = new MySQLDriver(dbConfig)
   } else {
     const { SQLiteDriver } = await import('./drivers/sqlite')
-    const dbPath = resolve(cwd, config.storage.dbPath)
-    driver = new SQLiteDriver(dbPath)
+    if (dbConfig.type !== 'sqlite') {
+      throw new Error('Invalid database type')
+    }
+    driver = new SQLiteDriver(resolve(cwd, dbConfig.path))
   }
 
   await driver.ensureSchema()

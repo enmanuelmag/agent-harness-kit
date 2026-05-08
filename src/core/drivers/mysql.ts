@@ -1,7 +1,7 @@
 import mysql, { type ExecuteValues } from 'mysql2/promise'
 
 import type { DBDriver } from './types'
-import type { DatabaseConfig } from '@/types'
+import type { RemoteDBConfig } from '@/types'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS tasks (
@@ -79,19 +79,8 @@ type MySQLPool = mysql.Pool
 export class MySQLDriver implements DBDriver {
   private pool: MySQLPool
 
-  constructor(config: DatabaseConfig) {
-    if (config.connectionString) {
-      this.pool = mysql.createPool(config.connectionString)
-    } else {
-      this.pool = mysql.createPool({
-        host: config.host ?? 'localhost',
-        port: config.port ?? 3306,
-        user: config.user,
-        password: config.password,
-        database: config.database,
-        multipleStatements: true,
-      })
-    }
+  constructor(config: RemoteDBConfig) {
+    this.pool = mysql.createPool(config.connectionString)
   }
 
   async ensureSchema(): Promise<void> {

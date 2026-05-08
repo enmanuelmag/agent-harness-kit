@@ -248,9 +248,13 @@ export default defineHarness({
     custom:   [],
   },
 
+  // SQLite (default). Switch to postgres/mysql by changing database.type.
+  // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
+  // database: { type: 'mysql',    connectionString: process.env.DATABASE_URL },
+  database: { type: 'sqlite', path: '.harness/harness.db' },
+
   storage: {
     dir:    '.harness',
-    dbPath: '.harness/harness.db',
     tasks:  { adapter: '${params.tasksAdapter}' },
     sections: {
       toolsUsed:     true,

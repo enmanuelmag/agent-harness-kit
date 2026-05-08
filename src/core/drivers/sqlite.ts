@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 import { lastInsertId, openSQLite, type SQLiteDB } from '../sqlite-adapter'
@@ -77,6 +77,16 @@ export class SQLiteDriver implements DBDriver {
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true })
+    // Remove stale WAL/SHM files left by a crashed session — they cause SQLITE_IOERR.
+    // A 0-byte WAL alongside a non-empty SHM means the last checkpoint never completed.
+    if (existsSync(dbPath)) {
+      const shm = `${dbPath}-shm`
+      const wal = `${dbPath}-wal`
+      if (existsSync(shm) && existsSync(wal) && statSync(wal).size === 0) {
+        rmSync(shm, { force: true })
+        rmSync(wal, { force: true })
+      }
+    }
     this.db = openSQLite(dbPath)
     this.db.exec('PRAGMA journal_mode = WAL')
     this.db.exec('PRAGMA foreign_keys = ON')

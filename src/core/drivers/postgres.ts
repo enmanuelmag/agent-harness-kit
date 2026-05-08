@@ -1,7 +1,7 @@
 import postgres from 'postgres'
 
 import type { DBDriver } from './types'
-import type { DatabaseConfig } from '@/types'
+import type { RemoteDBConfig } from '@/types'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS tasks (
@@ -79,18 +79,8 @@ function toPositional(sql: string): string {
 export class PostgresDriver implements DBDriver {
   private sql: postgres.Sql
 
-  constructor(config: DatabaseConfig) {
-    if (config.connectionString) {
-      this.sql = postgres(config.connectionString)
-    } else {
-      this.sql = postgres({
-        host: config.host ?? 'localhost',
-        port: config.port ?? 5432,
-        user: config.user,
-        password: config.password,
-        database: config.database,
-      })
-    }
+  constructor(config: RemoteDBConfig) {
+    this.sql = postgres(config.connectionString)
   }
 
   async ensureSchema(): Promise<void> {

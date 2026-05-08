@@ -57,9 +57,9 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
       custom: [],
       ...c.agents,
     } as HarnessConfig['agents'],
+    database: c.database ?? { type: 'sqlite' as const, path: '.harness/harness.db' },
     storage: {
       dir: '.harness',
-      dbPath: '.harness/harness.db',
       tasks: { adapter: 'local' as const },
       sections: {
         toolsUsed: true,
