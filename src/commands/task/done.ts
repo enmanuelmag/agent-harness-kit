@@ -23,12 +23,12 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
     }
   }
 
-  const db = openDB(config, cwd)
+  const db = await openDB(config, cwd)
 
   try {
     const parsed = parseInt(idOrSlug, 10)
     const isId = !isNaN(parsed)
-    const task = isId ? db.getTaskById(parsed) : db.getTaskBySlug(idOrSlug)
+    const task = isId ? await db.getTaskById(parsed) : await db.getTaskBySlug(idOrSlug)
 
     if (!task) {
       console.error(pc.red(`Task not found: ${idOrSlug}`))
@@ -40,11 +40,11 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
       return
     }
 
-    db.updateTaskStatus(task.id, 'done')
-    db.writeFeatureList(cwd)
+    await db.updateTaskStatus(task.id, 'done')
+    await db.writeFeatureList(cwd)
 
     console.log(pc.green(`✓ Task #${task.id} — ${task.slug} marked as done`))
   } finally {
-    db.close()
+    await db.close()
   }
 }

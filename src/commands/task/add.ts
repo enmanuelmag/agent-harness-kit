@@ -35,12 +35,12 @@ export async function runTaskAdd(cwd: string): Promise<void> {
 
   try {
     const config = await loadConfig(cwd)
-    const db = openDB(config, cwd)
+    const db = await openDB(config, cwd)
 
     const slug = slugify(title)
-    const task = db.addTask({ slug, title, description: description || undefined, acceptance })
-    db.writeFeatureList(cwd)
-    db.close()
+    const task = await db.addTask({ slug, title, description: description || undefined, acceptance })
+    await db.writeFeatureList(cwd)
+    await db.close()
 
     spinner.stop('')
     console.log(pc.green(`✓ Task #${task.id} added — ${task.slug} (pending)`))

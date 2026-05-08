@@ -20,7 +20,7 @@ const STATUS_COLOR: Record<string, (s: string) => string> = {
 
 export async function runTaskList(cwd: string, opts: TaskListOptions): Promise<void> {
   const config = await loadConfig(cwd)
-  const db = openDB(config, cwd)
+  const db = await openDB(config, cwd)
 
   try {
     const validStatuses: TaskStatus[] = ['pending', 'in_progress', 'done', 'blocked']
@@ -29,7 +29,7 @@ export async function runTaskList(cwd: string, opts: TaskListOptions): Promise<v
         ? (opts.status as TaskStatus)
         : undefined
 
-    const tasks = filterStatus ? db.getTasks(filterStatus) : db.getTasks()
+    const tasks = filterStatus ? await db.getTasks(filterStatus) : await db.getTasks()
 
     if (opts.json) {
       console.log(JSON.stringify(tasks, null, 2))
@@ -53,6 +53,6 @@ export async function runTaskList(cwd: string, opts: TaskListOptions): Promise<v
 
     console.log(table.toString())
   } finally {
-    db.close()
+    await db.close()
   }
 }
