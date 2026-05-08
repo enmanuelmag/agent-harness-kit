@@ -17,11 +17,11 @@ export async function runExport(cwd: string, opts: ExportOptions): Promise<void>
   }
 
   const config = await loadConfig(cwd)
-  const db = openDB(config, cwd)
+  const db = await openDB(config, cwd)
 
   try {
     if (opts.json) {
-      const data = db.exportJson()
+      const data = await db.exportJson()
       const out = JSON.stringify(data, null, 2) + '\n'
       if (opts.output) {
         writeFileSync(opts.output, out, 'utf8')
@@ -36,6 +36,6 @@ export async function runExport(cwd: string, opts: ExportOptions): Promise<void>
       process.exit(1)
     }
   } finally {
-    db.close()
+    await db.close()
   }
 }

@@ -172,7 +172,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     mkdirSync(join(installDir, config.storage.dir), { recursive: true })
 
     // Initialize SQLite DB
-    const db = openDB(config, installDir)
+    const db = await openDB(config, installDir)
 
     // Scaffold provider-specific files
     await materializer.scaffold(config, { cwd: installDir, firstTask })
@@ -180,7 +180,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     // Seed first task into DB if provided
     if (firstTask) {
       const slug = slugify(firstTask.title)
-      db.addTask({
+      await db.addTask({
         slug,
         title: firstTask.title,
         description: firstTask.description,
@@ -188,7 +188,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       })
     }
 
-    db.close()
+    await db.close()
     spinner.stop('')
   } catch (err) {
     spinner.stop('Failed')

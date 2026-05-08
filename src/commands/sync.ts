@@ -17,7 +17,7 @@ export async function runSync(cwd: string, opts: SyncOptions): Promise<void> {
   const direction = opts.direction ?? 'both'
   const featureListPath = resolve(join(cwd, config.storage.dir, 'feature_list.json'))
 
-  const db = openDB(config, cwd)
+  const db = await openDB(config, cwd)
 
   try {
     if (direction === 'in' || direction === 'both') {
@@ -25,16 +25,16 @@ export async function runSync(cwd: string, opts: SyncOptions): Promise<void> {
     }
 
     if (direction === 'out' || direction === 'both') {
-      syncOut(db, cwd, opts.dryRun ?? false)
+      await syncOut(db, cwd, opts.dryRun ?? false)
     }
   } finally {
-    db.close()
+    await db.close()
   }
 }
 
 async function syncIn(
   featureListPath: string,
-  db: ReturnType<typeof openDB>,
+  db: Awaited<ReturnType<typeof openDB>>,
   dryRun: boolean
 ): Promise<void> {
   if (!existsSync(featureListPath)) {
@@ -53,28 +53,28 @@ async function syncIn(
   if (dryRun) {
     console.log(pc.bold('Dry run — in-sync (feature_list.json → SQLite):'))
     for (const t of seeds) {
-      const existing = db.getTaskBySlug(t.slug)
+      const existing = await db.getTaskBySlug(t.slug)
       console.log(`  ${existing ? pc.dim('skip') : pc.green('add ')} ${t.slug}`)
     }
     return
   }
 
-  const result = db.syncFromFeatureList(seeds)
+  const result = await db.syncFromFeatureList(seeds)
   console.log(pc.green(`✓ In-sync: ${result.added} added, ${result.skipped} already existed`))
 }
 
-function syncOut(
-  db: ReturnType<typeof openDB>,
+async function syncOut(
+  db: Awaited<ReturnType<typeof openDB>>,
   cwd: string,
   dryRun: boolean
-): void {
+): Promise<void> {
   if (dryRun) {
-    const tasks = db.getTasks()
+    const tasks = await db.getTasks()
     console.log(pc.bold('Dry run — out-sync (SQLite → feature_list.json):'))
     console.log(`  ${tasks.length} tasks would be written`)
     return
   }
 
-  db.writeFeatureList(cwd)
+  await db.writeFeatureList(cwd)
   console.log(pc.green('✓ Out-sync: feature_list.json updated'))
 }

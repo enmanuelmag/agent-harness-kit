@@ -17,18 +17,20 @@ const STATUS_COLOR: Record<string, (s: string) => string> = {
 
 export async function runStatus(cwd: string, opts: StatusOptions): Promise<void> {
   const config = await loadConfig(cwd)
-  const db = openDB(config, cwd)
+  const db = await openDB(config, cwd)
 
   try {
-    const tasks = db.getTasks()
-    const summary = db.getStatusSummary()
+    const tasks = await db.getTasks()
+    const summary = await db.getStatusSummary()
 
     if (opts.json) {
-      const actions = tasks.map((t) => ({
-        ...t,
-        actions: db.getActionsForTask(t.id),
-        acceptance: db.getTaskAcceptance(t.id),
-      }))
+      const actions = await Promise.all(
+        tasks.map(async (t) => ({
+          ...t,
+          actions: await db.getActionsForTask(t.id),
+          acceptance: await db.getTaskAcceptance(t.id),
+        })),
+      )
       console.log(JSON.stringify({ tasks: actions, summary }, null, 2))
       return
     }
@@ -63,7 +65,7 @@ export async function runStatus(cwd: string, opts: StatusOptions): Promise<void>
       console.log('')
       console.log(pc.bold('Active actions:'))
       for (const t of inProgress) {
-        const actions = db.getActionsForTask(t.id)
+        const actions = await db.getActionsForTask(t.id)
         const active = actions.filter((a) => a.status === 'in_progress')
         for (const a of active) {
           console.log(`  ${pc.cyan(a.agent.padEnd(10))} → task #${t.id} ${t.slug}`)
@@ -79,6 +81,6 @@ export async function runStatus(cwd: string, opts: StatusOptions): Promise<void>
     })
     console.log(pc.dim('Tasks — ') + parts.join(pc.dim(' | ')))
   } finally {
-    db.close()
+    await db.close()
   }
 }

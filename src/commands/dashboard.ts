@@ -15,8 +15,9 @@ interface DashboardOptions {
 
 export async function runDashboard(cwd: string, opts: DashboardOptions): Promise<void> {
   const config = await loadConfig(cwd)
-  const db = openDB(config, cwd)
-  const dbPath = resolve(cwd, config.storage.dbPath)
+  const db = await openDB(config, cwd)
+  const dbType = config.database?.type ?? 'sqlite'
+  const dbPath = dbType === 'sqlite' ? resolve(cwd, config.storage.dbPath) : null
   const staticPath = join(__dirname, 'dashboard-dist')
 
   const { url } = startDashboardServer(db, dbPath, staticPath, opts.port)
