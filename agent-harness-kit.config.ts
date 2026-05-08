@@ -3,41 +3,45 @@ import { defineHarness } from '@cardor/agent-harness-kit'
 export default defineHarness({
   project: {
     name: '@cardor/agent-harness-kit',
-    description: 'A CLI tool for agent harness scaffolding',
+    description: 'A CLI Tool to setup agent harness',
     docsPath: './docs',
   },
 
-  provider: 'claude-code',
+  provider: 'opencode',
 
   agents: {
-    lead: { instructionsPath: null },
+    lead:     { instructionsPath: null },
     explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'] },
-    builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
+    builder:  { instructionsPath: null, writablePaths: ['./src', './tests'] },
     reviewer: { instructionsPath: null },
-    custom: [],
+    custom:   [],
   },
 
+  // SQLite (default). Switch to postgres/mysql by changing database.type.
+  // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
+  // database: { type: 'mysql',    connectionString: process.env.DATABASE_URL },
+  database: { type: 'sqlite', path: '.harness/harness.db' },
+
   storage: {
-    dir: '.harness',
-    dbPath: '.harness/harness.db',
-    tasks: { adapter: 'local' },
+    dir:    '.harness',
+    tasks:  { adapter: 'local' },
     sections: {
-      toolsUsed: true,
+      toolsUsed:     true,
       filesModified: true,
-      result: true,
-      blockers: true,
-      nextSteps: false,
+      result:        true,
+      blockers:      true,
+      nextSteps:     false,
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
   },
 
   health: {
     scriptPath: './health.sh',
-    required: true,
+    required:   true,
   },
 
   tools: {
-    mcp: { enabled: true, port: 3742 },
+    mcp:     { enabled: true, port: 3742 },
     scripts: { enabled: true, outputDir: './.harness/scripts' },
   },
 })
