@@ -3,7 +3,7 @@ import { join, resolve } from 'path'
 
 import { mergeClaudeMcpJson } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile } from './scaffold-utils'
-import { agentBuilder, agentExplorer, agentLead, agentReviewer, agentsMd, featureListJson, HEALTH_SH } from './templates'
+import { agentBuilder, agentExplorer, agentLead, agentReviewer, agentsMd, claudeMd, featureListJson, HEALTH_SH } from './templates'
 
 import type { Materializer } from './index'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
@@ -18,8 +18,9 @@ export class ClaudeCodeMaterializer implements Materializer {
       writeFileSync(abs, content, { encoding: 'utf8', mode })
     }
 
-    // AGENTS.md — always overwrite (generated from config)
+    // AGENTS.md and CLAUDE.md — always overwrite (generated from config)
     write('AGENTS.md', agentsMd(config))
+    write('CLAUDE.md', claudeMd(config))
 
     // health.sh — only create if it doesn't exist
     if (!existsSync(join(cwd, 'health.sh'))) {
@@ -63,8 +64,9 @@ export class ClaudeCodeMaterializer implements Materializer {
       writeFileSync(abs, content, 'utf8')
     }
 
-    // build always regenerates AGENTS.md (it's derived from config)
+    // build always regenerates AGENTS.md and CLAUDE.md (derived from config)
     write('AGENTS.md', agentsMd(config))
+    write('CLAUDE.md', claudeMd(config))
 
     // Agent files: skip if customized, write if missing
     const projectName = config.project.name
