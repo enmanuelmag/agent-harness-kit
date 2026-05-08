@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/link-local.sh — Link the local build into another project for testing.
+# scripts/link-local.sh -- Link the local build into another project for testing.
 #
 # Usage:
 #   ./scripts/link-local.sh [target-project-path]
@@ -19,18 +19,18 @@ set -euo pipefail
 PACKAGE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET_DIR="${1:-}"
 
-# ── 1. Build ──────────────────────────────────────────────────────────────────
-echo "▶ Building package…"
+# -- 1. Build -----------------------------------------------------------------
+echo "==> Building package..."
 cd "$PACKAGE_DIR"
 npm run build
 
-# ── 2. Register globally ──────────────────────────────────────────────────────
-echo "▶ Registering with npm link…"
+# -- 2. Register globally -----------------------------------------------------
+echo "==> Registering with npm link..."
 npm link
 
 if [[ -z "$TARGET_DIR" ]]; then
   echo ""
-  echo "✓ Package registered globally."
+  echo "OK: Package registered globally."
   echo ""
   echo "  To link into a project, run inside that project:"
   echo "    npm link @cardor/agent-harness-kit"
@@ -40,24 +40,24 @@ if [[ -z "$TARGET_DIR" ]]; then
   exit 0
 fi
 
-# ── 3. Link into target project ───────────────────────────────────────────────
-ABS_TARGET="$(cd "$TARGET_DIR" && pwd)"
-echo "▶ Linking into $ABS_TARGET…"
-cd "$ABS_TARGET"
+# -- 3. Link into target project ----------------------------------------------
+ABS_TARGET="$(cd "${TARGET_DIR}" && pwd)"
+echo "==> Linking into ${ABS_TARGET}..."
+cd "${ABS_TARGET}"
 npm link @cardor/agent-harness-kit
 
-# ── 4. Smoke-test the binary ──────────────────────────────────────────────────
-echo "▶ Verifying ahk binary…"
+# -- 4. Smoke-test the binary -------------------------------------------------
+echo "==> Verifying ahk binary..."
 if npx ahk --version 2>/dev/null; then
   echo ""
-  echo "✓ Done. \`ahk\` is linked and working in $ABS_TARGET"
+  echo "OK: 'ahk' is linked and working in ${ABS_TARGET}"
   echo ""
   echo "  Try it:"
-  echo "    cd $ABS_TARGET"
+  echo "    cd ${ABS_TARGET}"
   echo "    npx ahk init"
 else
   echo ""
-  echo "⚠ \`ahk\` did not respond to --version."
+  echo "WARN: 'ahk' did not respond to --version."
   echo "  The link was created but something may be wrong with the build."
   exit 1
 fi
