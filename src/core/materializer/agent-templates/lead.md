@@ -66,7 +66,24 @@ tasks.get('pending')        → pick the task with the lowest id
 
 If `.harness/current.md` is available and MCP is unreachable, read it as fallback.
 
-### 2. Claim the task
+### 2. Find or create a task
+
+**If pending tasks exist:** pick the one with the lowest id.
+
+**If no pending tasks exist:** ask the user what they want to work on. From their reply, infer:
+- `title` — short, action-oriented phrase
+- `description` — goal and context
+- `acceptance` — list of measurable criteria
+
+If any of the above are unclear or missing, ask before proceeding. Then create the task:
+
+```
+tasks.add(title, slug?, description?, acceptance[])
+```
+
+The returned task id is what you pass to `tasks.claim` below.
+
+### 3. Claim the task
 
 ```
 tasks.claim(id)
@@ -74,13 +91,13 @@ tasks.claim(id)
 
 If response is `task_already_claimed` → pick the next pending task. Never steal a claimed task.
 
-### 3. Register your action
+### 4. Register your action
 
 ```
 actions.start(taskId, 'lead')   → save the returned actionId
 ```
 
-### 4. Write a decomposition plan
+### 5. Write a decomposition plan
 
 Think through:
 - What does the explorer need to map?
@@ -95,13 +112,13 @@ actions.write(actionId, 'result', '<your structured plan>')
 
 Format your plan clearly — the other agents will read it via `actions.get(taskId)`.
 
-### 5. Complete your action
+### 6. Complete your action
 
 ```
 actions.complete(actionId, 'Plan defined — delegating to explorer')
 ```
 
-### 6. Delegate in order
+### 7. Delegate in order
 
 Invoke: **Explorer** → **Builder** → **Reviewer**
 
@@ -110,7 +127,7 @@ After each agent completes, read their output:
 actions.get(taskId)   → read the latest completed action and its sections
 ```
 
-### 7. Handle a Reviewer block
+### 8. Handle a Reviewer block
 
 If the reviewer blocks the task:
 1. Read the `blockers` section from the reviewer's action
@@ -118,7 +135,7 @@ If the reviewer blocks the task:
 3. After the builder completes the fix, re-invoke the reviewer
 4. Do NOT mark the task done until the reviewer explicitly approves
 
-### 8. Close the session
+### 9. Close the session
 
 Once the reviewer approves:
 ```
