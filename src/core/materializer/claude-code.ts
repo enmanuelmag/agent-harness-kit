@@ -50,8 +50,8 @@ export class ClaudeCodeMaterializer implements Materializer {
     writeAgentFile(cwd, '.claude/agents/builder.md', agentBuilder({ projectName, writablePaths }))
     writeAgentFile(cwd, '.claude/agents/reviewer.md', agentReviewer({ projectName }))
 
-    // .mcp.json — MERGE, never overwrite whole file
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port)
+    // .claude/mcp.json — MERGE, never overwrite whole file
+    mergeClaudeMcpJson(join(cwd, '.claude/mcp.json'), config.tools.mcp.port)
 
     // .gitignore additions
     appendGitignore(cwd)
@@ -78,7 +78,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     writeAgentFile(cwd, '.claude/agents/reviewer.md', agentReviewer({ projectName }))
 
     // MCP config: always merge
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port)
+    mergeClaudeMcpJson(join(cwd, '.claude/mcp.json'), config.tools.mcp.port)
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {
