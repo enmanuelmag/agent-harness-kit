@@ -175,7 +175,7 @@ const TOOLS = [
 // ─── Server ───────────────────────────────────────────────────────────────────
 
 export async function startMcpServer(config: HarnessConfig, cwd: string): Promise<void> {
-  const db = openDB(config, cwd)
+  const db = await openDB(config, cwd)
   const docsPath = resolve(cwd, config.project.docsPath)
 
   const server = new Server(
@@ -213,7 +213,7 @@ async function dispatch(
     case 'actions.start': {
       const taskId = num(args, 'taskId')
       const agent = str(args, 'agent') as AgentName
-      const action = db.startAction(taskId, agent)
+      const action = await db.startAction(taskId, agent)
       return ok(JSON.stringify({ actionId: action.id, taskId, agent, status: 'in_progress' }))
     }
 
@@ -221,39 +221,41 @@ async function dispatch(
       const actionId = str(args, 'actionId')
       const sectionType = str(args, 'sectionType')
       const content = str(args, 'content')
-      db.writeSection(actionId, sectionType, content)
+      await db.writeSection(actionId, sectionType, content)
       return ok(JSON.stringify({ actionId, sectionType, recorded: true }))
     }
 
     case 'actions.complete': {
       const actionId = str(args, 'actionId')
       const summary = str(args, 'summary')
-      const action = db.completeAction(actionId, summary)
+      const action = await db.completeAction(actionId, summary)
       return ok(JSON.stringify({ actionId, status: action.status, completedAt: action.completed_at }))
     }
 
     case 'actions.get': {
       const taskId = num(args, 'taskId')
-      const actions = db.getActionsForTask(taskId)
-      const full = actions.map((a) => ({
-        ...a,
-        sections: db.getActionSections(a.id),
-      }))
+      const actions = await db.getActionsForTask(taskId)
+      const full = await Promise.all(
+        actions.map(async (a) => ({
+          ...a,
+          sections: await db.getActionSections(a.id),
+        })),
+      )
       return ok(JSON.stringify(full, null, 2))
     }
 
     case 'tasks.get': {
       const status = args['status'] as string | undefined
       const tasks = status
-        ? db.getTasks(status as TaskStatus)
-        : db.getTasks()
+        ? await db.getTasks(status as TaskStatus)
+        : await db.getTasks()
       return ok(JSON.stringify(tasks, null, 2))
     }
 
     case 'tasks.claim': {
       const id = num(args, 'id')
       const agent = str(args, 'agent')
-      const task = db.claimTask(id, agent)
+      const task = await db.claimTask(id, agent)
       if (!task) {
         return ok(JSON.stringify({ error: 'task_already_claimed', taskId: id }))
       }
@@ -264,9 +266,9 @@ async function dispatch(
       const id = num(args, 'id')
       const status = str(args, 'status') as TaskStatus
       if (status === 'done') {
-        db.closeOrphanedActions(id)
+        await db.closeOrphanedActions(id)
       }
-      const task = db.updateTaskStatus(id, status)
+      const task = await db.updateTaskStatus(id, status)
       return ok(JSON.stringify(task))
     }
 
@@ -281,13 +283,13 @@ async function dispatch(
       const filePath = str(args, 'filePath')
       const operation = str(args, 'operation') as ActionFileRow['operation']
       const notes = args['notes'] as string | undefined
-      db.recordFile(actionId, filePath, operation, notes)
+      await db.recordFile(actionId, filePath, operation, notes)
       return ok(JSON.stringify({ actionId, filePath, operation, recorded: true }))
     }
 
     case 'tasks.acceptance.update': {
       const criterionId = num(args, 'criterionId')
-      db.markAcceptanceMet(criterionId)
+      await db.markAcceptanceMet(criterionId)
       return ok(JSON.stringify({ criterionId, met: true }))
     }
 
@@ -296,7 +298,7 @@ async function dispatch(
       const toolName = str(args, 'toolName')
       const argsJson = args['argsJson'] as string | undefined
       const resultSummary = args['resultSummary'] as string | undefined
-      db.recordTool(actionId, toolName, argsJson, resultSummary)
+      await db.recordTool(actionId, toolName, argsJson, resultSummary)
       return ok(JSON.stringify({ actionId, toolName, recorded: true }))
     }
 

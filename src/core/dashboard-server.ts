@@ -53,7 +53,7 @@ export interface DashboardServerResult {
 
 export function startDashboardServer(
   db: HarnessDB,
-  dbPath: string,
+  dbPath: string | null,
   staticPath: string,
   port: number,
 ): DashboardServerResult {
@@ -66,15 +66,15 @@ export function startDashboardServer(
   })
 
   // ─── Stats overview ───────────────────────────────────────────────────────
-  app.get('/api/stats', (c) => {
-    const summary = db.getStatusSummary()
+  app.get('/api/stats', async (c) => {
+    const summary = await db.getStatusSummary()
     const byStatus: Record<string, number> = { pending: 0, in_progress: 0, done: 0, blocked: 0 }
     for (const { status, total } of summary) byStatus[status] = total
 
-    const [{ total: totalActions }] = db.queryRaw<CountRow>(`SELECT COUNT(*) as total FROM actions`)
-    const [{ total: totalFiles }] = db.queryRaw<CountRow>(`SELECT COUNT(*) as total FROM action_files`)
-    const [{ total: uniqueTools }] = db.queryRaw<CountRow>(`SELECT COUNT(DISTINCT tool_name) as total FROM action_tools`)
-    const [{ total: activeAgents }] = db.queryRaw<CountRow>(
+    const [{ total: totalActions }] = await db.queryRaw<CountRow>(`SELECT COUNT(*) as total FROM actions`)
+    const [{ total: totalFiles }] = await db.queryRaw<CountRow>(`SELECT COUNT(*) as total FROM action_files`)
+    const [{ total: uniqueTools }] = await db.queryRaw<CountRow>(`SELECT COUNT(DISTINCT tool_name) as total FROM action_tools`)
+    const [{ total: activeAgents }] = await db.queryRaw<CountRow>(
       `SELECT COUNT(DISTINCT agent) as total FROM actions WHERE status = 'in_progress'`,
     )
 
@@ -87,8 +87,8 @@ export function startDashboardServer(
   })
 
   // ─── Tasks list ───────────────────────────────────────────────────────────
-  app.get('/api/tasks', (c) => {
-    const rows = db.queryRaw<TaskListRow>(`
+  app.get('/api/tasks', async (c) => {
+    const rows = await db.queryRaw<TaskListRow>(`
       SELECT t.*,
         COUNT(ta.id) as acceptance_total,
         COALESCE(SUM(ta.met), 0) as acceptance_met
@@ -101,32 +101,35 @@ export function startDashboardServer(
   })
 
   // ─── Task detail ──────────────────────────────────────────────────────────
-  app.get('/api/tasks/:id', (c) => {
+  app.get('/api/tasks/:id', async (c) => {
     const id = parseInt(c.req.param('id'))
-    const task = db.getTaskById(id)
+    const task = await db.getTaskById(id)
     if (!task) return c.json({ error: 'Not found' }, 404)
 
-    const acceptance = db.getTaskAcceptance(id)
-    const actions = db.getActionsForTask(id).map((action) => ({
-      ...action,
-      sections: db.getActionSections(action.id),
-      files: db.queryRaw(`SELECT * FROM action_files WHERE action_id = ?`, action.id),
-      tools: db.queryRaw(`SELECT * FROM action_tools WHERE action_id = ? ORDER BY called_at`, action.id),
-    }))
+    const acceptance = await db.getTaskAcceptance(id)
+    const rawActions = await db.getActionsForTask(id)
+    const actions = await Promise.all(
+      rawActions.map(async (action) => ({
+        ...action,
+        sections: await db.getActionSections(action.id),
+        files: await db.queryRaw(`SELECT * FROM action_files WHERE action_id = ?`, action.id),
+        tools: await db.queryRaw(`SELECT * FROM action_tools WHERE action_id = ? ORDER BY called_at`, action.id),
+      })),
+    )
 
     return c.json({ ...task, acceptance, actions })
   })
 
   // ─── Tools top ────────────────────────────────────────────────────────────
-  app.get('/api/tools/top', (c) => {
+  app.get('/api/tools/top', async (c) => {
     const limit = parseInt(c.req.query('limit') ?? '20')
-    return c.json(db.getTopTools(limit))
+    return c.json(await db.getTopTools(limit))
   })
 
   // ─── Tools recent ─────────────────────────────────────────────────────────
-  app.get('/api/tools/recent', (c) => {
+  app.get('/api/tools/recent', async (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50')
-    const rows = db.queryRaw<RecentToolRow>(`
+    const rows = await db.queryRaw<RecentToolRow>(`
       SELECT at.*, t.id as task_id, t.title as task_title, t.slug as task_slug, a.agent
       FROM action_tools at
       JOIN actions a ON at.action_id = a.id
@@ -138,9 +141,9 @@ export function startDashboardServer(
   })
 
   // ─── Files top ────────────────────────────────────────────────────────────
-  app.get('/api/files/top', (c) => {
+  app.get('/api/files/top', async (c) => {
     const limit = parseInt(c.req.query('limit') ?? '20')
-    const rows = db.queryRaw<TopFileRow>(`
+    const rows = await db.queryRaw<TopFileRow>(`
       SELECT
         file_path,
         COUNT(*) as total,
@@ -157,9 +160,9 @@ export function startDashboardServer(
   })
 
   // ─── Files recent ─────────────────────────────────────────────────────────
-  app.get('/api/files/recent', (c) => {
+  app.get('/api/files/recent', async (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50')
-    const rows = db.queryRaw<RecentFileRow>(`
+    const rows = await db.queryRaw<RecentFileRow>(`
       SELECT af.*, t.id as task_id, t.title as task_title, t.slug as task_slug,
         a.agent, a.created_at as called_at
       FROM action_files af
@@ -172,8 +175,8 @@ export function startDashboardServer(
   })
 
   // ─── Agents stats ─────────────────────────────────────────────────────────
-  app.get('/api/agents/stats', (c) => {
-    const rows = db.queryRaw<AgentStatRow>(`
+  app.get('/api/agents/stats', async (c) => {
+    const rows = await db.queryRaw<AgentStatRow>(`
       SELECT
         a.agent,
         COUNT(*)                                                    as actions_total,
@@ -198,9 +201,9 @@ export function startDashboardServer(
   })
 
   // ─── Timeline ─────────────────────────────────────────────────────────────
-  app.get('/api/timeline', (c) => {
+  app.get('/api/timeline', async (c) => {
     const limit = parseInt(c.req.query('limit') ?? '50')
-    const rows = db.queryRaw<TimelineRow>(`
+    const rows = await db.queryRaw<TimelineRow>(`
       SELECT a.*, t.title as task_title, t.slug as task_slug, t.status as task_status
       FROM actions a
       JOIN tasks t ON a.task_id = t.id
@@ -252,16 +255,19 @@ export function startDashboardServer(
     }, 150)
   }
 
-  // Watch WAL file for writes (more responsive in WAL mode)
-  const walPath = `${dbPath}-wal`
-  const watchTarget = existsSync(walPath) ? walPath : dbPath
-  const watcher = watch(watchTarget, broadcast)
+  // Watch WAL file for writes (SQLite only — no watcher for Postgres/MySQL)
+  let watcher: ReturnType<typeof watch> | null = null
+  if (dbPath) {
+    const walPath = `${dbPath}-wal`
+    const watchTarget = existsSync(walPath) ? walPath : dbPath
+    watcher = watch(watchTarget, broadcast)
+  }
 
   return {
     url: `http://localhost:${port}`,
     close: () => {
       clearTimeout(debounce)
-      watcher.close()
+      watcher?.close()
       wss.close()
       httpServer.close()
     },
