@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
 # health.sh — project health check for agent-harness-kit
-#
-# This script must exit 0 when the project is healthy.
-# Agents will run this before starting work.
-#
-# TODO: implement your project's health checks below.
-# Examples:
-#   npm test
-#   docker compose ps | grep -q "running"
-#   psql -c "SELECT 1" > /dev/null 2>&1
-#
-# Until you implement it, this script intentionally exits 1
-# so agents know the environment is not verified.
 
-echo "health.sh not implemented yet."
-echo "Edit this file with your project's health checks."
-echo "It must exit 0 for agents to start working."
-exit 1
+# Check that Node.js is available
+command -v node >/dev/null 2>&1 || { echo "FAIL: node not found"; exit 1; }
+
+# Check that npm is available
+command -v npm >/dev/null 2>&1 || { echo "FAIL: npm not found"; exit 1; }
+
+# Check that package.json exists
+[ -f package.json ] || { echo "FAIL: package.json not found"; exit 1; }
+
+npm run build
+
+if [ $? -ne 0 ]; then
+  echo "FAIL: Build failed"
+  exit 1
+fi
+
+npm run test
+
+if [ $? -ne 0 ]; then
+  echo "FAIL: Tests failed"
+  exit 1
+fi
+
+exit 0
