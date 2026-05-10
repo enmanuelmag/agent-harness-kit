@@ -49,3 +49,5 @@ coverage/
 .harness/harness.db
 .harness/harness.db-shm
 .harness/harness.db-wal
+
+graphify-out/

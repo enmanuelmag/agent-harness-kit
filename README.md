@@ -6,6 +6,8 @@ Instead of letting AI agents roam freely through your project with no memory, no
 
 You stay in control. The agents stay on track.
 
+<a href='https://ko-fi.com/S6S31ZBGQK' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+
 ```bash
 npx ahk init
 ```
@@ -14,33 +16,41 @@ npx ahk init
 
 ## Table of Contents
 
-- [Why this exists](#why-this-exists)
-- [How it works](#how-it-works)
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Commands](#commands)
-  - [ahk init](#ahk-init)
-  - [ahk build](#ahk-build)
-  - [ahk dashboard](#ahk-dashboard)
-  - [ahk status](#ahk-status)
-  - [ahk health](#ahk-health)
-  - [ahk sync](#ahk-sync)
-  - [ahk serve](#ahk-serve)
-  - [ahk task add](#ahk-task-add)
-  - [ahk task list](#ahk-task-list)
-  - [ahk task done](#ahk-task-done-idslug)
-  - [ahk reset](#ahk-reset)
-  - [ahk migrate](#ahk-migrate)
-  - [ahk export](#ahk-export)
-- [Files created by ahk init](#files-created-by-ahk-init)
-- [What you can customize](#what-you-can-customize)
-- [MCP tools (for agents)](#mcp-tools-for-agents)
-- [Agent roles](#agent-roles)
-- [What to commit](#what-to-commit)
-- [Runtime compatibility](#runtime-compatibility)
-- [Contributing & local development](#contributing--local-development)
-- [Roadmap](#roadmap)
+- [@cardor/agent-harness-kit](#cardoragent-harness-kit)
+  - [Table of Contents](#table-of-contents)
+  - [Why this exists](#why-this-exists)
+  - [How it works](#how-it-works)
+  - [Features](#features)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Commands](#commands)
+    - [`ahk init`](#ahk-init)
+    - [`ahk build`](#ahk-build)
+    - [`ahk dashboard`](#ahk-dashboard)
+    - [`ahk status`](#ahk-status)
+    - [`ahk health`](#ahk-health)
+    - [`ahk sync`](#ahk-sync)
+    - [`ahk serve`](#ahk-serve)
+    - [`ahk task add`](#ahk-task-add)
+    - [`ahk task list`](#ahk-task-list)
+    - [`ahk task done <id|slug>`](#ahk-task-done-idslug)
+    - [`ahk reset`](#ahk-reset)
+    - [`ahk migrate`](#ahk-migrate)
+    - [`ahk export`](#ahk-export)
+  - [Files created by `ahk init`](#files-created-by-ahk-init)
+    - [What each file does](#what-each-file-does)
+  - [What you can customize](#what-you-can-customize)
+    - [`agent-harness-kit.config.ts`](#agent-harness-kitconfigts)
+    - [`health.sh`](#healthsh)
+    - [Agent definition files (`.claude/agents/*.md` or `.opencode/agents/*.md`)](#agent-definition-files-claudeagentsmd-or-opencodeagentsmd)
+    - [`.harness/feature_list.json`](#harnessfeature_listjson)
+  - [MCP tools (for agents)](#mcp-tools-for-agents)
+  - [Agent roles](#agent-roles)
+  - [What to commit](#what-to-commit)
+  - [Runtime compatibility](#runtime-compatibility)
+  - [Contributing \& local development](#contributing--local-development)
+    - [Testing the local build in another project](#testing-the-local-build-in-another-project)
+  - [Roadmap](#roadmap)
 
 ---
 
