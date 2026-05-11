@@ -6,6 +6,8 @@ Instead of letting AI agents roam freely through your project with no memory, no
 
 You stay in control. The agents stay on track.
 
+Visit the [website](https://stack.cardor.dev/ahk) to view a full explanation, examples, and other tools!
+
 <a href='https://ko-fi.com/S6S31ZBGQK' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ```bash
