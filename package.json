@@ -1,6 +1,6 @@
 {
   "name": "@cardor/agent-harness-kit",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "CLI scaffolding for multi-agent harness systems",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,13 +15,15 @@
     "ahk": "./bin/ahk.js"
   },
   "scripts": {
-    "build": "npm run build:ui && tsup && npm run copy-assets",
-    "build:ui": "cd dashboard && npm install --prefer-offline && npm run build",
+    "build": "pnpm run build:ui && tsup && pnpm run copy-assets",
+    "build:ui": "cd dashboard && pnpm install --prefer-offline && pnpm run build",
     "copy-assets": "node scripts/copy-assets.mjs",
     "dev": "tsup --watch",
     "test": "node --test --import tsx/esm src/tests/*.test.ts",
     "lint": "eslint . --fix",
-    "prepublishOnly": "npm run build && npm test",
+    "release": "bash scripts/publish.sh",
+    "release:dry": "bash scripts/publish.sh --dry-run",
+    "prepublishOnly": "pnpm run build && npm test",
     "prepare": "husky"
   },
   "files": [
