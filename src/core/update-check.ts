@@ -1,8 +1,9 @@
 // src/core/update-check.ts
 import pc from 'picocolors'
 
-import { pkg } from './package-data'
 import { drawBox } from '@/commands/init-helpers'
+
+import { pkg } from './package-data'
 
 const REGISTRY_URL = `https://registry.npmjs.org/${pkg.name}/latest`
 const TIMEOUT_MS = 2500
