@@ -12,7 +12,12 @@ import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
 
-import { applyConfigDefaults, drawBox, printWelcomeMessage, readProjectNameFromPackageJson } from './init-helpers'
+import {
+  applyConfigDefaults,
+  drawBox,
+  printWelcomeMessage,
+  readProjectNameFromPackageJson,
+} from './init-helpers'
 
 import type { Provider } from '@/types'
 
@@ -33,32 +38,32 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   if (flags.name) {
     name = flags.name
   } else {
-    name = await cliFormWithRetry(
-      async () => {
-        const val = await p.text({
-          message: 'Project name',
-          placeholder: 'my-app',
-          ...(detectedName && { initialValue: detectedName }),
-        })
-        if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
-        return val as string
-      },
-      initNameSchema,
-    )
+    name = await cliFormWithRetry(async () => {
+      const val = await p.text({
+        message: 'Project name',
+        placeholder: 'my-app',
+        ...(detectedName && { initialValue: detectedName }),
+      })
+      if (p.isCancel(val)) {
+        p.cancel('Cancelled.')
+        process.exit(0)
+      }
+      return val as string
+    }, initNameSchema)
   }
 
   // ─── Description ─────────────────────────────────────────────────────────
-  const description = await cliFormWithRetry(
-    async () => {
-      const val = await p.text({
-        message: 'Short description (shown to agents as context)',
-        placeholder: 'A REST API for managing notes',
-      })
-      if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
-      return val as string
-    },
-    initDescriptionSchema,
-  )
+  const description = await cliFormWithRetry(async () => {
+    const val = await p.text({
+      message: 'Short description (shown to agents as context)',
+      placeholder: 'A REST API for managing notes',
+    })
+    if (p.isCancel(val)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
+    return val as string
+  }, initDescriptionSchema)
 
   // ─── Provider ─────────────────────────────────────────────────────────────
   let provider: Provider
@@ -68,12 +73,16 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     const val = await p.select({
       message: 'AI provider',
       options: [
-        { value: 'claude-code', label: 'Claude Code' },
         { value: 'opencode', label: 'OpenCode' },
+        { value: 'claude-code', label: 'Claude Code' },
+        { value: 'codex-cli', label: 'Codex CLI' },
       ],
     })
-    if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
-    provider = val as Provider
+    if (p.isCancel(val)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
+    provider = val satisfies Provider
   }
 
   // ─── Global installation option ──────────────────────────────────────────
@@ -82,7 +91,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     message: 'Install globally (to home directory)?',
     initialValue: false,
   })
-  if (p.isCancel(globalVal)) { p.cancel('Cancelled.'); process.exit(0) }
+  if (p.isCancel(globalVal)) {
+    p.cancel('Cancelled.')
+    process.exit(0)
+  }
   if (globalVal) {
     globalInstallation = true
   }
@@ -92,17 +104,17 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   if (flags.docs) {
     docsPath = flags.docs
   } else {
-    docsPath = await cliFormWithRetry(
-      async () => {
-        const val = await p.text({
-          message: 'Docs folder path (agents will search here)',
-          initialValue: './docs',
-        })
-        if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
-        return val as string
-      },
-      initDocsSchema,
-    )
+    docsPath = await cliFormWithRetry(async () => {
+      const val = await p.text({
+        message: 'Docs folder path (agents will search here)',
+        initialValue: './docs',
+      })
+      if (p.isCancel(val)) {
+        p.cancel('Cancelled.')
+        process.exit(0)
+      }
+      return val as string
+    }, initDocsSchema)
   }
 
   // ─── Task adapter ─────────────────────────────────────────────────────────
@@ -118,34 +130,40 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         { value: 'linear', label: 'Linear (coming soon)' },
       ],
     })
-    if (p.isCancel(val)) { p.cancel('Cancelled'); process.exit(0) }
+    if (p.isCancel(val)) {
+      p.cancel('Cancelled')
+      process.exit(0)
+    }
     tasksAdapter = val as string
   }
 
   // ─── Optional first task ──────────────────────────────────────────────────
-  const addFirstTask = await p.confirm({ message: 'Add your first task now?', initialValue: true })
-  if (p.isCancel(addFirstTask)) { p.cancel('Cancelled'); process.exit(0) }
+  const addFirstTask = await p.confirm({ message: 'Add your first task now?', initialValue: false })
+  if (p.isCancel(addFirstTask)) {
+    p.cancel('Cancelled')
+    process.exit(0)
+  }
 
   let firstTask: { title: string; description: string; acceptance: string[] } | undefined
 
   if (addFirstTask) {
-    const taskTitle = await cliFormWithRetry(
-      async () => {
-        const val = await p.text({ message: 'Task title' })
-        if (p.isCancel(val)) { p.cancel('Cancelled'); process.exit(0) }
-        return (val as string).trim()
-      },
-      taskTitleSchema,
-    )
+    const taskTitle = await cliFormWithRetry(async () => {
+      const val = await p.text({ message: 'Task title' })
+      if (p.isCancel(val)) {
+        p.cancel('Cancelled')
+        process.exit(0)
+      }
+      return (val as string).trim()
+    }, taskTitleSchema)
 
-    const taskDesc = await cliFormWithRetry(
-      async () => {
-        const val = await p.text({ message: 'Task description', placeholder: 'What and why' })
-        if (p.isCancel(val)) { p.cancel('Cancelled'); process.exit(0) }
-        return (val as string).trim()
-      },
-      taskDescriptionSchema,
-    )
+    const taskDesc = await cliFormWithRetry(async () => {
+      const val = await p.text({ message: 'Task description', placeholder: 'What and why' })
+      if (p.isCancel(val)) {
+        p.cancel('Cancelled')
+        process.exit(0)
+      }
+      return (val as string).trim()
+    }, taskDescriptionSchema)
 
     const acceptance: string[] = []
     p.log.info('Acceptance criteria — one per line, empty line to finish')
@@ -239,7 +257,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log('')
   console.log(pc.cyan('→') + ` Edit ${pc.cyan('health.sh')} with your project checks`)
   console.log(pc.cyan('→') + ` ${pc.cyan('ahk task add')} to queue work for agents`)
-  console.log(pc.cyan('→') + ` Enrich your docs with knowledge graphs: ${pc.cyan('https://github.com/safishamsi/graphify')}`)
+  console.log(
+    pc.cyan('→') +
+      ` Enrich your docs with knowledge graphs: ${pc.cyan('https://github.com/safishamsi/graphify')}`
+  )
 
   const recommendations: string[] = [
     `   Give a try to Heimdall MCP: Transparent proxy that traces every MCP tool call with OpenTelemetry.  `,
