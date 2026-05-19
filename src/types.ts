@@ -1,6 +1,6 @@
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-export type Provider = 'claude-code' | 'opencode'
+export type Provider = 'claude-code' | 'opencode' | 'codex-cli'
 
 // ─── Config types ─────────────────────────────────────────────────────────────
 
