@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // copy-assets.mjs — copies non-TS assets from src/ to dist/ after tsc build
-import { readdirSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync, cpSync } from 'node:fs'
+import { cpSync,existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // ─── Agent templates ──────────────────────────────────────────────────────────
