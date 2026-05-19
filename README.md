@@ -78,7 +78,7 @@ ahk init
   └── creates config, agent definitions, task backlog, health check
 
 AI tool opens your project
-  └── reads .claude/mcp.json or opencode.json
+  └── reads .claude/mcp.json, opencode.json, or .codex/config.toml
   └── spawns: npx ahk serve (stdio MCP server)
 
 Agent starts working
@@ -99,7 +99,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 
 ## Features
 
-- **Provider-agnostic** — works with Claude Code, OpenCode, or any MCP-compatible AI tool. Switch providers without losing your task history or reconfiguring your workflow.
+- **Provider-agnostic** — works with Claude Code, OpenCode, Codex CLI, or any MCP-compatible AI tool. Switch providers without losing your task history or reconfiguring your workflow.
 - **Structured 4-agent workflow** — Lead, Explorer, Builder, and Reviewer each have defined responsibilities and can only act within their role.
 - **Atomic task claiming** — agents use `tasks.claim()` which uses a SQLite transaction to prevent two agents from picking up the same task at the same time.
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
@@ -151,11 +151,12 @@ ahk init
 
 # Skip prompts with flags
 ahk init --name "my-app" --provider claude-code --docs ./docs --tasks local
+ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local
 ```
 
 Run this once per project. Safe to re-run — it will not overwrite files you've customized.
 
-**Global installation** — if you answer yes to "Install globally?", files go to `~/.claude` (Claude Code) or `~/.config/opencode` (OpenCode). This lets you share one harness config across all your projects.
+**Global installation** — if you answer yes to "Install globally?", files go to `~/.claude` (Claude Code), `~/.config/opencode` (OpenCode), or `~/.codex` (Codex CLI). This lets you share one harness config across all your projects.
 
 ---
 
@@ -285,14 +286,15 @@ Clears harness data interactively. Only SQLite databases are managed by this com
 ```bash
 ahk reset                          # interactive — asks before deleting each item
 ahk reset --force                  # skip all confirmation prompts
-ahk reset --provider claude-code   # also delete agent .md files for this provider
+ahk reset --provider claude-code   # also delete agent files for this provider
 ahk reset --provider opencode
+ahk reset --provider codex-cli
 ```
 
 What it can reset:
 - The SQLite `.db` file (plus WAL and SHM files if present)
 - `.harness/feature_list.json`
-- Agent `.md` files in `.claude/agents/` or `.opencode/agents/`
+- Agent definition files in `.claude/agents/`, `.opencode/agents/`, or `.codex/agents/`
 
 After a reset, run `ahk init` to scaffold a fresh harness.
 
@@ -305,6 +307,7 @@ Migrates provider-specific files from one AI provider to another. Useful when sw
 ```bash
 ahk migrate --to opencode
 ahk migrate --to claude-code
+ahk migrate --to codex-cli
 ```
 
 ---
@@ -324,22 +327,58 @@ ahk export --sql --output dump.sql       # SQL dump to file
 
 ## Files created by `ahk init`
 
+**Claude Code** (`provider: 'claude-code'`):
 ```
 your-project/
-├── agent-harness-kit.config.ts    ← main config (edit freely)
-├── AGENTS.md                      ← navigation map regenerated from config
-├── health.sh                      ← implement your health checks here
+├── agent-harness-kit.config.ts
+├── AGENTS.md
+├── CLAUDE.md
+├── health.sh
 ├── .harness/
-│   ├── harness.db                 ← SQLite source of truth (gitignored)
-│   ├── current.md                 ← auto-generated session snapshot (gitignored)
-│   └── feature_list.json          ← human-editable task backlog (commit this)
-└── .claude/                       ← or .opencode/ depending on your provider
+│   ├── harness.db                 ← gitignored
+│   ├── current.md                 ← gitignored
+│   └── feature_list.json
+└── .claude/
     ├── agents/
     │   ├── lead.md
     │   ├── explorer.md
     │   ├── builder.md
     │   └── reviewer.md
-    └── mcp.json                   ← tells Claude Code to spawn ahk serve
+    ├── mcp.json                   ← MCP server registration
+    └── settings.json              ← sets `agent: "lead"` as the default session agent
+```
+
+**OpenCode** (`provider: 'opencode'`):
+```
+your-project/
+├── agent-harness-kit.config.ts
+├── AGENTS.md
+├── health.sh
+├── opencode.json                  ← MCP server + default_agent + compaction config
+├── .harness/
+└── .opencode/
+    └── agents/
+        ├── lead.md
+        ├── explorer.md
+        ├── builder.md
+        └── reviewer.md
+```
+
+**Codex CLI** (`provider: 'codex-cli'`):
+```
+your-project/
+├── agent-harness-kit.config.ts
+├── AGENTS.md
+├── health.sh
+├── .harness/
+└── .codex/
+    ├── config.toml                ← MCP server registration
+    └── agents/
+        ├── lead.toml
+        ├── explorer.toml
+        ├── builder.toml
+        ├── reviewer.toml
+        └── default.toml           ← overrides Codex's built-in default agent → routes to lead
 ```
 
 ### What each file does
@@ -352,8 +391,13 @@ your-project/
 | `.harness/feature_list.json` | Task backlog in JSON. Humans edit this, `ahk sync` loads it into SQLite | Yes — add tasks here |
 | `.harness/harness.db` | SQLite database. Source of truth for tasks, actions, sections | No — managed by the harness |
 | `.harness/current.md` | Auto-generated session snapshot for agents without MCP access | No — regenerated automatically |
-| `.claude/agents/*.md` | Agent role definitions. Created once, never overwritten | **Yes — customize agent behavior** |
-| `.claude/mcp.json` | MCP server config. Merged (not overwritten) by `ahk build` | Yes, carefully — don't remove the `agent-harness-kit` entry |
+| `.claude/agents/*.md` | Agent role definitions (Claude Code). Created once, never overwritten | **Yes — customize agent behavior** |
+| `.claude/mcp.json` | MCP server registration for Claude Code. Merged by `ahk build` | Yes, carefully — don't remove the `agent-harness-kit` entry |
+| `.claude/settings.json` | Sets `agent: "lead"` so lead runs as the default session agent. Merged by `ahk build` | Yes, carefully |
+| `.opencode/agents/*.md` | Agent role definitions (OpenCode). Created once, never overwritten | **Yes — customize agent behavior** |
+| `opencode.json` | MCP server + `default_agent` + compaction config for OpenCode. Merged by `ahk build` | Yes, carefully |
+| `.codex/agents/*.toml` | Agent role definitions (Codex CLI). Created once, never overwritten | **Yes — customize agent behavior** |
+| `.codex/config.toml` | MCP server registration for Codex CLI. Merged by `ahk build` | Yes, carefully |
 
 ---
 
@@ -373,7 +417,7 @@ export default defineHarness({
     docsPath: './docs',           // where agents search for documentation
   },
 
-  provider: 'claude-code',        // 'claude-code' | 'opencode'
+  provider: 'claude-code',        // 'claude-code' | 'opencode' | 'codex-cli'
 
   agents: {
     lead:     { instructionsPath: null },
@@ -437,19 +481,22 @@ psql "$DATABASE_URL" -c "SELECT 1" > /dev/null 2>&1 || exit 1
 echo "All checks passed."
 ```
 
-### Agent definition files (`.claude/agents/*.md` or `.opencode/agents/*.md`)
+### Agent definition files
 
-These are Markdown files with a YAML frontmatter and free-form instructions. They are created once and **never overwritten** by `ahk build` — so any edits you make are permanent.
+Created once and **never overwritten** by `ahk build` — your edits are permanent.
 
-You can:
-- Add domain-specific context (e.g. "this project uses hexagonal architecture")
-- Restrict what the agent is allowed to do
-- Add project-specific conventions the agent must follow
-- Reference specific files or docs the agent should read first
+**Claude Code** (`.claude/agents/*.md`) and **OpenCode** (`.opencode/agents/*.md`) use Markdown with YAML frontmatter:
 
 ```markdown
 ---
+name: builder
 description: Builder agent — implements the plan produced by explorer and lead
+tools:
+  read: true
+  write: true
+  edit: true
+  bash: true
+permissionMode: acceptEdits
 ---
 
 # Builder Agent
@@ -461,6 +508,29 @@ You are the builder agent for MyApp. Follow these rules:
 - Run `npm test` after every change and fix failures before completing
 - Use the existing error handling pattern from `src/lib/errors.ts`
 ```
+
+**Codex CLI** (`.codex/agents/*.toml`) uses TOML format:
+
+```toml
+name = "builder"
+sandbox_mode = "workspace-write"
+
+description = """
+Builder agent — implements the plan produced by explorer and lead.
+"""
+
+developer_instructions = """
+# Builder Agent
+
+You are the builder agent for MyApp. Follow these rules:
+
+- All API endpoints must be defined in `src/routes/`
+- Never modify `src/core/` without lead approval
+- Run `npm test` after every change and fix failures before completing
+"""
+```
+
+The `sandbox_mode` field controls Codex's filesystem permissions per agent: `"read-only"` for lead, explorer, and reviewer; `"workspace-write"` for builder. The `permissionMode` field in Claude Code agent files enforces the same constraints at the session level (`plan` for read-only roles, `acceptEdits` for builder).
 
 ### `.harness/feature_list.json`
 
@@ -524,10 +594,16 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 |------|---------|
 | `agent-harness-kit.config.ts` | Yes |
 | `AGENTS.md` | Yes |
+| `CLAUDE.md` | Yes |
 | `health.sh` | Yes |
 | `.harness/feature_list.json` | Yes |
 | `.claude/agents/*.md` | Yes |
-| `.claude/mcp.json` / `opencode.json` | Yes |
+| `.claude/mcp.json` | Yes |
+| `.claude/settings.json` | Yes |
+| `.opencode/agents/*.md` | Yes |
+| `opencode.json` | Yes |
+| `.codex/agents/*.toml` | Yes |
+| `.codex/config.toml` | Yes |
 | `.harness/harness.db` | **No** (gitignored) |
 | `.harness/current.md` | **No** (gitignored) |
 
@@ -627,6 +703,7 @@ Types: `feat fix chore refactor docs test perf style build ci revert`
 - ✅ **`tasks.add` via MCP** — agents can create new tasks on the fly without leaving the conversation.
 - ✅ **Global installation** — `ahk init` can install the harness to your home directory, shared across projects.
 - ✅ **Input validation** — all CLI prompts validate and retry on bad values.
+- ✅ **Codex CLI provider** — full support for OpenAI Codex CLI. Generates `.codex/agents/*.toml` files with proper `sandbox_mode` per role and merges `.codex/config.toml` for MCP registration. Overrides the built-in `default` agent so the harness lead runs by default.
 - **Graphify integration** — connect the harness to Graphify to visualize agent workflows, task dependencies, and action timelines as interactive graphs.
 - **Open Telemetry integration** — emit OpenTelemetry spans for all agent actions, file operations, and tool calls.
 - **Jira task adapter** — pull tasks directly from Jira instead of maintaining `feature_list.json` manually.
