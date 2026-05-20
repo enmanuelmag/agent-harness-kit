@@ -2,6 +2,11 @@
 
 **A provider-agnostic scaffolding kit for running structured multi-agent workflows in your codebase.**
 
+![npm version](https://img.shields.io/npm/v/@cardor/agent-harness-kit)
+![npm downloads](https://img.shields.io/npm/dm/@cardor/agent-harness-kit)
+![license](https://img.shields.io/npm/l/@cardor/agent-harness-kit)
+[![Known Vulnerabilities](https://snyk.io/test/npm/@cardor/agent-harness-kit/badge.svg)](https://snyk.io/test/npm/@cardor/agent-harness-kit)
+
 Instead of letting AI agents roam freely through your project with no memory, no coordination, and no audit trail, agent-harness-kit gives them a shared structure: a task backlog, a defined workflow, a persistent log of every action taken, and a health gate that must be green before any work begins.
 
 You stay in control. The agents stay on track.
