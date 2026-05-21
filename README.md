@@ -3,7 +3,6 @@
 **A provider-agnostic scaffolding kit for running structured multi-agent workflows in your codebase.**
 
 ![npm version](https://img.shields.io/npm/v/@cardor/agent-harness-kit)
-![npm downloads](https://img.shields.io/npm/dm/@cardor/agent-harness-kit)
 ![license](https://img.shields.io/npm/l/@cardor/agent-harness-kit)
 [![Known Vulnerabilities](https://snyk.io/test/npm/@cardor/agent-harness-kit/badge.svg)](https://snyk.io/test/npm/@cardor/agent-harness-kit)
 
