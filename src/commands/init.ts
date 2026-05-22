@@ -172,7 +172,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         message: '>',
         placeholder: 'Criterion (or press Enter to finish)',
       })
-      if (p.isCancel(criterionVal) || !(criterionVal as string).trim()) break
+      if (p.isCancel(criterionVal) || !criterionVal || !(criterionVal as string).trim()) break
       acceptance.push((criterionVal as string).trim())
     }
 
