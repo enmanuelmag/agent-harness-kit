@@ -5,6 +5,8 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 
+import type { HarnessConfig } from '@/types'
+
 function checkLine(label: string | null, ok: boolean, message: string, indent = 0): void {
   const prefix = label ? pc.cyan(`[${label}] `) : ' '.repeat(indent)
   const icon = ok ? pc.green('✓') : pc.red('✗')
@@ -36,21 +38,27 @@ export async function runHealth(cwd: string): Promise<void> {
   if (!dbOk) allOk = false
 
   // ─── [checking agents] ──────────────────────────────────────────────────────
-  const agentsDir = config.provider === 'claude-code' ? '.claude/agents' : '.opencode/agents'
+  const providerFiles = getProviderHealthFiles(config.provider)
+  const agentsDir = providerFiles.agentsDir
   const agentNames = ['lead', 'explorer', 'builder', 'reviewer']
 
   const agentsLabelWidth = '[checking agents] '.length
   for (let i = 0; i < agentNames.length; i++) {
     const name = agentNames[i]
-    const agentPath = join(cwd, agentsDir, `${name}.md`)
+    const agentPath = join(cwd, agentsDir, `${name}${providerFiles.agentExtension}`)
     const ok = existsSync(agentPath)
-    checkLine(i === 0 ? 'checking agents' : null, ok, `${name}.md present`, agentsLabelWidth)
+    checkLine(
+      i === 0 ? 'checking agents' : null,
+      ok,
+      `${name}${providerFiles.agentExtension} present`,
+      agentsLabelWidth,
+    )
     if (!ok) allOk = false
   }
 
   // ─── [checking MCP] ─────────────────────────────────────────────────────────
   if (config.tools.mcp.enabled) {
-    const mcpFile = config.provider === 'claude-code' ? '.claude/mcp.json' : 'opencode.json'
+    const mcpFile = providerFiles.mcpFile
     const mcpPath = resolve(cwd, mcpFile)
     const mcpOk = existsSync(mcpPath)
     checkLine('checking MCP', mcpOk, `${mcpFile} valid`)
@@ -89,5 +97,22 @@ export async function runHealth(cwd: string): Promise<void> {
   } else {
     console.error(pc.red(`✗ Health check failed (exit ${result.status ?? 'unknown'})`))
     process.exit(result.status ?? 1)
+  }
+}
+
+function getProviderHealthFiles(provider: HarnessConfig['provider']): {
+  agentsDir: string
+  agentExtension: '.md' | '.toml'
+  mcpFile: string
+} {
+  switch (provider) {
+    case 'claude-code':
+      return { agentsDir: '.claude/agents', agentExtension: '.md', mcpFile: '.claude/mcp.json' }
+    case 'opencode':
+      return { agentsDir: '.opencode/agents', agentExtension: '.md', mcpFile: 'opencode.json' }
+    case 'codex-cli':
+      return { agentsDir: '.codex/agents', agentExtension: '.toml', mcpFile: '.codex/config.toml' }
+    default:
+      throw new Error(`Unknown provider: ${provider as string}`)
   }
 }
