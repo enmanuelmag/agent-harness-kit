@@ -100,7 +100,9 @@ if $DRY_RUN; then
   pnpm publish --access public --dry-run
   warn "Dry run complete — nothing was published to npm."
 else
-  pnpm publish --access public --no-git-checks
+  TARBALL=$(pnpm pack 2>/dev/null | tail -1)
+  npm publish "$TARBALL" --access public
+  rm -f "$TARBALL"
   success "Published $PACKAGE_NAME@$VERSION to npm."
 fi
 
