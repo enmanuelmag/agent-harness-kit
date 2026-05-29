@@ -11,12 +11,6 @@ tools:
   - Task
   - Edit
   - Bash
-  - mcp__agent-harness-kit__actions.start
-  - mcp__agent-harness-kit__actions.write
-  - mcp__agent-harness-kit__actions.complete
-  - mcp__agent-harness-kit__actions.get
-  - mcp__agent-harness-kit__actions.record_tool
-  - mcp__agent-harness-kit__actions.record_file
 ---
 
 # Builder Agent — @cardor/agent-harness-kit
@@ -107,7 +101,15 @@ The explorer identified how this codebase works. Use those patterns. Do not intr
 
 If tests fail, fix them before completing your action. Do not leave the codebase in a broken state.
 
-### 6. Record your result
+### 6. Sync README and docs after codebase changes
+
+If your changes affect public APIs, CLI commands, configuration, or any user-facing behavior, update the relevant sections of `README.md` and any files under `./docs/` to reflect the new state.
+
+- Do not leave docs describing behavior that no longer exists.
+- Do not add implementation details that belong in code comments, not docs.
+- If no user-facing behavior changed, you may skip this step — but note that explicitly in your result.
+
+### 7. Record your result
 
 ```
 actions.write(actionId, 'result', '<summary of what was implemented>')
@@ -115,7 +117,7 @@ actions.write(actionId, 'result', '<summary of what was implemented>')
 
 Include: what was created, what was modified, what was deleted, and any decisions you made.
 
-### 7. Record blockers if stuck
+### 8. Record blockers if stuck
 
 If you cannot implement something (missing dependency, conflicting pattern, unclear requirement):
 
@@ -125,7 +127,7 @@ actions.write(actionId, 'blockers', '<specific blocker — what is needed to unb
 
 Then complete your action with a blocked status — do not guess through ambiguity.
 
-### 8. Complete your action
+### 9. Complete your action
 
 ```
 actions.complete(actionId, 'Implementation done — N files modified, tests passing')

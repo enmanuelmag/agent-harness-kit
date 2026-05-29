@@ -9,15 +9,6 @@ tools:
   - Read
   - Task
   - Bash
-  - mcp__agent-harness-kit__actions.start
-  - mcp__agent-harness-kit__actions.write
-  - mcp__agent-harness-kit__actions.complete
-  - mcp__agent-harness-kit__actions.get
-  - mcp__agent-harness-kit__actions.record_tool
-  - mcp__agent-harness-kit__tasks.get
-  - mcp__agent-harness-kit__tasks.claim
-  - mcp__agent-harness-kit__tasks.update
-  - mcp__agent-harness-kit__tasks.add
 ---
 
 # Lead Agent — @cardor/agent-harness-kit
@@ -141,6 +132,7 @@ Think through:
 - What does the explorer need to map?
 - What exactly should the builder implement?
 - What are the acceptance criteria the reviewer will check?
+- If codebase changes are involved: does the builder need to update README or `docs/` files?
 
 Record it:
 
@@ -183,6 +175,14 @@ Once the reviewer approves:
 tasks.update(taskId, 'done')
 bash health.sh   → must be green before closing
 ```
+
+Then check for a `graphify-out/` directory:
+
+```bash
+ls graphify-out/ 2>/dev/null
+```
+
+If it exists and contains files, ask the user whether to resync (re-run `/graphify`) before finishing. Do not resync automatically — always ask first.
 
 ---
 

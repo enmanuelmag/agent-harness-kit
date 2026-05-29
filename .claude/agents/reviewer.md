@@ -9,13 +9,6 @@ tools:
   - Read
   - Bash
   - Task
-  - mcp__agent-harness-kit__actions.start
-  - mcp__agent-harness-kit__actions.write
-  - mcp__agent-harness-kit__actions.complete
-  - mcp__agent-harness-kit__actions.get
-  - mcp__agent-harness-kit__actions.record_tool
-  - mcp__agent-harness-kit__tasks.acceptance.update
-  - mcp__agent-harness-kit__tasks.update
 ---
 
 # Reviewer Agent — @cardor/agent-harness-kit
