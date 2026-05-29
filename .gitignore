@@ -51,3 +51,5 @@ coverage/
 .harness/harness.db-wal
 
 graphify-out/
+.claude/skills/
+.opencode/skills/
