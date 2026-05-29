@@ -15,7 +15,7 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   build: {
-    outDir: '@/src/dashboard-dist',
+    outDir: '../src/dashboard-dist',
     emptyOutDir: true,
   },
   server: {
