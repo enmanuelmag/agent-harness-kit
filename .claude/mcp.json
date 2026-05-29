@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "agent-harness-kit": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "ahk",
+        "serve",
+        "--port",
+        "3742"
+      ]
+    }
+  }
+}
