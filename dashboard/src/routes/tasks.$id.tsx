@@ -1,26 +1,22 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 
-import { AgentBadge } from '@/components/shared/agent-badge';
-import { ErrorState } from '@/components/shared/error-state';
-import { LoadingState } from '@/components/shared/loading-state';
-import { OperationBadge } from '@/components/shared/operation-badge';
-import { PageHeader } from '@/components/shared/page-header';
-import { StatusBadge } from '@/components/shared/status-badge';
-import {
-  ActionCard,
-  SectionTitle,
-  TimestampItem,
-} from '@/components/task-detail/indx';
-import { api, formatDate, formatDuration,qk } from '@/lib/api';
+import { AgentBadge } from '@/components/shared/agent-badge'
+import { ErrorState } from '@/components/shared/error-state'
+import { LoadingState } from '@/components/shared/loading-state'
+import { OperationBadge } from '@/components/shared/operation-badge'
+import { PageHeader } from '@/components/shared/page-header'
+import { StatusBadge } from '@/components/shared/status-badge'
+import { ActionCard, SectionTitle, TimestampItem } from '@/components/task-detail/indx'
+import { api, formatDate, formatDuration, qk } from '@/lib/api'
 
 export const Route = createFileRoute('/tasks/$id')({
   component: TaskDetailPage,
-});
+})
 
 function TaskDetailPage() {
-  const { id } = Route.useParams();
+  const { id } = Route.useParams()
   const {
     data: task,
     isLoading,
@@ -28,39 +24,42 @@ function TaskDetailPage() {
   } = useQuery({
     queryKey: qk.task(Number(id)),
     queryFn: () => api.task(Number(id)),
-  });
+  })
 
-  if (isLoading) return <LoadingState />;
-  if (isError || !task) return <ErrorState message="Task not found" backTo="/tasks" backLabel="← Back to tasks" />;
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(task?.title)
+  const [editDescription, setEditDescription] = useState(task?.description ?? '')
+  const [editAcceptance, setEditAcceptance] = useState(
+    task?.acceptance.map((a) => a.criterion) ?? []
+  )
 
-  const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(task.title);
-  const [editDescription, setEditDescription] = useState(task.description ?? '');
-  const [editAcceptance, setEditAcceptance] = useState(task.acceptance.map(a => a.criterion));
+  if (isLoading) return <LoadingState />
+  if (isError || !task)
+    return <ErrorState message="Task not found" backTo="/tasks" backLabel="← Back to tasks" />
 
-  const addAcField = () => setEditAcceptance([...editAcceptance, '']);
+  const addAcField = () => setEditAcceptance([...editAcceptance, ''])
 
   const handleSave = async () => {
     await api.updateTask(Number(id), {
       title: editTitle,
       description: editDescription || null,
-      acceptance: editAcceptance.filter(a => a.trim() !== ''),
-    });
-    setEditing(false);
-    window.location.reload();
-  };
+      acceptance: editAcceptance.filter((a) => a.trim() !== ''),
+    })
+    setEditing(false)
+    window.location.reload()
+  }
 
-  const doneCount = task.acceptance.filter((a) => a.met).length;
+  const doneCount = task.acceptance.filter((a) => a.met).length
 
   const handleArchive = async () => {
-    await api.archiveTask(Number(id));
-    window.location.reload();
-  };
+    await api.archiveTask(Number(id))
+    window.location.reload()
+  }
 
   const handleUnarchive = async () => {
-    await api.unarchiveTask(Number(id));
-    window.location.reload();
-  };
+    await api.unarchiveTask(Number(id))
+    window.location.reload()
+  }
 
   return (
     <div>
@@ -102,41 +101,82 @@ function TaskDetailPage() {
 
       {/* Edit modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setEditing(false)}>
-          <div className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+          onClick={() => setEditing(false)}
+        >
+          <div
+            className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="font-mono text-sm text-[#fafafa] mb-4">Edit Task</h3>
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-neutral-500 font-mono block mb-1">Title</label>
-                <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600" />
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600"
+                />
               </div>
               <div>
                 <label className="text-xs text-neutral-500 font-mono block mb-1">Description</label>
-                <textarea value={editDescription ?? ''} onChange={(e) => setEditDescription(e.target.value)} className="w-full bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600 resize-none h-20" />
+                <textarea
+                  value={editDescription ?? ''}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600 resize-none h-20"
+                />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-neutral-500 font-mono">Acceptance Criteria</span>
-                  <button onClick={addAcField} className="text-xs font-mono text-green-500 hover:text-green-400">+ Add</button>
+                  <button
+                    onClick={addAcField}
+                    className="text-xs font-mono text-green-500 hover:text-green-400"
+                  >
+                    + Add
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {editAcceptance.map((ac, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="text-xs text-neutral-600 font-mono mt-2 shrink-0">#{i + 1}</span>
-                      <input value={ac} onChange={(e) => {
-                        const next = [...editAcceptance]
-                        next[i] = e.target.value
-                        setEditAcceptance(next)
-                      }} className="flex-1 bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600" />
-                      <button onClick={() => setEditAcceptance(editAcceptance.filter((_, j) => j !== i))} className="text-xs text-red-500 hover:text-red-400 mt-2">✕</button>
+                    // eslint-disable-next-line @eslint-react/no-array-index-key
+                    <div key={`index-${i}`} className="flex gap-2">
+                      <span className="text-xs text-neutral-600 font-mono mt-2 shrink-0">
+                        #{i + 1}
+                      </span>
+                      <input
+                        value={ac}
+                        onChange={(e) => {
+                          const next = [...editAcceptance]
+                          next[i] = e.target.value
+                          setEditAcceptance(next)
+                        }}
+                        className="flex-1 bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600"
+                      />
+                      <button
+                        onClick={() => setEditAcceptance(editAcceptance.filter((_, j) => j !== i))}
+                        className="text-xs text-red-500 hover:text-red-400 mt-2"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setEditing(false)} className="text-xs font-mono text-neutral-500 hover:text-neutral-300 px-3 py-1.5">Cancel</button>
-              <button onClick={handleSave} className="text-xs font-mono bg-[#fafafa] text-black px-3 py-1.5 rounded hover:bg-white">Save</button>
+              <button
+                onClick={() => setEditing(false)}
+                className="text-xs font-mono text-neutral-500 hover:text-neutral-300 px-3 py-1.5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="text-xs font-mono bg-[#fafafa] text-black px-3 py-1.5 rounded hover:bg-white"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>
@@ -168,10 +208,7 @@ function TaskDetailPage() {
           {task.archived_at && (
             <>
               <span className="text-neutral-700">·</span>
-              <TimestampItem
-                label="Archived"
-                value={formatDate(task.archived_at)}
-              />
+              <TimestampItem label="Archived" value={formatDate(task.archived_at)} />
             </>
           )}
         </div>
@@ -194,9 +231,7 @@ function TaskDetailPage() {
                     >
                       {a.met ? '✓' : '○'}
                     </span>
-                    <span
-                      className={`text-xs ${a.met ? 'text-neutral-300' : 'text-neutral-500'}`}
-                    >
+                    <span className={`text-xs ${a.met ? 'text-neutral-300' : 'text-neutral-500'}`}>
                       {a.criterion}
                     </span>
                   </div>
@@ -209,9 +244,7 @@ function TaskDetailPage() {
           {task.description && (
             <div className="col-span-2">
               <SectionTitle>Description</SectionTitle>
-              <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
-                {task.description}
-              </p>
+              <p className="text-sm text-neutral-400 mt-2 leading-relaxed">{task.description}</p>
             </div>
           )}
         </div>
@@ -219,9 +252,7 @@ function TaskDetailPage() {
         {/* Actions timeline */}
         {task.actions.length > 0 && (
           <div>
-            <SectionTitle>
-              Actions Timeline ({task.actions.length})
-            </SectionTitle>
+            <SectionTitle>Actions Timeline ({task.actions.length})</SectionTitle>
             <div className="mt-3 space-y-2">
               {task.actions.map((action) => (
                 <ActionCard key={action.id} action={action} />
@@ -260,11 +291,9 @@ function TaskDetailPage() {
                       <td className="px-3 py-2">
                         <AgentBadge agent={action.agent} size="xs" />
                       </td>
-                      <td className="px-3 py-2 text-xs text-neutral-600">
-                        {f.notes ?? '—'}
-                      </td>
+                      <td className="px-3 py-2 text-xs text-neutral-600">{f.notes ?? '—'}</td>
                     </tr>
-                  )),
+                  ))
                 )}
               </tbody>
             </table>
@@ -272,6 +301,5 @@ function TaskDetailPage() {
         )}
       </div>
     </div>
-  );
+  )
 }
-
