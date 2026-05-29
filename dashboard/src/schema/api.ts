@@ -37,6 +37,7 @@ export const TaskSummarySchema = v.object({
   created_at: v.string(),
   started_at: v.nullable(v.string()),
   completed_at: v.nullable(v.string()),
+  archived_at: v.nullable(v.string()),
   acceptance_total: v.number(),
   acceptance_met: v.number(),
 })
