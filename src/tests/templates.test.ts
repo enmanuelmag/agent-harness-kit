@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
-import { mergeClaudeMcpJson, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import { featureListJson } from '@/core/materializer/templates'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
@@ -60,6 +60,59 @@ describe('mergeOpencodeJson', () => {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.mcp['other'])
     assert.ok(parsed.mcp['agent-harness-kit'])
+    teardown()
+  })
+})
+
+describe('mergeClaudeSettingsLocalJson', () => {
+  test('creates file when it does not exist', () => {
+    setup()
+    const path = join(TMP, '.claude/settings.local.json')
+    mergeClaudeSettingsLocalJson(path)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    assert.ok(Array.isArray(parsed.permissions.allow))
+    assert.ok(parsed.permissions.allow.includes('mcp__agent-harness-kit__actions_start'))
+    assert.ok(Array.isArray(parsed.enabledMcpjsonServers))
+    assert.ok(parsed.enabledMcpjsonServers.includes('agent-harness-kit'))
+    assert.equal(parsed.permissions.allow.length, 15)
+    teardown()
+  })
+
+  test('preserves existing permissions and merges without duplicates', () => {
+    setup()
+    const path = join(TMP, '.claude/settings.local.json')
+    mkdirSync(join(TMP, '.claude'), { recursive: true })
+    const initial = {
+      permissions: { allow: ['mcp__agent-harness-kit__actions_start', 'mcp__other__tool'] },
+      enabledMcpjsonServers: ['agent-harness-kit', 'other-server'],
+    }
+    writeFileSync(path, JSON.stringify(initial))
+    mergeClaudeSettingsLocalJson(path)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    // No duplicates — actions_start was already present
+    const count = parsed.permissions.allow.filter(
+      (e: string) => e === 'mcp__agent-harness-kit__actions_start'
+    ).length
+    assert.equal(count, 1)
+    assert.ok(parsed.permissions.allow.includes('mcp__other__tool'))
+    assert.ok(parsed.enabledMcpjsonServers.includes('other-server'))
+    const serverCount = parsed.enabledMcpjsonServers.filter(
+      (e: string) => e === 'agent-harness-kit'
+    ).length
+    assert.equal(serverCount, 1)
+    teardown()
+  })
+
+  test('handles missing permissions key gracefully', () => {
+    setup()
+    const path = join(TMP, '.claude/settings.local.json')
+    mkdirSync(join(TMP, '.claude'), { recursive: true })
+    writeFileSync(path, JSON.stringify({ someOtherKey: true }))
+    mergeClaudeSettingsLocalJson(path)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    assert.ok(parsed.someOtherKey)
+    assert.ok(Array.isArray(parsed.permissions.allow))
+    assert.ok(parsed.permissions.allow.length === 15)
     teardown()
   })
 })
