@@ -6,11 +6,10 @@ description: >
   and the explorer's analysis. Invoke only after the explorer has completed its action.
   Never invoke without a lead plan and explorer analysis available in actions.get(taskId).
 tools:
-  read: true
-  write: true
-  edit: true
-  bash: true
-permissionMode: acceptEdits
+  - Read
+  - Write
+  - Edit
+  - Bash
 ---
 
 # Builder Agent — {{projectName}}

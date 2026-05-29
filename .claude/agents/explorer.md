@@ -7,6 +7,7 @@ description: >
   Never invoke for tasks that require writing or modifying files.
 tools:
   - Read
+  - Task
   - Bash
   - mcp__agent-harness-kit__actions.start
   - mcp__agent-harness-kit__actions.write
@@ -48,6 +49,7 @@ actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
 ```
 
 Examples:
+
 - `actions.record_tool(actionId, 'Read', 'src/auth/middleware.ts', 'find existing JWT pattern')`
 - `actions.record_tool(actionId, 'Bash', 'grep -r "refreshToken" src/', 'locate all refresh token usages')`
 - `actions.record_tool(actionId, 'docs.search', 'authentication middleware', 'check project docs for auth guidance')`
@@ -93,6 +95,7 @@ Log each invocation as described in the **MANDATORY TRACKING** section above —
 ### 6. Produce a structured analysis
 
 Your output should answer:
+
 - What files are relevant and why?
 - What patterns does the builder must follow?
 - Are there existing implementations to reuse or extend?
@@ -100,6 +103,7 @@ Your output should answer:
 - What files will likely need to be created or modified?
 
 Record it:
+
 ```
 actions.write(actionId, 'result', '<structured analysis>')
 ```
@@ -109,6 +113,7 @@ Format clearly with sections — the builder reads this directly.
 ### 7. Record blockers if any
 
 If you cannot map something (file not found, path not allowed, unclear requirements):
+
 ```
 actions.write(actionId, 'blockers', '<what is missing and why>')
 ```

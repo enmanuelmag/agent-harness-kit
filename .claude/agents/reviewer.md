@@ -8,6 +8,7 @@ description: >
 tools:
   - Read
   - Bash
+  - Task
   - mcp__agent-harness-kit__actions.start
   - mcp__agent-harness-kit__actions.write
   - mcp__agent-harness-kit__actions.complete
@@ -44,6 +45,7 @@ actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
 ```
 
 Examples:
+
 - `actions.record_tool(actionId, 'Read', 'src/auth/middleware.ts', 'verify refresh token logic matches criterion 2')`
 - `actions.record_tool(actionId, 'Bash', 'npm test --testPathPattern=auth', 'confirm all auth tests pass')`
 
@@ -68,6 +70,7 @@ actions.get(taskId)
 ```
 
 Read in order:
+
 1. Lead's `result` — the original plan and acceptance criteria
 2. Explorer's `result` — what was mapped
 3. Builder's `result` and `files_modified` — what was actually changed
@@ -95,11 +98,13 @@ If exit code ≠ 0 → **block immediately**. A failing health check is an autom
 ### 5. Record your verdict
 
 **If approved:**
+
 ```
 actions.write(actionId, 'result', 'APPROVED\n\nAll N acceptance criteria met.\n<brief summary>')
 ```
 
 **If blocked:**
+
 ```
 actions.write(actionId, 'result', 'BLOCKED\n\n<list each unmet criterion with specific details>')
 actions.write(actionId, 'blockers', '<actionable list of what the builder needs to fix>')
@@ -110,12 +115,14 @@ Be specific. "Tests are failing" is not actionable. "test/auth.test.ts line 34 f
 ### 6. Complete your action
 
 **If approved:**
+
 ```
 actions.complete(actionId, 'Task approved — all criteria met, health green')
 tasks.update(taskId, 'done')
 ```
 
 **If blocked:**
+
 ```
 actions.complete(actionId, 'Task blocked — N issues require builder attention')
 ```

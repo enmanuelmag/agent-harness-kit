@@ -14,6 +14,7 @@ import {
   claudeMd,
   featureListJson,
   HEALTH_SH,
+  translateFrontmatterForClaudeCode,
 } from './templates'
 
 import type { Materializer } from './index'
@@ -49,10 +50,10 @@ export class ClaudeCodeMaterializer implements Materializer {
     const projectName = config.project.name
     const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    writeAgentFile(cwd, '.claude/agents/lead.md', agentLead({ projectName }))
-    writeAgentFile(cwd, '.claude/agents/explorer.md', agentExplorer({ projectName, allowedPaths }))
-    writeAgentFile(cwd, '.claude/agents/builder.md', agentBuilder({ projectName, writablePaths }))
-    writeAgentFile(cwd, '.claude/agents/reviewer.md', agentReviewer({ projectName }))
+    writeAgentFile(cwd, '.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead'))
+    writeAgentFile(cwd, '.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer'))
+    writeAgentFile(cwd, '.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder'))
+    writeAgentFile(cwd, '.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer'))
 
     // .claude/mcp.json — MERGE, never overwrite whole file
     mergeClaudeMcpJson(join(cwd, '.claude/mcp.json'), config.tools.mcp.port)
@@ -78,10 +79,10 @@ export class ClaudeCodeMaterializer implements Materializer {
     const projectName = config.project.name
     const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    writeAgentFile(cwd, '.claude/agents/lead.md', agentLead({ projectName }))
-    writeAgentFile(cwd, '.claude/agents/explorer.md', agentExplorer({ projectName, allowedPaths }))
-    writeAgentFile(cwd, '.claude/agents/builder.md', agentBuilder({ projectName, writablePaths }))
-    writeAgentFile(cwd, '.claude/agents/reviewer.md', agentReviewer({ projectName }))
+    writeAgentFile(cwd, '.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead'))
+    writeAgentFile(cwd, '.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer'))
+    writeAgentFile(cwd, '.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder'))
+    writeAgentFile(cwd, '.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer'))
 
     // MCP config: always merge
     mergeClaudeMcpJson(join(cwd, '.claude/mcp.json'), config.tools.mcp.port)

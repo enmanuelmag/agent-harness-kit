@@ -7,14 +7,14 @@ export default defineHarness({
     docsPath: './docs',
   },
 
-  provider: 'opencode',
+  provider: 'claude-code',
 
   agents: {
-    lead:     { instructionsPath: null },
+    lead: { instructionsPath: null },
     explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'] },
-    builder:  { instructionsPath: null, writablePaths: ['./src', './tests'] },
+    builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
     reviewer: { instructionsPath: null },
-    custom:   [],
+    custom: [],
   },
 
   // SQLite (default). Switch to postgres/mysql by changing database.type.
@@ -23,25 +23,25 @@ export default defineHarness({
   database: { type: 'sqlite', path: '.harness/harness.db' },
 
   storage: {
-    dir:    '.harness',
-    tasks:  { adapter: 'local' },
+    dir: '.harness',
+    tasks: { adapter: 'local' },
     sections: {
-      toolsUsed:     true,
+      toolsUsed: true,
       filesModified: true,
-      result:        true,
-      blockers:      true,
-      nextSteps:     false,
+      result: true,
+      blockers: true,
+      nextSteps: false,
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
   },
 
   health: {
     scriptPath: './health.sh',
-    required:   true,
+    required: true,
   },
 
   tools: {
-    mcp:     { enabled: true, port: 3742 },
+    mcp: { enabled: true, port: 3742 },
     scripts: { enabled: true, outputDir: './.harness/scripts' },
   },
 })

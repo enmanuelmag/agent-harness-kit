@@ -6,11 +6,8 @@ description: >
   changes against each criterion, runs the health check, and either approves or blocks
   with specific, actionable feedback. Invoke only after the builder has completed its action.
 tools:
-  read: true
-  write: false
-  edit: false
-  bash: true
-permissionMode: plan
+  - Read
+  - Bash
 ---
 
 # Reviewer Agent — {{projectName}}

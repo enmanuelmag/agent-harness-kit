@@ -6,11 +6,8 @@ description: >
   builder to use. Invoke after the lead has defined a plan and before the builder starts.
   Never invoke for tasks that require writing or modifying files.
 tools:
-  read: true
-  write: false
-  edit: false
-  bash: true
-permissionMode: plan
+  - Read
+  - Bash
 ---
 
 # Explorer Agent — {{projectName}}

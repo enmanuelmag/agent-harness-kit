@@ -8,6 +8,7 @@ description: >
 tools:
   - Read
   - Write
+  - Task
   - Edit
   - Bash
   - mcp__agent-harness-kit__actions.start
@@ -51,6 +52,7 @@ actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
 ```
 
 Examples:
+
 - `actions.record_tool(actionId, 'Read', 'src/auth/middleware.ts', 'understand existing JWT pattern')`
 - `actions.record_tool(actionId, 'Bash', 'npm test --testPathPattern=auth', 'verify auth tests pass')`
 - `actions.record_tool(actionId, 'Edit', 'src/auth/middleware.ts:45-78', 'add refresh token validation')`

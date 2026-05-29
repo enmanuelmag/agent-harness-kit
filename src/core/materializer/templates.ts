@@ -27,7 +27,7 @@ export const HEALTH_SH = `#!/usr/bin/env bash
 # health.sh — project health check for agent-harness-kit
 #
 # This script must exit 0 when the project is healthy.
-# Agents will run this before starting work.
+# Agents will run this before making codebase changes.
 #
 # TODO: implement your project's health checks below.
 # Examples:
@@ -58,13 +58,13 @@ export function agentsMd(config: HarnessConfig): string {
 
 **${name}** — ${description}
 
-## Health check (run before starting)
+## Health check (run before making codebase changes)
 
 \`\`\`bash
 bash health.sh
 \`\`\`
 
-If it exits non-zero, stop and report the issue. Do not proceed with tasks until health is green.
+If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green.
 
 ## Harness data (source of truth)
 
@@ -97,7 +97,7 @@ docs.search          query                                  → search ${docsPat
 
 \`\`\`
 1. INIT
-   - Run health.sh → exit 1 means stop
+   - Assess user intent: only run health.sh if changes are needed
    - tasks.get('in_progress') → resume if something is in progress
    - tasks.get('pending') → pick lowest id
 
@@ -109,7 +109,7 @@ docs.search          query                                  → search ${docsPat
 
 3. CLOSE
    - tasks.update(taskId, 'done')
-   - Run health.sh → must be green before closing
+   - Run health.sh (if changes were made) → must be green before closing
 \`\`\`
 
 ## Agent roles
@@ -145,13 +145,13 @@ export function claudeMd(config: HarnessConfig): string {
 
 **${name}** — ${description}
 
-## Health check (run before starting)
+## Health check (run before making codebase changes)
 
 \`\`\`bash
 bash health.sh
 \`\`\`
 
-If it exits non-zero, stop and report the issue. Do not proceed with tasks until health is green.
+If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green.
 
 ## Harness data (source of truth)
 
@@ -184,7 +184,7 @@ docs.search          query                                  → search ${docsPat
 
 \`\`\`
 1. INIT
-   - Run health.sh → exit 1 means stop
+   - Assess user intent: only run health.sh if changes are needed
    - tasks.get('in_progress') → resume if something is in progress
    - tasks.get('pending') → pick lowest id
    - No pending tasks? → ask user, infer fields, call tasks.add, then tasks.claim
@@ -197,7 +197,7 @@ docs.search          query                                  → search ${docsPat
 
 3. CLOSE
    - tasks.update(taskId, 'done')
-   - Run health.sh → must be green before closing
+   - Run health.sh (if changes were made) → must be green before closing
 \`\`\`
 
 ## Agent roles
@@ -375,6 +375,72 @@ export function agentBuilderToml(vars: { projectName: string; writablePaths: str
 export function agentReviewerToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('reviewer', vars))
   return toCodexToml('reviewer', description, body, 'read-only')
+}
+
+// ─── Claude Code frontmatter translation ─────────────────────────────────────
+
+const CLAUDE_CODE_MCP_TOOLS: Record<string, string[]> = {
+  lead: [
+    'mcp__agent-harness-kit__actions.start',
+    'mcp__agent-harness-kit__actions.write',
+    'mcp__agent-harness-kit__actions.complete',
+    'mcp__agent-harness-kit__actions.get',
+    'mcp__agent-harness-kit__actions.record_tool',
+    'mcp__agent-harness-kit__tasks.get',
+    'mcp__agent-harness-kit__tasks.claim',
+    'mcp__agent-harness-kit__tasks.update',
+    'mcp__agent-harness-kit__tasks.add',
+  ],
+  explorer: [
+    'mcp__agent-harness-kit__actions.start',
+    'mcp__agent-harness-kit__actions.write',
+    'mcp__agent-harness-kit__actions.complete',
+    'mcp__agent-harness-kit__actions.get',
+    'mcp__agent-harness-kit__actions.record_tool',
+    'mcp__agent-harness-kit__docs.search',
+  ],
+  builder: [
+    'mcp__agent-harness-kit__actions.start',
+    'mcp__agent-harness-kit__actions.write',
+    'mcp__agent-harness-kit__actions.complete',
+    'mcp__agent-harness-kit__actions.get',
+    'mcp__agent-harness-kit__actions.record_tool',
+    'mcp__agent-harness-kit__actions.record_file',
+  ],
+  reviewer: [
+    'mcp__agent-harness-kit__actions.start',
+    'mcp__agent-harness-kit__actions.write',
+    'mcp__agent-harness-kit__actions.complete',
+    'mcp__agent-harness-kit__actions.get',
+    'mcp__agent-harness-kit__actions.record_tool',
+    'mcp__agent-harness-kit__tasks.acceptance.update',
+    'mcp__agent-harness-kit__tasks.update',
+  ],
+}
+
+/**
+ * Takes a template markdown string (with simple tools list) and injects
+ * `Task` + the agent-specific `mcp__agent-harness-kit__*` tools into the
+ * frontmatter `tools:` section for Claude Code.
+ *
+ * Inserts `Task` after the last non-mcp tool entry, then appends mcp tools.
+ */
+export function translateFrontmatterForClaudeCode(
+  md: string,
+  agentName: 'lead' | 'explorer' | 'builder' | 'reviewer'
+): string {
+  const mcpTools = CLAUDE_CODE_MCP_TOOLS[agentName] ?? []
+  const mcpLines = mcpTools.map(t => `  - ${t}`).join('\n')
+
+  // Find the tools: block in frontmatter and append Task + mcp tools after last tool entry
+  // We look for the pattern: a line with `  - SomeTool` followed by either `---` or a non-tool line
+  return md.replace(
+    /(tools:\n(?:  - (?!mcp__)[^\n]+\n)+)/,
+    (match) => {
+      const trimmed = match.trimEnd()
+      return `${trimmed}\n  - Task\n${mcpLines}\n`
+    }
+  )
 }
 
 // ─── .gitignore additions ─────────────────────────────────────────────────────

@@ -6,10 +6,8 @@ description: >
   Invoke when starting a new work session, picking up a pending task, or when another agent
   reports a blocker that requires re-coordination.
 tools:
-  read: true
-  write: false
-  edit: false
-  bash: true
+  - Read
+  - Bash
 ---
 
 # Lead Agent — {{projectName}}
@@ -64,7 +62,7 @@ actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
 ```
 
 Examples:
-- `actions.record_tool(actionId, 'Bash', 'bash health.sh', 'verify codebase health before starting')`
+- `actions.record_tool(actionId, 'Bash', 'bash health.sh', 'verify codebase health before making changes')`
 - `actions.record_tool(actionId, 'tasks.get', 'pending', 'find next task to claim')`
 - `actions.record_tool(actionId, 'actions.get', 'taskId=abc123', 'read action history to resume in-progress task')`
 
@@ -74,7 +72,14 @@ Examples:
 
 ## Workflow
 
-### 1. Orient (always first)
+### 0. Assess user intent (before running health check)
+
+Before running the health check, evaluate whether the user's prompt requires codebase changes:
+
+- **If the user is simply asking a question, checking something, or seeking information** (no code changes needed) → skip the health check entirely. Proceed to respond to the query directly.
+- **If the user wants to make changes** (refactor, fix, add feature, modify config, or any codebase modification) → proceed to Step 1 below and run health check.
+
+### 1. Orient (run health check when making changes)
 
 ```
 bash health.sh
@@ -165,7 +170,7 @@ If the reviewer blocks the task:
 Once the reviewer approves:
 ```
 tasks.update(taskId, 'done')
-bash health.sh   → must be green before closing
+bash health.sh   → must be green before closing (only if changes were made)
 ```
 
 
@@ -183,9 +188,10 @@ When creating a PR via the CLI, gather context in this order:
 
 - **One task at a time.** Never pick a second task while one is in progress.
 - **YOU DO NOT MODIFY THE CODEBASE — EVER.** No file writes, no edits, no Bash commands that change state. Delegate ALL implementation to Builder, ALL analysis to Explorer.
-- **Bash is read-only.** The only Bash commands you may run are: `bash health.sh`, `git status/log/diff`, `ls`, `cat`, `find`, `grep`. Nothing that writes.
+- **Bash is read-only.** The only Bash commands you may run are: `bash health.sh` (only when making changes), `git status/log/diff`, `ls`, `cat`, `find`, `grep`. Nothing that writes.
 - **Never mark done without reviewer approval.**
 - **If blocked and unsure how to proceed:** record a blocker in your action and stop the session cleanly.
+- **Skip health check for informational queries.** If the user is just asking a question, do not run health.sh.
 
 ## Anti-patterns to avoid
 
