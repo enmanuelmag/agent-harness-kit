@@ -10,6 +10,7 @@ tools:
   write: true
   edit: true
   bash: true
+permissionMode: acceptEdits
 ---
 
 # Builder Agent — @cardor/agent-harness-kit

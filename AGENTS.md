@@ -4,7 +4,7 @@
 
 ## Project
 
-**@cardor/agent-harness-kit** — A CLI Tool to setup agent harness
+**@cardor/agent-harness-kit** — A CLI tool to manage agnets
 
 ## Health check (run before starting)
 

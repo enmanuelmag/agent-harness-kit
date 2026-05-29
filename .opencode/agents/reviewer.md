@@ -10,6 +10,7 @@ tools:
   write: false
   edit: false
   bash: true
+permissionMode: plan
 ---
 
 # Reviewer Agent — @cardor/agent-harness-kit

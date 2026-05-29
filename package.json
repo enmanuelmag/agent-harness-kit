@@ -59,7 +59,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@cardor/agent-harness-kit": "^0.17.0",
+    "@cardor/agent-harness-kit": "^1.2.3",
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
     "@eslint-react/eslint-plugin": "^5.7.1",

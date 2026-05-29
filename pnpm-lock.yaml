@@ -52,8 +52,8 @@ importers:
         version: 8.20.0
     devDependencies:
       '@cardor/agent-harness-kit':
-        specifier: ^0.17.0
-        version: 0.17.0(zod@4.4.3)
+        specifier: ^1.2.3
+        version: 1.2.3(@types/node@22.19.19)(typescript@5.9.3)(zod@4.4.3)
       '@commitlint/cli':
         specifier: ^20.5.3
         version: 20.5.3(@types/node@22.19.19)(conventional-commits-parser@6.4.0)(typescript@5.9.3)
@@ -246,9 +246,9 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@cardor/agent-harness-kit@0.17.0':
-    resolution: {integrity: sha512-lEBCQac81lghwwY4Du7eyjW4rwX3XfqMM3N3245Pn7Jxq8V79kVXWe+4JFf9j+wCuMRDMRnadT5ORJCklZX7AA==}
-    engines: {node: '>=20.0.0'}
+  '@cardor/agent-harness-kit@1.2.3':
+    resolution: {integrity: sha512-bMT1bLnzOAr1iOW0l2sxS6RRB9yjT2c7tGxlrWZwl++6/vZLW6SeApkq9goxWxZSRZQQmOuHGnFyo6EWTduXjw==}
+    engines: {node: '>=22.5.0'}
     hasBin: true
 
   '@clack/core@0.4.1':
@@ -2796,22 +2796,55 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@cardor/agent-harness-kit@0.17.0(zod@4.4.3)':
+  '@cardor/agent-harness-kit@1.2.3(@types/node@22.19.19)(typescript@5.9.3)(zod@4.4.3)':
     dependencies:
       '@clack/prompts': 0.9.1
       '@hono/node-server': 1.19.14(hono@4.12.18)
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
       cli-table3: 0.6.5
       commander: 12.1.0
+      drizzle-orm: 0.45.2(mysql2@3.22.3(@types/node@22.19.19))(postgres@3.4.9)
       hono: 4.12.18
       jiti: 2.7.0
+      mysql2: 3.22.3(@types/node@22.19.19)
       open: 10.2.0
       picocolors: 1.1.1
+      postgres: 3.4.9
+      valibot: 1.4.0(typescript@5.9.3)
       ws: 8.20.0
     transitivePeerDependencies:
+      - '@aws-sdk/client-rds-data'
       - '@cfworker/json-schema'
+      - '@cloudflare/workers-types'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@libsql/client-wasm'
+      - '@neondatabase/serverless'
+      - '@op-engineering/op-sqlite'
+      - '@opentelemetry/api'
+      - '@planetscale/database'
+      - '@prisma/client'
+      - '@tidbcloud/serverless'
+      - '@types/better-sqlite3'
+      - '@types/node'
+      - '@types/pg'
+      - '@types/sql.js'
+      - '@upstash/redis'
+      - '@vercel/postgres'
+      - '@xata.io/client'
+      - better-sqlite3
       - bufferutil
+      - bun-types
+      - expo-sqlite
+      - gel
+      - knex
+      - kysely
+      - pg
+      - prisma
+      - sql.js
+      - sqlite3
       - supports-color
+      - typescript
       - utf-8-validate
       - zod
 

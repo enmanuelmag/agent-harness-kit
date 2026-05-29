@@ -10,6 +10,7 @@ tools:
   write: false
   edit: false
   bash: true
+permissionMode: plan
 ---
 
 # Explorer Agent — @cardor/agent-harness-kit
