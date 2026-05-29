@@ -107,7 +107,7 @@ function getProviderHealthFiles(provider: HarnessConfig['provider']): {
 } {
   switch (provider) {
     case 'claude-code':
-      return { agentsDir: '.claude/agents', agentExtension: '.md', mcpFile: '.claude/mcp.json' }
+      return { agentsDir: '.claude/agents', agentExtension: '.md', mcpFile: '.mcp.json' }
     case 'opencode':
       return { agentsDir: '.opencode/agents', agentExtension: '.md', mcpFile: 'opencode.json' }
     case 'codex-cli':
