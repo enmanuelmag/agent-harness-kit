@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @eslint-react/exhaustive-deps */
 /* eslint-disable @eslint-react/set-state-in-effect */
 import { useQuery } from '@tanstack/react-query'

@@ -19,8 +19,9 @@
     "ahk": "./bin/ahk.js"
   },
   "scripts": {
-    "build": "pnpm run build:ui && tsup && pnpm run copy-assets",
-    "build:ui": "pnpm --filter ahk-dashboard install && pnpm --filter ahk-dashboard run build",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm run build:ui && pnpm run typecheck && tsup && pnpm run copy-assets",
+    "build:ui": "pnpm --filter ahk-dashboard install && npx eslint dashboard/src/ && pnpm --filter ahk-dashboard run typecheck && pnpm --filter ahk-dashboard run build",
     "copy-assets": "node scripts/copy-assets.mjs",
     "dev": "tsup --watch",
     "test": "node --test --import tsx/esm src/tests/*.test.ts",
