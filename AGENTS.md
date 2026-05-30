@@ -6,13 +6,13 @@
 
 **@cardor/agent-harness-kit** — A CLI tool to manage agnets
 
-## Health check (run before starting)
+## Health check (run before making codebase changes)
 
 ```bash
 bash health.sh
 ```
 
-If it exits non-zero, stop and report the issue. Do not proceed with tasks until health is green.
+If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green.
 
 ## Harness data (source of truth)
 
@@ -45,7 +45,7 @@ docs.search          query                                  → search ./docs fo
 
 ```
 1. INIT
-   - Run health.sh → exit 1 means stop
+   - Assess user intent: only run health.sh if changes are needed
    - tasks.get('in_progress') → resume if something is in progress
    - tasks.get('pending') → pick lowest id
 
@@ -57,7 +57,7 @@ docs.search          query                                  → search ./docs fo
 
 3. CLOSE
    - tasks.update(taskId, 'done')
-   - Run health.sh → must be green before closing
+   - Run health.sh (if changes were made) → must be green before closing
 ```
 
 ## Agent roles
