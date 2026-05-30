@@ -11,6 +11,21 @@ tools:
   - Task
   - Edit
   - Bash
+  - mcp__agent-harness-kit__actions_start
+  - mcp__agent-harness-kit__actions_write
+  - mcp__agent-harness-kit__actions_complete
+  - mcp__agent-harness-kit__actions_get
+  - mcp__agent-harness-kit__actions_record_file
+  - mcp__agent-harness-kit__actions_record_tool
+  - mcp__agent-harness-kit__tasks_get
+  - mcp__agent-harness-kit__tasks_claim
+  - mcp__agent-harness-kit__tasks_update
+  - mcp__agent-harness-kit__tasks_add
+  - mcp__agent-harness-kit__tasks_acceptance_update
+  - mcp__agent-harness-kit__tasks_edit
+  - mcp__agent-harness-kit__tasks_archive
+  - mcp__agent-harness-kit__tasks_unarchive
+  - mcp__agent-harness-kit__docs_search
 ---
 
 # Builder Agent — @cardor/agent-harness-kit
