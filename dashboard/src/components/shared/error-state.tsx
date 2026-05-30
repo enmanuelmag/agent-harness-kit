@@ -10,7 +10,7 @@ export function ErrorState({ message = 'Something went wrong', backTo, backLabel
   return (
     <div className="p-6">
       {backTo && (
-        <Link to={backTo} className="font-mono text-xs text-neutral-500 hover:text-neutral-300 transition-colors">
+        <Link to={backTo} className="font-mono text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors">
           {backLabel}
         </Link>
       )}
