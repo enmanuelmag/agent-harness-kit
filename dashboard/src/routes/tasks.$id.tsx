@@ -93,7 +93,7 @@ function TaskDetailPage() {
             ) : (
               <button
                 onClick={handleArchive}
-                className="text-xs font-mono text-neutral-500 hover:text-red-400 border border-[#1f1f1f] px-3 py-1 rounded"
+                className="text-xs font-mono text-[var(--color-text-muted)] hover:text-red-400 border border-[var(--color-border)] px-3 py-1 rounded"
               >
                 Archive
               </button>
@@ -106,7 +106,7 @@ function TaskDetailPage() {
       <div className="px-6 pt-3">
         <button
           onClick={() => setEditing(true)}
-          className="text-xs font-mono text-neutral-500 hover:text-[#fafafa] border border-[#1f1f1f] px-3 py-1.5 rounded transition-colors"
+          className="text-xs font-mono text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] px-3 py-1.5 rounded transition-colors"
         >
           Edit
         </button>
@@ -119,30 +119,30 @@ function TaskDetailPage() {
           onClick={() => setEditing(false)}
         >
           <div
-            className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-6 w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-4 max-h-[80vh] overflow-y-auto max-md:inset-0 max-md:rounded-none max-md:h-screen max-md:w-screen max-md:max-w-full max-md:max-h-full max-md:m-0"
+            className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-lg p-6 w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-4 max-h-[80vh] overflow-y-auto max-md:inset-0 max-md:rounded-none max-md:h-screen max-md:w-screen max-md:max-w-full max-md:max-h-full max-md:m-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-mono text-sm text-[#fafafa] mb-4">Edit Task</h3>
+            <h3 className="font-mono text-sm text-[var(--color-text-primary)] mb-4">Edit Task</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-neutral-500 font-mono block mb-1">Title</label>
+                <label className="text-xs text-[var(--color-text-muted)] font-mono block mb-1">Title</label>
                 <input
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600"
+                  className="w-full bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono outline-none focus:border-[var(--color-text-muted)]"
                 />
               </div>
               <div>
-                <label className="text-xs text-neutral-500 font-mono block mb-1">Description</label>
+                <label className="text-xs text-[var(--color-text-muted)] font-mono block mb-1">Description</label>
                 <textarea
                   value={editDescription ?? ''}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600 resize-none h-20"
+                  className="w-full bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono outline-none focus:border-[var(--color-text-muted)] resize-none h-20"
                 />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-neutral-500 font-mono">Acceptance Criteria</span>
+                  <span className="text-xs text-[var(--color-text-muted)] font-mono">Acceptance Criteria</span>
                   <button
                     onClick={addAcField}
                     className="text-xs font-mono text-green-500 hover:text-green-400"
@@ -154,7 +154,7 @@ function TaskDetailPage() {
                   {editAcceptance.map((ac, i) => (
                     // eslint-disable-next-line @eslint-react/no-array-index-key
                     <div key={`index-${i}`} className="flex gap-2">
-                      <span className="text-xs text-neutral-600 font-mono mt-2 shrink-0">
+                      <span className="text-xs text-[var(--color-text-faint)] font-mono mt-2 shrink-0">
                         #{i + 1}
                       </span>
                       <input
@@ -164,7 +164,7 @@ function TaskDetailPage() {
                           next[i] = e.target.value
                           setEditAcceptance(next)
                         }}
-                        className="flex-1 bg-black border border-[#1f1f1f] rounded px-3 py-2 text-sm text-[#fafafa] font-mono outline-none focus:border-neutral-600"
+                        className="flex-1 bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono outline-none focus:border-[var(--color-text-muted)]"
                       />
                       <button
                         onClick={() => setEditAcceptance(editAcceptance.filter((_, j) => j !== i))}
@@ -180,13 +180,13 @@ function TaskDetailPage() {
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setEditing(false)}
-                className="text-xs font-mono text-neutral-500 hover:text-neutral-300 px-3 py-1.5"
+                className="text-xs font-mono text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] px-3 py-1.5"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="text-xs font-mono bg-[#fafafa] text-black px-3 py-1.5 rounded hover:bg-white"
+                className="text-xs font-mono bg-[var(--color-text-primary)] text-[var(--color-bg-base)] px-3 py-1.5 rounded hover:opacity-90"
               >
                 Save
               </button>
@@ -199,19 +199,19 @@ function TaskDetailPage() {
         {/* Timestamps */}
         <div className="flex gap-6 text-xs font-mono">
           <TimestampItem label="Created" value={formatDate(task.created_at)} />
-          <span className="text-neutral-700">→</span>
+          <span className="text-[var(--color-text-faint)]">→</span>
           <TimestampItem
             label="Started"
             value={task.started_at ? formatDate(task.started_at) : '—'}
           />
-          <span className="text-neutral-700">→</span>
+          <span className="text-[var(--color-text-faint)]">→</span>
           <TimestampItem
             label="Completed"
             value={task.completed_at ? formatDate(task.completed_at) : '—'}
           />
           {task.started_at && (
             <>
-              <span className="text-neutral-700">·</span>
+              <span className="text-[var(--color-text-faint)]">·</span>
               <TimestampItem
                 label="Duration"
                 value={formatDuration(task.started_at, task.completed_at)}
@@ -220,7 +220,7 @@ function TaskDetailPage() {
           )}
           {task.archived_at && (
             <>
-              <span className="text-neutral-700">·</span>
+              <span className="text-[var(--color-text-faint)]">·</span>
               <TimestampItem label="Archived" value={formatDate(task.archived_at)} />
             </>
           )}
@@ -232,7 +232,7 @@ function TaskDetailPage() {
             <div className="col-span-1">
               <SectionTitle>
                 Acceptance Criteria{' '}
-                <span className="text-neutral-600">
+                <span className="text-[var(--color-text-faint)]">
                   ({doneCount}/{task.acceptance.length})
                 </span>
               </SectionTitle>
@@ -240,11 +240,11 @@ function TaskDetailPage() {
                 {task.acceptance.map((a) => (
                   <div key={a.id} className="flex items-start gap-2">
                     <span
-                      className={`mt-0.5 text-xs font-mono shrink-0 ${a.met ? 'text-green-400' : 'text-neutral-700'}`}
+                      className={`mt-0.5 text-xs font-mono shrink-0 ${a.met ? 'text-green-400' : 'text-[var(--color-text-faint)]'}`}
                     >
                       {a.met ? '✓' : '○'}
                     </span>
-                    <span className={`text-xs ${a.met ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                    <span className={`text-xs ${a.met ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}`}>
                       {a.criterion}
                     </span>
                   </div>
@@ -257,7 +257,7 @@ function TaskDetailPage() {
           {task.description && (
             <div className="col-span-2">
               <SectionTitle>Description</SectionTitle>
-              <p className="text-sm text-neutral-400 mt-2 leading-relaxed">{task.description}</p>
+              <p className="text-sm text-[var(--color-text-secondary)] mt-2 leading-relaxed">{task.description}</p>
             </div>
           )}
         </div>
@@ -280,11 +280,11 @@ function TaskDetailPage() {
             <SectionTitle>Files Touched</SectionTitle>
             <table className="w-full mt-2 text-sm">
               <thead>
-                <tr className="border-b border-[#1f1f1f]">
+                <tr className="border-b border-[var(--color-border)]">
                   {['Operation', 'File Path', 'Agent', 'Notes'].map((h) => (
                     <th
                       key={h}
-                      className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-3 py-2"
+                      className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-3 py-2"
                     >
                       {h}
                     </th>
@@ -294,17 +294,17 @@ function TaskDetailPage() {
               <tbody>
                 {task.actions.flatMap((action) =>
                   action.files.map((f) => (
-                    <tr key={f.id} className="border-b border-[#1f1f1f]">
+                    <tr key={f.id} className="border-b border-[var(--color-border)]">
                       <td className="px-3 py-2">
                         <OperationBadge op={f.operation} />
                       </td>
-                      <td className="px-3 py-2 font-mono text-xs text-neutral-300">
+                      <td className="px-3 py-2 font-mono text-xs text-[var(--color-text-secondary)]">
                         {f.file_path}
                       </td>
                       <td className="px-3 py-2">
                         <AgentBadge agent={action.agent} size="xs" />
                       </td>
-                      <td className="px-3 py-2 text-xs text-neutral-600">{f.notes ?? '—'}</td>
+                      <td className="px-3 py-2 text-xs text-[var(--color-text-faint)]">{f.notes ?? '—'}</td>
                     </tr>
                   ))
                 )}

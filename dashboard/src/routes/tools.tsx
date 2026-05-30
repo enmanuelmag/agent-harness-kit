@@ -35,34 +35,34 @@ function ToolsPage() {
       <div className="p-6 space-y-8">
         {/* Top tools bar chart */}
         <div>
-          <h2 className="font-mono text-xs text-neutral-500 uppercase tracking-wider mb-4">
+          <h2 className="font-mono text-xs text-[var(--color-text-muted)] uppercase tracking-wider mb-4">
             Top Tools
           </h2>
           {topTools.isLoading && (
-            <p className="font-mono text-xs text-neutral-600">Loading…</p>
+            <p className="font-mono text-xs text-[var(--color-text-faint)]">Loading…</p>
           )}
 
           <div className="space-y-1.5">
             {(topTools.data ?? []).map(({ tool_name, uses }) => (
               <div key={tool_name} className="flex items-center gap-3">
-                <div className="w-48 font-mono text-xs text-neutral-400 text-right shrink-0 truncate">
+                <div className="w-48 font-mono text-xs text-[var(--color-text-secondary)] text-right shrink-0 truncate">
                   {tool_name}
                 </div>
                 <div className="flex-1 flex items-center gap-2">
-                  <div className="flex-1 bg-neutral-900 rounded-sm h-5 overflow-hidden">
+                  <div className="flex-1 bg-[var(--color-bg-elevated)] rounded-sm h-5 overflow-hidden">
                     <div
                       className="bg-violet-900 h-full transition-all flex items-center px-2"
                       style={{ width: `${(uses / maxUses) * 100}%` }}
                     />
                   </div>
-                  <span className="font-mono text-xs text-neutral-500 w-8 text-right shrink-0">
+                  <span className="font-mono text-xs text-[var(--color-text-muted)] w-8 text-right shrink-0">
                     {uses}
                   </span>
                 </div>
               </div>
             ))}
             {!topTools.isLoading && topTools.data?.length === 0 && (
-              <p className="font-mono text-xs text-neutral-600">
+              <p className="font-mono text-xs text-[var(--color-text-faint)]">
                 No tool calls recorded yet.
               </p>
             )}
@@ -71,17 +71,17 @@ function ToolsPage() {
 
         {/* Recent tool calls */}
         <div>
-          <h2 className="font-mono text-xs text-neutral-500 uppercase tracking-wider mb-3">
+          <h2 className="font-mono text-xs text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
             Recent Calls
           </h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1f1f1f]">
+              <tr className="border-b border-[var(--color-border)]">
                 {['Tool', 'Agent', 'Task', 'Args', 'Result', 'Called'].map(
                   (h) => (
                     <th
                       key={h}
-                      className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-2"
+                      className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-2"
                     >
                       {h}
                     </th>
@@ -119,23 +119,23 @@ function RecentToolRow({ tool }: { tool: RecentTool }) {
   }
 
   return (
-    <tr className="border-b border-[#1f1f1f] hover:bg-[#0a0a0a] transition-colors">
+    <tr className="border-b border-[var(--color-border)] hover:bg-[var(--color-bg-surface)] transition-colors">
       <td className="px-4 py-2 font-mono text-xs text-violet-400">
         {tool.tool_name}
       </td>
       <td className="px-4 py-2">
         <AgentBadge agent={tool.agent} size="xs" />
       </td>
-      <td className="px-4 py-2 font-mono text-xs text-neutral-500 max-w-[120px] truncate">
+      <td className="px-4 py-2 font-mono text-xs text-[var(--color-text-muted)] max-w-[120px] truncate">
         {tool.task_slug}
       </td>
-      <td className="px-4 py-2 font-mono text-xs text-neutral-600 max-w-[180px] truncate">
+      <td className="px-4 py-2 font-mono text-xs text-[var(--color-text-faint)] max-w-[180px] truncate">
         {argsPreview}
       </td>
-      <td className="px-4 py-2 text-xs text-neutral-500 max-w-[180px] truncate">
+      <td className="px-4 py-2 text-xs text-[var(--color-text-muted)] max-w-[180px] truncate">
         {tool.result_summary ?? '—'}
       </td>
-      <td className="px-4 py-2 font-mono text-[10px] text-neutral-700">
+      <td className="px-4 py-2 font-mono text-[10px] text-[var(--color-text-faint)]">
         {formatDate(tool.called_at)}
       </td>
     </tr>

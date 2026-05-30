@@ -40,7 +40,7 @@ const VIEWS: { value: ViewMode; label: string }[] = [
 ];
 
 const BOARD_COLUMNS: { status: string; label: string; color: string }[] = [
-  { status: 'pending', label: 'Pending', color: 'text-neutral-400' },
+  { status: 'pending', label: 'Pending', color: 'text-[var(--color-text-secondary)]' },
   { status: 'in_progress', label: 'In Progress', color: 'text-amber-400' },
   { status: 'done', label: 'Done', color: 'text-green-400' },
   { status: 'blocked', label: 'Blocked', color: 'text-red-400' },
@@ -114,22 +114,22 @@ function Tasks() {
                 onClick={() => setViewMode(value)}
                 className={`font-mono text-xs px-3 py-1.5 rounded transition-colors ${
                   viewMode === value
-                    ? 'bg-[#0a0a0a] text-[#fafafa] border border-[#3a3a3a]'
-                    : 'text-neutral-500 hover:text-neutral-300 border border-transparent'
+                    ? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] border border-[var(--color-border)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] border border-transparent'
                 }`}
               >
                 {label}
               </button>
             ))}
-            <span className="w-px h-5 bg-[#1f1f1f] mx-1" />
+            <span className="w-px h-5 bg-[var(--color-border)] mx-1" />
             {FILTERS.map(({ value, label }) => (
               <button
                 key={value}
                 onClick={() => setFilter(value)}
                 className={`font-mono text-xs px-3 py-1.5 rounded transition-colors ${
                   filter === value
-                    ? 'bg-[#0a0a0a] text-[#fafafa] border border-[#3a3a3a]'
-                    : 'text-neutral-500 hover:text-neutral-300 border border-transparent'
+                    ? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] border border-[var(--color-border)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] border border-transparent'
                 }`}
               >
                 {label}
@@ -178,35 +178,35 @@ function ListView({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#1f1f1f]">
-            <th className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3">
+          <tr className="border-b border-[var(--color-border)]">
+            <th className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3">
               #
             </th>
-            <th className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3">
+            <th className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3">
               Title
             </th>
-            <th className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3">
+            <th className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3">
               Slug
             </th>
             <th
-              className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3 cursor-pointer select-none hover:text-neutral-400 transition-colors"
+              className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3 cursor-pointer select-none hover:text-[var(--color-text-secondary)] transition-colors"
               onClick={() => handleSort('status')}
             >
               Status{sortArrow('status')}
             </th>
-            <th className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3">
+            <th className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3">
               Assigned
             </th>
-            <th className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3">
+            <th className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3">
               Acceptance
             </th>
             <th
-              className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3 cursor-pointer select-none hover:text-neutral-400 transition-colors"
+              className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3 cursor-pointer select-none hover:text-[var(--color-text-secondary)] transition-colors"
               onClick={() => handleSort('created')}
             >
               Created{sortArrow('created')}
             </th>
-            <th className="text-left font-mono text-[10px] text-neutral-600 uppercase tracking-wider px-4 py-3">
+            <th className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-3">
               Archived
             </th>
           </tr>
@@ -225,21 +225,21 @@ function ListView({
 
 function TaskRow({ task }: { task: TaskSummary }) {
   return (
-    <tr className="border-b border-[#1f1f1f] hover:bg-[#0a0a0a] transition-colors group">
-      <td className="px-4 py-3 font-mono text-xs text-neutral-600">{task.id}</td>
+    <tr className="border-b border-[var(--color-border)] hover:bg-[var(--color-bg-surface)] transition-colors group">
+      <td className="px-4 py-3 font-mono text-xs text-[var(--color-text-faint)]">{task.id}</td>
       <td className="px-4 py-3">
         <Link
           to="/tasks/$id"
           params={{ id: String(task.id) }}
-          className="font-mono text-sm text-[#fafafa] hover:text-green-400 transition-colors"
+          className="font-mono text-sm text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors"
         >
           {task.title}
         </Link>
         {task.description && (
-          <div className="text-xs text-neutral-600 mt-0.5 truncate max-w-xs">{task.description}</div>
+          <div className="text-xs text-[var(--color-text-faint)] mt-0.5 truncate max-w-xs">{task.description}</div>
         )}
       </td>
-      <td className="px-4 py-3 font-mono text-xs text-neutral-500">{task.slug}</td>
+      <td className="px-4 py-3 font-mono text-xs text-[var(--color-text-muted)]">{task.slug}</td>
       <td className="px-4 py-3">
         <StatusBadge status={task.status} />
       </td>
@@ -247,13 +247,13 @@ function TaskRow({ task }: { task: TaskSummary }) {
         {task.assigned_to ? (
           <AgentBadge agent={task.assigned_to} size="xs" />
         ) : (
-          <span className="text-neutral-700 text-xs">—</span>
+          <span className="text-[var(--color-text-faint)] text-xs">—</span>
         )}
       </td>
       <td className="px-4 py-3">
         {task.acceptance_total > 0 ? (
           <div className="flex items-center gap-2">
-            <div className="w-16 bg-neutral-900 rounded-full h-1">
+            <div className="w-16 bg-[var(--color-bg-elevated)] rounded-full h-1">
               <div
                 className="bg-green-600 h-1 rounded-full"
                 style={{
@@ -261,22 +261,22 @@ function TaskRow({ task }: { task: TaskSummary }) {
                 }}
               />
             </div>
-            <span className="font-mono text-[10px] text-neutral-600">
+            <span className="font-mono text-[10px] text-[var(--color-text-faint)]">
               {task.acceptance_met}/{task.acceptance_total}
             </span>
           </div>
         ) : (
-          <span className="text-neutral-700 text-xs">—</span>
+          <span className="text-[var(--color-text-faint)] text-xs">—</span>
         )}
       </td>
-      <td className="px-4 py-3 font-mono text-xs text-neutral-600">{formatDate(task.created_at)}</td>
+      <td className="px-4 py-3 font-mono text-xs text-[var(--color-text-faint)]">{formatDate(task.created_at)}</td>
       <td className="px-4 py-3">
         {task.archived_at ? (
           <span className="text-[10px] font-mono text-yellow-600/80 bg-yellow-500/5 px-2 py-0.5 rounded">
             archived
           </span>
         ) : (
-          <span className="text-neutral-800 text-xs">—</span>
+          <span className="text-[var(--color-text-faint)] text-xs">—</span>
         )}
       </td>
     </tr>
@@ -293,15 +293,15 @@ function BoardView({ columns }: { columns: Record<string, TaskSummary[]> }) {
           const tasks = columns[status] ?? [];
           return (
             <div key={status} className="w-72 shrink-0 flex flex-col">
-              <div className="flex items-center gap-2 px-1 py-3 border-b border-[#1f1f1f] mb-3">
+              <div className="flex items-center gap-2 px-1 py-3 border-b border-[var(--color-border)] mb-3">
                 <h3 className={`font-mono text-sm font-medium ${color}`}>{label}</h3>
-                <span className="font-mono text-xs text-neutral-600">({tasks.length})</span>
+                <span className="font-mono text-xs text-[var(--color-text-faint)]">({tasks.length})</span>
               </div>
               <div className="flex-1 overflow-y-auto max-h-[calc(100vh-16rem)] space-y-2 pr-1">
                 {tasks.length > 0 ? (
                   tasks.map((task) => <TaskCard key={task.id} task={task} />)
                 ) : (
-                  <div className="text-xs font-mono text-neutral-700 text-center py-8">No tasks</div>
+                  <div className="text-xs font-mono text-[var(--color-text-faint)] text-center py-8">No tasks</div>
                 )}
               </div>
             </div>
@@ -314,12 +314,12 @@ function BoardView({ columns }: { columns: Record<string, TaskSummary[]> }) {
 
 function TaskCard({ task }: { task: TaskSummary }) {
   return (
-    <div className="border border-[#1f1f1f] rounded bg-black p-3 hover:bg-[#0a0a0a] transition-colors space-y-2">
-      <div className="font-mono text-[10px] text-neutral-600">#{task.id}</div>
+    <div className="border border-[var(--color-border)] rounded bg-[var(--color-bg-base)] p-3 hover:bg-[var(--color-bg-surface)] transition-colors space-y-2">
+      <div className="font-mono text-[10px] text-[var(--color-text-faint)]">#{task.id}</div>
       <Link
         to="/tasks/$id"
         params={{ id: String(task.id) }}
-        className="font-mono text-sm text-[#fafafa] hover:text-green-400 transition-colors block"
+        className="font-mono text-sm text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors block"
       >
         {task.title}
       </Link>
@@ -327,23 +327,23 @@ function TaskCard({ task }: { task: TaskSummary }) {
         {task.assigned_to ? (
           <AgentBadge agent={task.assigned_to} size="xs" />
         ) : (
-          <span className="text-neutral-700 text-xs">—</span>
+          <span className="text-[var(--color-text-faint)] text-xs">—</span>
         )}
       </div>
       {task.acceptance_total > 0 && (
         <div className="flex items-center gap-2">
-          <div className="flex-1 bg-neutral-900 rounded-full h-1">
+          <div className="flex-1 bg-[var(--color-bg-elevated)] rounded-full h-1">
             <div
               className="bg-green-600 h-1 rounded-full"
               style={{ width: `${(task.acceptance_met / task.acceptance_total) * 100}%` }}
             />
           </div>
-          <span className="font-mono text-[10px] text-neutral-600">
+          <span className="font-mono text-[10px] text-[var(--color-text-faint)]">
             {task.acceptance_met}/{task.acceptance_total}
           </span>
         </div>
       )}
-      <div className="font-mono text-[10px] text-neutral-600">{formatDate(task.created_at)}</div>
+      <div className="font-mono text-[10px] text-[var(--color-text-faint)]">{formatDate(task.created_at)}</div>
     </div>
   );
 }
