@@ -1,14 +1,17 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ahk dashboard</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo-512.png" />
+    <meta property="og:image" content="/logo-512.png" />
     <script>
-      (function(){
-        var t = localStorage.getItem('ahk-theme') || 'dark';
-        document.documentElement.classList.add(t);
-      })();
+      ;(function () {
+        var t = localStorage.getItem('ahk-theme') || 'dark'
+        document.documentElement.classList.add(t)
+      })()
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

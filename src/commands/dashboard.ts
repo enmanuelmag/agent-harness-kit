@@ -19,7 +19,7 @@ export async function runDashboard(cwd: string, opts: DashboardOptions): Promise
   const dbPath = config.database.type === 'sqlite' ? resolve(cwd, config.database.path) : null
   const staticPath = join(__dirname, 'dashboard-dist')
 
-  const { url } = startDashboardServer(db, dbPath, staticPath, opts.port)
+  const { url } = await startDashboardServer(db, dbPath, staticPath, opts.port)
 
   console.log(pc.green(`✓`) + ` Dashboard running at ${pc.bold(pc.cyan(url))}`)
   console.log(pc.dim(`  WebSocket live updates enabled`))

@@ -52,6 +52,7 @@ describe('HarnessDB', () => {
     assert.equal(task.title, 'My Feature')
     assert.equal(task.status, 'pending')
     assert.ok(task.id > 0)
+    assert.ok(task.updated_at)
   })
 
   test('getTasks returns all tasks', async () => {
@@ -76,6 +77,7 @@ describe('HarnessDB', () => {
     assert.ok(claimed)
     assert.equal(claimed.status, 'in_progress')
     assert.equal(claimed.assigned_to, 'lead')
+    assert.ok(claimed.updated_at)
   })
 
   test('claimTask returns null for already claimed task', async () => {
@@ -111,6 +113,25 @@ describe('HarnessDB', () => {
     assert.equal(ac[0].criterion, 'Must pass tests')
   })
 
+  test('getTaskAcceptance returns empty array for unknown taskId', async () => {
+    const criteria = await db.getTaskAcceptance(99999)
+    assert.equal(criteria.length, 0)
+  })
+
+  test('getTaskAcceptance returns criteria with correct shape', async () => {
+    const task = await db.addTask({
+      slug: 'ac-shape',
+      title: 'AC Shape',
+      acceptance: ['Criterion A', 'Criterion B'],
+    })
+    const criteria = await db.getTaskAcceptance(task.id)
+    assert.equal(criteria.length, 2)
+    assert.ok(typeof criteria[0].id === 'number')
+    assert.equal(criteria[0].task_id, task.id)
+    assert.equal(criteria[0].criterion, 'Criterion A')
+    assert.equal(criteria[0].met, 0)
+  })
+
   test('getTaskById returns task by id', async () => {
     const task = await db.addTask({ slug: 'find-me', title: 'Find Me' })
     const found = await db.getTaskById(task.id)
@@ -127,6 +148,7 @@ describe('HarnessDB', () => {
     await db.addTask({ slug: 'status-test', title: 'Status Test' })
     const updated = await db.updateTaskStatus('status-test', 'done')
     assert.equal(updated.status, 'done')
+    assert.ok(updated.updated_at)
   })
 
   test('getActionsForTask returns actions for a task', async () => {
@@ -202,6 +224,7 @@ describe('HarnessDB', () => {
     const archived = await db.archiveTask(task.id)
     assert.notEqual(archived.archived_at, null)
     assert.ok(archived.archived_at!)
+    assert.ok(archived.updated_at)
   })
 
   test('unarchiveTask clears archived_at', async () => {
@@ -210,6 +233,7 @@ describe('HarnessDB', () => {
 
     const unarchived = await db.unarchiveTask(task.id)
     assert.equal(unarchived.archived_at, null)
+    assert.ok(unarchived.updated_at)
   })
 
   test('getTasks excludes archived by default', async () => {
