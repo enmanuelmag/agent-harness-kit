@@ -108,7 +108,7 @@ export interface TaskAcceptanceRow {
   met: number
 }
 
-export type AgentName = 'lead' | 'explorer' | 'builder' | 'reviewer' | `custom:${string}`
+export type AgentName = 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer' | `custom:${string}`
 
 export type ActionStatus = 'in_progress' | 'completed' | 'blocked'
 

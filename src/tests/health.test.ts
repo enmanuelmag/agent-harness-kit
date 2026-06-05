@@ -50,11 +50,9 @@ async function captureRunHealth(fn: () => Promise<void>): Promise<{
 
   console.log = (...args: unknown[]) => {
     output += `${args.join(' ')}\n`
-    originalLog(...args)
   }
   console.error = (...args: unknown[]) => {
     output += `${args.join(' ')}\n`
-    originalError(...args)
   }
 
   process.exit = ((exitCode?: string | number | null) => {
