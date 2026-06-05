@@ -52,8 +52,8 @@ importers:
         version: 8.20.0
     devDependencies:
       '@cardor/agent-harness-kit':
-        specifier: ^1.2.3
-        version: 1.2.3(@types/node@22.19.19)(typescript@5.9.3)(zod@4.4.3)
+        specifier: ^1.6.0
+        version: 1.6.0(@types/node@22.19.19)(typescript@5.9.3)(zod@4.4.3)
       '@commitlint/cli':
         specifier: ^20.5.3
         version: 20.5.3(@types/node@22.19.19)(conventional-commits-parser@6.4.0)(typescript@5.9.3)
@@ -246,8 +246,8 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@cardor/agent-harness-kit@1.2.3':
-    resolution: {integrity: sha512-bMT1bLnzOAr1iOW0l2sxS6RRB9yjT2c7tGxlrWZwl++6/vZLW6SeApkq9goxWxZSRZQQmOuHGnFyo6EWTduXjw==}
+  '@cardor/agent-harness-kit@1.6.0':
+    resolution: {integrity: sha512-P6V3I+2c06U89O/JwWM6P9Bre56poXed2GKbz4a4L/TsXU8aCvhz/6XxYqbOBXNkCDUYHgZ9vht8crRuSBBleQ==}
     engines: {node: '>=22.5.0'}
     hasBin: true
 
@@ -2796,7 +2796,7 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@cardor/agent-harness-kit@1.2.3(@types/node@22.19.19)(typescript@5.9.3)(zod@4.4.3)':
+  '@cardor/agent-harness-kit@1.6.0(@types/node@22.19.19)(typescript@5.9.3)(zod@4.4.3)':
     dependencies:
       '@clack/prompts': 0.9.1
       '@hono/node-server': 1.19.14(hono@4.12.18)
