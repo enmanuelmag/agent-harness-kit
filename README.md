@@ -592,41 +592,47 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `actions.record_tool`     | `actionId, toolName, argsJson?, resultSummary?` | Register a tool call. The **only** way to populate the Tools dashboard                                                                                  |
 | `docs.search`             | `query`                                         | Search the `docsPath` folder for content matching the query                                                                                             |
 | `tasks.acceptance_get`    | `taskId`    | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update` |
+| `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                              |
+| `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                       |
 
 ---
 
 ## Agent roles
 
-| Role         | Responsibility                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| **lead**     | Decomposes the task into a plan, assigns sub-agents. Does not write code or read source files.    |
-| **explorer** | Reads and maps the codebase. Never writes files. Records every file read.                         |
-| **builder**  | Implements the plan. Only writes to `writablePaths`. Records every file modified.                 |
-| **reviewer** | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving. |
+| Role            | Responsibility                                                                                                                          |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **lead**        | Decomposes the task into a plan, assigns sub-agents. Does not write code or read source files.                                          |
+| **explorer**    | Reads and maps the codebase. Never writes files. Records every file read.                                                               |
+| **consultant**  | Provides structured technical advisory after explorer. Runs conditionally. Never writes code. Writes advisory to harness via actions.write. |
+| **builder**     | Implements the plan. Only writes to `writablePaths`. Records every file modified.                                                       |
+| **reviewer**    | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving.                                       |
 
 ### MCP tool permissions by role
 
 Each agent role has a scoped set of MCP tools enforced through the agent definition files.
 
-| Tool | lead | explorer | builder | reviewer |
-|---|:---:|:---:|:---:|:---:|
-| `tasks.get` | ✅ | ✅ | ✅ | ✅ |
-| `tasks.claim` | ✅ | ✅ | ✅ | ✅ |
-| `tasks.add` | ✅ | ❌ | ✅ | ✅ |
-| `tasks.update` | ✅ | ❌ | ✅ | ✅ |
-| `tasks.edit` | ✅ | ❌ | ✅ | ✅ |
-| `tasks.archive` / `unarchive` | ✅ | ❌ | ✅ | ✅ |
-| `tasks.acceptance_get` | ✅ | ✅ | ✅ | ✅ |
-| `tasks.acceptance.update` | ❌ | ❌ | ❌ | ✅ |
-| `actions.*` (all 6) | ✅ | ✅ | ✅ | ✅ |
-| `docs.search` | ✅ | ✅ | ✅ | ✅ |
-| `permissions.check` | ✅ | ✅ | ✅ | ✅ |
+| Tool | lead | explorer | consultant | builder | reviewer |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `tasks.get` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `tasks.claim` | ✅ | ✅ | ❌ | ✅ | ✅ |
+| `tasks.add` | ✅ | ❌ | ❌ | ✅ | ✅ |
+| `tasks.update` | ✅ | ❌ | ❌ | ✅ | ✅ |
+| `tasks.edit` | ✅ | ❌ | ❌ | ✅ | ✅ |
+| `tasks.archive` / `unarchive` | ✅ | ❌ | ❌ | ✅ | ✅ |
+| `tasks.acceptance_get` | ✅ | ✅ | ❌ | ✅ | ✅ |
+| `tasks.acceptance.update` | ❌ | ❌ | ❌ | ❌ | ✅ |
+| `actions.*` (all 6) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `docs.search` | ✅ | ✅ | ❌ | ✅ | ✅ |
+| `permissions.check` | ✅ | ✅ | ❌ | ✅ | ✅ |
+| `deps.snapshot` | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `deps.check` | ❌ | ❌ | ✅ | ❌ | ❌ |
 
 **explorer** is read-only for task state — can query but cannot mutate status or mark criteria.  
 **reviewer** is the only role that can mark acceptance criteria as met (`tasks.acceptance.update`).  
-**lead** and **builder** have identical access, both excluding `tasks.acceptance.update`.
+**lead** and **builder** have identical access, both excluding `tasks.acceptance.update`.  
+**consultant** is advisory-only — reads code, writes to harness, and can call deps tools. Never modifies the codebase.
 
-`permissions.check` compares each `.claude/agents/*.md` tool list against the canonical constants in the package. Returns `{ in_sync: bool, agents: { lead, explorer, builder, reviewer } }` with per-agent `missing` and `extra` arrays. Run `ahk build --sync` to fix any drift.
+`permissions.check` compares each `.claude/agents/*.md` tool list against the canonical constants in the package. Returns `{ in_sync: bool, agents: { lead, explorer, consultant, builder, reviewer } }` with per-agent `missing` and `extra` arrays. Run `ahk build --sync` to fix any drift.
 
 ---
 
