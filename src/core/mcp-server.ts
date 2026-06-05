@@ -10,6 +10,7 @@ import {
 
 import { type HarnessDB, openDB } from './db'
 import { slugify } from './materializer/scaffold-utils'
+import { checkPermissionsSync } from './permissions-check'
 
 import type { ActionFileRow, AgentName, HarnessConfig, TaskStatus } from '@/types'
 
@@ -246,6 +247,11 @@ const TOOLS = [
       required: ['id'],
     },
   },
+  {
+    name: 'permissions.check',
+    description: 'Check whether the .claude/agents/*.md tool permission lists are in sync with the current canonical permission constants. Returns per-agent diff with missing and extra tools. Call this at session start to detect outdated agent files after an ahk upgrade.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
 ] as const
 
 // ─── Server ───────────────────────────────────────────────────────────────────
@@ -266,7 +272,7 @@ export async function startMcpServer(config: HarnessConfig, cwd: string): Promis
     const a = (args ?? {}) as Record<string, unknown>
 
     try {
-      const result = await dispatch(name, a, db, docsPath)
+      const result = await dispatch(name, a, db, docsPath, cwd)
       return result
     } catch (err) {
       return ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true)
@@ -283,7 +289,8 @@ async function dispatch(
   name: string,
   args: Record<string, unknown>,
   db: HarnessDB,
-  docsPath: string
+  docsPath: string,
+  cwd: string
 ): Promise<CallToolResult> {
   switch (name) {
     case 'actions.start': {
@@ -421,6 +428,11 @@ async function dispatch(
       const id = num(args, 'id')
       const task = await db.unarchiveTask(id)
       return ok(JSON.stringify(task))
+    }
+
+    case 'permissions.check': {
+      const result = checkPermissionsSync(cwd)
+      return ok(JSON.stringify(result, null, 2))
     }
 
     default:

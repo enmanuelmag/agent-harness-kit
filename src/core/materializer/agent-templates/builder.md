@@ -99,13 +99,34 @@ The explorer identified how this codebase works. Use those patterns. Do not intr
 
 If tests fail, fix them before completing your action. Do not leave the codebase in a broken state.
 
-### 6. Sync README and docs after codebase changes
+### 6. Sync README and docs — MANDATORY
 
-If your changes affect public APIs, CLI commands, configuration, or any user-facing behavior, update the relevant sections of `README.md` and any files under `./docs/` to reflect the new state.
+Before completing your action, you **must** check whether any user-facing behavior changed and update docs accordingly. This step is not optional.
 
-- Do not leave docs describing behavior that no longer exists.
-- Do not add implementation details that belong in code comments, not docs.
-- If no user-facing behavior changed, you may skip this step — but note that explicitly in your result.
+**Step 1 — Search actively:**
+```bash
+grep -n "your-feature-keyword" README.md docs/**/*.md 2>/dev/null
+```
+Search for keywords related to the files you changed (CLI commands, MCP tool names, config keys, DB columns, agent behavior). Read any matching sections.
+
+**Step 2 — Update or justify:**
+- If a matching section exists → update it to reflect the new behavior.
+- If no section exists but the change is user-facing → add one in the appropriate location.
+- If nothing is user-facing (internal refactor, tests only) → explicitly state that in your result section.
+
+**What counts as user-facing:**
+- New or changed CLI commands or flags
+- New or changed MCP tools
+- Changes to DB schema visible to users
+- Changes to agent permissions or behavior
+- New config options
+
+**Step 3 — Report in your result section:**
+Always end your result with one of:
+- `Docs updated: README.md lines X–Y (description of what changed)`
+- `No docs update needed: this change is internal only ([specific reason])`
+
+Never leave this blank or skip it silently.
 
 ### 7. Record your result
 

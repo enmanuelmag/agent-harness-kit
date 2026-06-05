@@ -1,6 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import {
+  MCP_CLAUDE_PERMISSIONS_LEAD,
+  MCP_CLAUDE_PERMISSIONS_EXPLORER,
+  MCP_CLAUDE_PERMISSIONS_BUILDER,
+  MCP_CLAUDE_PERMISSIONS_REVIEWER,
+} from './mcp-merge'
 import { GITIGNORE_ENTRIES } from './templates'
 
 export function writeAgentFile(cwd: string, relPath: string, content: string): void {
@@ -29,4 +35,31 @@ export function slugify(title: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 64)
+}
+
+const AGENT_TOOLS: Record<string, string[]> = {
+  lead: MCP_CLAUDE_PERMISSIONS_LEAD,
+  explorer: MCP_CLAUDE_PERMISSIONS_EXPLORER,
+  builder: MCP_CLAUDE_PERMISSIONS_BUILDER,
+  reviewer: MCP_CLAUDE_PERMISSIONS_REVIEWER,
+}
+
+export async function syncAgentPermissions(cwd: string): Promise<void> {
+  for (const [agent, tools] of Object.entries(AGENT_TOOLS)) {
+    const filePath = join(cwd, '.claude', 'agents', `${agent}.md`)
+    if (!existsSync(filePath)) {
+      console.log(`  ${agent}.md not found — skipping`)
+      continue
+    }
+    const content = readFileSync(filePath, 'utf-8')
+    const toolsBlock = `tools:\n${tools.map(t => `  - ${t}`).join('\n')}\n`
+    // Replace existing tools: block in frontmatter (mcp__ lines only section)
+    const updated = content.replace(/tools:\n(?:  - [^\n]+\n)*/m, toolsBlock)
+    if (updated === content) {
+      console.log(`  ${agent}.md already in sync`)
+    } else {
+      writeFileSync(filePath, updated, 'utf-8')
+      console.log(`  ${agent}.md updated`)
+    }
+  }
 }

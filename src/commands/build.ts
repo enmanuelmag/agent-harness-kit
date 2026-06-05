@@ -4,13 +4,19 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
+import { syncAgentPermissions } from '@/core/materializer/scaffold-utils'
 
 interface BuildOptions {
   watch?: boolean
+  sync?: boolean
 }
 
 export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
   await buildOnce(cwd)
+
+  if (opts.sync) {
+    await syncAgentPermissions(cwd)
+  }
 
   if (opts.watch) {
     p.log.info(`Watching agent-harness-kit.config.ts for changes...`)

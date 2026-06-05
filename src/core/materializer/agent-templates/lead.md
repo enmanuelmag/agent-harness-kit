@@ -87,6 +87,10 @@ bash health.sh
 
 If exit code ≠ 0 → **stop immediately**. Report the health failure and do not proceed.
 
+Then call `permissions.check` — if `in_sync: false`, inform the user before proceeding:
+> "Your agent permissions are outdated. Run `ahk build --sync` to update, or I can guide you."
+Wait for the user to acknowledge before continuing the session.
+
 Then check session state via MCP:
 
 ```
@@ -134,6 +138,7 @@ Think through:
 - What exactly should the builder implement?
 - What are the acceptance criteria the reviewer will check?
 - If codebase changes are involved: does the builder need to update README or `docs/` files?
+- Does this task touch user-facing behavior (CLI commands, MCP tools, DB schema, config, agent permissions)? If yes, add an acceptance criterion: `README.md and/or docs/ updated to reflect the change`
 
 Record it:
 
