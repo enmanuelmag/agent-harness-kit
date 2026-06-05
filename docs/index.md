@@ -7,7 +7,7 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 ## Key Features
 
 - **Provider Agnostic**: Works with Claude Code, OpenCode, or any MCP-compatible AI tool
-- **Structured Workflow**: Implements a 4-agent workflow (Lead, Explorer, Builder, Reviewer) 
+- **Structured Workflow**: Implements a multi-agent workflow (Lead, Explorer, Consultant (conditional), Builder, Reviewer) 
 - **Task Management**: Provides a task backlog with acceptance criteria
 - **Audit Trail**: Full logging of every action, file modification, and tool usage
 - **Health Checks**: Ensures code quality through configurable health checks
@@ -24,13 +24,13 @@ MCP Protocol → Agent Harness Kit (Node.js/Bun)
         ↓
 SQLite Database (Tasks, Actions, Logs)
         ↓
-Agent Roles: Lead → Explorer → Builder → Reviewer
+Agent Roles: Lead → Explorer → Consultant (conditional) → Builder → Reviewer
 ```
 
 ### Core Components
 
 1. **Task System**: Manages the full lifecycle of development tasks
-2. **Agent Roles**: Four distinct roles with defined responsibilities
+2. **Agent Roles**: Five roles with defined responsibilities (consultant is conditional)
 3. **Action Logging**: Comprehensive audit trail for all activities  
 4. **File System Interface**: Controlled access to project files
 5. **Health Checks**: Quality gate enforcement
@@ -63,7 +63,7 @@ npx ahk init
 
 ## Core Concepts
 
-### The Four Agent Roles
+### The Agent Roles
 
 #### Lead Agent
 - **Primary Responsibility**: Orchestrator and coordinator
@@ -74,6 +74,12 @@ npx ahk init
 - **Primary Responsibility**: Codebase analysis and mapping
 - **Duties**: Reads source files, identifies patterns, documents constraints
 - **Key Actions**: File reading, documentation search, analysis creation
+
+#### Consultant Agent (conditional)
+- **Primary Responsibility**: Technical advisory
+- **Duties**: Provides structured advisory on patterns, risks, and best practices; runs deps tools
+- **Key Actions**: Code reading, `deps.check`, writing advisory to harness via `actions.write`
+- **Invoked when**: dependency changes detected, first task of session, or task touches config/deps
 
 #### Builder Agent
 - **Primary Responsibility**: Implementation and task execution  
@@ -90,7 +96,7 @@ npx ahk init
 1. **Task Creation**: Tasks added to backlog via feature_list.json or CLI
 2. **Task Selection**: Lead agent selects and claims pending tasks
 3. **Workflow Execution**: 
-   - Lead → Explorer (analysis) → Builder (implementation) → Reviewer (approval)
+   - Lead → Explorer (analysis) → Consultant (advisory, conditional) → Builder (implementation) → Reviewer (approval)
 4. **Task Completion**: Approved through health checks and quality gates
 
 ## Configuration

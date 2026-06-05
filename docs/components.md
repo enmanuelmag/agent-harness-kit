@@ -65,6 +65,24 @@ The system implements a comprehensive multi-agent workflow where each role has d
 - Documentation search capabilities
 - Pattern identification and constraint documentation
 
+#### Consultant Agent
+**Primary Responsibility**: Technical advisory (conditional)
+- Runs after the explorer and before the builder, only when needed
+- Provides structured advisory: patterns to follow, risks, best practices
+- Writes advisory directly to the harness so the builder reads it via `actions.get`
+- Never modifies code or files — advisory only
+
+**Invoked when ANY of these are true**:
+- `deps.check` returns `significant: true` (dependency changes detected)
+- `.harness/deps-lock.json` did not exist before the session (first task)
+- Task description mentions `package.json`, dependencies, or config files
+
+**Key Features**:
+- Read-only codebase access
+- Writes structured advisory with clear headings to harness
+- Can call `deps.snapshot` and `deps.check` tools
+- One action per session, then complete
+
 #### Builder Agent  
 **Primary Responsibility**: Implementation and task execution
 - Implements solutions based on lead's plan and explorer's analysis
