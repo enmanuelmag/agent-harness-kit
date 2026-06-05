@@ -46,6 +46,7 @@ npx ahk init
     - [`ahk export`](#ahk-export)
   - [Files created by `ahk init`](#files-created-by-ahk-init)
     - [What each file does](#what-each-file-does)
+  - [Tasks schema](#tasks-schema)
   - [What you can customize](#what-you-can-customize)
     - [`agent-harness-kit.config.ts`](#agent-harness-kitconfigts)
     - [`health.sh`](#healthsh)
@@ -53,6 +54,7 @@ npx ahk init
     - [`.harness/feature_list.json`](#harnessfeature_listjson)
   - [MCP tools (for agents)](#mcp-tools-for-agents)
   - [Agent roles](#agent-roles)
+    - [MCP tool permissions by role](#mcp-tool-permissions-by-role)
   - [What to commit](#what-to-commit)
   - [Runtime compatibility](#runtime-compatibility)
   - [Contributing \& local development](#contributing--local-development)
@@ -577,55 +579,55 @@ Good acceptance criteria make the difference — the reviewer agent uses them to
 
 The harness exposes these tools via MCP. Agents use them instead of reading files directly.
 
-| Tool                      | Parameters                                      | Description                                                                                                                                             |
-| ------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tasks.get`               | `status?`                                       | List tasks, optionally filtered by `pending \| in_progress \| done \| blocked`                                                                          |
-| `tasks.claim`             | `id, agent`                                     | Atomically claim a pending task. Returns `task_already_claimed` if another agent got it first                                                           |
-| `tasks.update`            | `id, status`                                    | Change task status                                                                                                                                      |
-| `tasks.add`               | `title, slug?, description?, acceptance?`       | Create a new task directly from MCP (agents can queue work on the fly)                                                                                  |
-| `tasks.acceptance.update` | `criterionId`                                   | Mark an acceptance criterion as met. Criterion IDs come from `tasks.acceptance_get`                                                                     |
-| `actions.start`           | `taskId, agent`                                 | Start a new action, returns `actionId`                                                                                                                  |
-| `actions.write`           | `actionId, sectionType, content`                | Record a text section: `result \| tools_used \| blockers \| next_steps`. Does **not** populate the Files dashboard — use `actions.record_file` for that |
-| `actions.complete`        | `actionId, summary`                             | Close an action with a one-line summary                                                                                                                 |
-| `actions.get`             | `taskId`                                        | Full action history for a task (all agents, all sections)                                                                                               |
-| `actions.record_file`     | `actionId, filePath, operation, notes?`         | Register a file touch. The **only** way to populate the Files dashboard. `operation`: `read \| created \| modified \| deleted`                          |
-| `actions.record_tool`     | `actionId, toolName, argsJson?, resultSummary?` | Register a tool call. The **only** way to populate the Tools dashboard                                                                                  |
-| `docs.search`             | `query`                                         | Search the `docsPath` folder for content matching the query                                                                                             |
-| `tasks.acceptance_get`    | `taskId`    | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update` |
-| `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                              |
-| `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                       |
+| Tool                      | Parameters                                      | Description                                                                                                                                                            |
+| ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tasks.get`               | `status?`                                       | List tasks, optionally filtered by `pending \| in_progress \| done \| blocked`                                                                                         |
+| `tasks.claim`             | `id, agent`                                     | Atomically claim a pending task. Returns `task_already_claimed` if another agent got it first                                                                          |
+| `tasks.update`            | `id, status`                                    | Change task status                                                                                                                                                     |
+| `tasks.add`               | `title, slug?, description?, acceptance?`       | Create a new task directly from MCP (agents can queue work on the fly)                                                                                                 |
+| `tasks.acceptance.update` | `criterionId`                                   | Mark an acceptance criterion as met. Criterion IDs come from `tasks.acceptance_get`                                                                                    |
+| `actions.start`           | `taskId, agent`                                 | Start a new action, returns `actionId`                                                                                                                                 |
+| `actions.write`           | `actionId, sectionType, content`                | Record a text section: `result \| tools_used \| blockers \| next_steps`. Does **not** populate the Files dashboard — use `actions.record_file` for that                |
+| `actions.complete`        | `actionId, summary`                             | Close an action with a one-line summary                                                                                                                                |
+| `actions.get`             | `taskId`                                        | Full action history for a task (all agents, all sections)                                                                                                              |
+| `actions.record_file`     | `actionId, filePath, operation, notes?`         | Register a file touch. The **only** way to populate the Files dashboard. `operation`: `read \| created \| modified \| deleted`                                         |
+| `actions.record_tool`     | `actionId, toolName, argsJson?, resultSummary?` | Register a tool call. The **only** way to populate the Tools dashboard                                                                                                 |
+| `docs.search`             | `query`                                         | Search the `docsPath` folder for content matching the query                                                                                                            |
+| `tasks.acceptance_get`    | `taskId`                                        | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update` |
+| `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                                              |
+| `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                                      |
 
 ---
 
 ## Agent roles
 
-| Role            | Responsibility                                                                                                                          |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **lead**        | Decomposes the task into a plan, assigns sub-agents. Does not write code or read source files.                                          |
-| **explorer**    | Reads and maps the codebase. Never writes files. Records every file read.                                                               |
-| **consultant**  | Provides structured technical advisory after explorer. Runs conditionally. Never writes code. Writes advisory to harness via actions.write. |
-| **builder**     | Implements the plan. Only writes to `writablePaths`. Records every file modified.                                                       |
-| **reviewer**    | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving.                                       |
+| Role           | Responsibility                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **lead**       | Decomposes the task into a plan, assigns sub-agents. Does not write code or read source files.                                              |
+| **explorer**   | Reads and maps the codebase. Never writes files. Records every file read.                                                                   |
+| **consultant** | Provides structured technical advisory after explorer. Runs conditionally. Never writes code. Writes advisory to harness via actions.write. |
+| **builder**    | Implements the plan. Only writes to `writablePaths`. Records every file modified.                                                           |
+| **reviewer**   | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving.                                           |
 
 ### MCP tool permissions by role
 
 Each agent role has a scoped set of MCP tools enforced through the agent definition files.
 
-| Tool | lead | explorer | consultant | builder | reviewer |
-|---|:---:|:---:|:---:|:---:|:---:|
-| `tasks.get` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `tasks.claim` | ✅ | ✅ | ❌ | ✅ | ✅ |
-| `tasks.add` | ✅ | ❌ | ❌ | ✅ | ✅ |
-| `tasks.update` | ✅ | ❌ | ❌ | ✅ | ✅ |
-| `tasks.edit` | ✅ | ❌ | ❌ | ✅ | ✅ |
-| `tasks.archive` / `unarchive` | ✅ | ❌ | ❌ | ✅ | ✅ |
-| `tasks.acceptance_get` | ✅ | ✅ | ❌ | ✅ | ✅ |
-| `tasks.acceptance.update` | ❌ | ❌ | ❌ | ❌ | ✅ |
-| `actions.*` (all 6) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `docs.search` | ✅ | ✅ | ❌ | ✅ | ✅ |
-| `permissions.check` | ✅ | ✅ | ❌ | ✅ | ✅ |
-| `deps.snapshot` | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `deps.check` | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Tool                          | lead | explorer | consultant | builder | reviewer |
+| ----------------------------- | :--: | :------: | :--------: | :-----: | :------: |
+| `tasks.get`                   |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
+| `tasks.claim`                 |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
+| `tasks.add`                   |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
+| `tasks.update`                |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
+| `tasks.edit`                  |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
+| `tasks.archive` / `unarchive` |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
+| `tasks.acceptance_get`        |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
+| `tasks.acceptance.update`     |  ❌  |    ❌    |     ❌     |   ❌    |    ✅    |
+| `actions.*` (all 6)           |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
+| `docs.search`                 |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
+| `permissions.check`           |  ✅  |    ✅    |     ❌     |   ✅    |    ✅    |
+| `deps.snapshot`               |  ❌  |    ❌    |     ✅     |   ❌    |    ❌    |
+| `deps.check`                  |  ❌  |    ❌    |     ✅     |   ❌    |    ❌    |
 
 **explorer** is read-only for task state — can query but cannot mutate status or mark criteria.  
 **reviewer** is the only role that can mark acceptance criteria as met (`tasks.acceptance.update`).  

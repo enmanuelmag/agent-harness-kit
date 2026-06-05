@@ -133,8 +133,11 @@ export const MCP_CLAUDE_PERMISSIONS_CONSULTANT = [
   'mcp__agent-harness-kit__actions_record_file',
   'mcp__agent-harness-kit__actions_record_tool',
   'mcp__agent-harness-kit__tasks_get',
+  'mcp__agent-harness-kit__tasks_claim',
+  'mcp__agent-harness-kit__tasks_acceptance_get',
   'mcp__agent-harness-kit__deps_snapshot',
   'mcp__agent-harness-kit__deps_check',
+  'mcp__agent-harness-kit__docs_search',
 ] as const
 
 // Full union — used by mergeClaudeSettingsLocalJson for project-wide settings
@@ -222,7 +225,7 @@ function mergeTomlSection(content: string, sectionName: string, sectionBody: str
   const lines = content.split('\n')
   const header = `[${sectionName}]`
 
-  const startIdx = lines.findIndex(l => l.trim() === header)
+  const startIdx = lines.findIndex((l) => l.trim() === header)
 
   if (startIdx === -1) {
     const trimmed = content.trimEnd()
