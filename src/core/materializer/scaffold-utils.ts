@@ -2,17 +2,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import {
-  MCP_CLAUDE_PERMISSIONS_LEAD,
-  MCP_CLAUDE_PERMISSIONS_EXPLORER,
   MCP_CLAUDE_PERMISSIONS_BUILDER,
-  MCP_CLAUDE_PERMISSIONS_REVIEWER,
   MCP_CLAUDE_PERMISSIONS_CONSULTANT,
+  MCP_CLAUDE_PERMISSIONS_EXPLORER,
+  MCP_CLAUDE_PERMISSIONS_LEAD,
+  MCP_CLAUDE_PERMISSIONS_REVIEWER,
 } from './mcp-merge'
 import { GITIGNORE_ENTRIES } from './templates'
 
 export function writeAgentFile(cwd: string, relPath: string, content: string): void {
   const abs = join(cwd, relPath)
-  if (existsSync(abs)) return  // preserve dev customizations
+  if (existsSync(abs)) return // preserve dev customizations
   mkdirSync(resolve(abs, '..'), { recursive: true })
   writeFileSync(abs, content, 'utf8')
 }
@@ -58,9 +58,11 @@ export async function syncAgentPermissions(cwd: string): Promise<void> {
     const updated = content.replace(
       /(tools:\n)((?:  - [^\n]+\n)*)/m,
       (_match, header, toolsSection) => {
-        const nativeLines = toolsSection.split('\n').filter(line => line.trim() && !line.includes('mcp__'))
+        const nativeLines = toolsSection
+          .split('\n')
+          .filter((line: string) => line.trim() && !line.includes('mcp__'))
         const nativeSection = nativeLines.length ? nativeLines.join('\n') + '\n' : ''
-        const mcpSection = tools.map(t => `  - ${t}`).join('\n') + '\n'
+        const mcpSection = tools.map((t) => `  - ${t}`).join('\n') + '\n'
         return header + nativeSection + mcpSection
       }
     )
