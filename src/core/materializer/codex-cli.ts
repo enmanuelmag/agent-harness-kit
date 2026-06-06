@@ -5,6 +5,7 @@ import { mergeCodexConfigToml } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile } from './scaffold-utils'
 import {
   agentBuilderToml,
+  agentConsultantToml,
   agentExplorerToml,
   agentLeadAsDefaultToml,
   agentLeadToml,
@@ -54,6 +55,7 @@ export class CodexCliMaterializer implements Materializer {
 
     writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName }))
     writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths }))
+    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName }))
     writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths }))
     writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName }))
     // Override Codex's built-in `default` agent so `lead` runs when no agent is selected
@@ -80,6 +82,7 @@ export class CodexCliMaterializer implements Materializer {
 
     writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName }))
     writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths }))
+    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName }))
     writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths }))
     writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName }))
     writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName }))

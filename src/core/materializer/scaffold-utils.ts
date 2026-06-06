@@ -54,9 +54,16 @@ export async function syncAgentPermissions(cwd: string): Promise<void> {
       continue
     }
     const content = readFileSync(filePath, 'utf-8')
-    const toolsBlock = `tools:\n${tools.map(t => `  - ${t}`).join('\n')}\n`
-    // Replace existing tools: block in frontmatter (mcp__ lines only section)
-    const updated = content.replace(/tools:\n(?:  - [^\n]+\n)*/m, toolsBlock)
+    // Replace mcp__ lines in the tools: block while preserving native tools (Read/Write/Bash/Task)
+    const updated = content.replace(
+      /(tools:\n)((?:  - [^\n]+\n)*)/m,
+      (_match, header, toolsSection) => {
+        const nativeLines = toolsSection.split('\n').filter(line => line.trim() && !line.includes('mcp__'))
+        const nativeSection = nativeLines.length ? nativeLines.join('\n') + '\n' : ''
+        const mcpSection = tools.map(t => `  - ${t}`).join('\n') + '\n'
+        return header + nativeSection + mcpSection
+      }
+    )
     if (updated === content) {
       console.log(`  ${agent}.md already in sync`)
     } else {

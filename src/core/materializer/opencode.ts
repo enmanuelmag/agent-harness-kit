@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 
 import { mergeOpencodeJson } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile } from './scaffold-utils'
-import { agentBuilder, agentExplorer, agentLead, agentReviewer, agentsMd, featureListJson, HEALTH_SH, translateFrontmatterForOpenCode } from './templates'
+import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, featureListJson, HEALTH_SH, translateFrontmatterForOpenCode } from './templates'
 
 import type { Materializer } from './index'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
@@ -44,6 +44,7 @@ export class OpenCodeMaterializer implements Materializer {
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
     writeAgentFile(cwd, '.opencode/agents/lead.md', translateFrontmatterForOpenCode(agentLead({ projectName })))
     writeAgentFile(cwd, '.opencode/agents/explorer.md', translateFrontmatterForOpenCode(agentExplorer({ projectName, allowedPaths })))
+    writeAgentFile(cwd, '.opencode/agents/consultant.md', translateFrontmatterForOpenCode(agentConsultant({ projectName })))
     writeAgentFile(cwd, '.opencode/agents/builder.md', translateFrontmatterForOpenCode(agentBuilder({ projectName, writablePaths })))
     writeAgentFile(cwd, '.opencode/agents/reviewer.md', translateFrontmatterForOpenCode(agentReviewer({ projectName })))
 
@@ -67,6 +68,7 @@ export class OpenCodeMaterializer implements Materializer {
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
     writeAgentFile(cwd, '.opencode/agents/lead.md', translateFrontmatterForOpenCode(agentLead({ projectName })))
     writeAgentFile(cwd, '.opencode/agents/explorer.md', translateFrontmatterForOpenCode(agentExplorer({ projectName, allowedPaths })))
+    writeAgentFile(cwd, '.opencode/agents/consultant.md', translateFrontmatterForOpenCode(agentConsultant({ projectName })))
     writeAgentFile(cwd, '.opencode/agents/builder.md', translateFrontmatterForOpenCode(agentBuilder({ projectName, writablePaths })))
     writeAgentFile(cwd, '.opencode/agents/reviewer.md', translateFrontmatterForOpenCode(agentReviewer({ projectName })))
 
