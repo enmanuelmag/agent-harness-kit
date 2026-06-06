@@ -107,7 +107,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 ## Features
 
 - **Provider-agnostic** — works with Claude Code, OpenCode, Codex CLI, or any MCP-compatible AI tool. Switch providers without losing your task history or reconfiguring your workflow.
-- **Structured 4-agent workflow** — Lead, Explorer, Builder, and Reviewer each have defined responsibilities and can only act within their role.
+- **Structured 5-agent workflow** — Lead, Explorer, Consultant, Builder, and Reviewer each have defined responsibilities and can only act within their role.
 - **Atomic task claiming** — agents use `tasks.claim()` which uses a SQLite transaction to prevent two agents from picking up the same task at the same time.
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
 - **Health gate** — agents must run `health.sh` and get a green exit before starting or closing any task. You define what "healthy" means.
