@@ -1,5 +1,4 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
@@ -83,20 +82,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       process.exit(0)
     }
     provider = val satisfies Provider
-  }
-
-  // ─── Global installation option ──────────────────────────────────────────
-  let globalInstallation = false
-  const globalVal = await p.confirm({
-    message: 'Install globally (to home directory)?',
-    initialValue: false,
-  })
-  if (p.isCancel(globalVal)) {
-    p.cancel('Cancelled.')
-    process.exit(0)
-  }
-  if (globalVal) {
-    globalInstallation = true
   }
 
   // ─── Docs path ────────────────────────────────────────────────────────────
@@ -187,15 +172,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     const config = applyConfigDefaults({ name, description, provider, docsPath, tasksAdapter })
     const materializer = getMaterializer(provider)
 
-    // Write config file - determine if we're installing globally
-    let installDir = cwd
-    if (globalInstallation) {
-      if (provider === 'claude-code') {
-        installDir = join(homedir(), '.claude')
-      } else {
-        installDir = join(homedir(), '.config', 'opencode')
-      }
-    }
+    const installDir = cwd
 
     const configContent = configTs({
       name,
@@ -235,8 +212,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     throw err
   }
 
-  const agentHarnessKitDir = globalInstallation ? 'home directory' : 'current directory'
-  console.log(pc.green(`✓ Scaffolded harness in ${agentHarnessKitDir}`))
+  console.log(pc.green('✓ Scaffolded harness in current directory'))
 
   // ─── Summary ─────────────────────────────────────────────────────────────-
   const agentsDir = provider === 'claude-code' ? '.claude/agents/' : '.opencode/agents/'

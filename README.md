@@ -151,7 +151,7 @@ ahk init
 
 ### `ahk init`
 
-Interactive scaffold. Asks for your project name, description, AI provider, whether to install globally, docs path, task adapter, and an optional first task. Creates all harness files in the current directory (or home directory if global).
+Interactive scaffold. Asks for your project name, description, AI provider, docs path, task adapter, and an optional first task. Creates all harness files in the current directory.
 
 ```bash
 ahk init
@@ -162,8 +162,6 @@ ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local
 ```
 
 Run this once per project. Safe to re-run — it will not overwrite files you've customized.
-
-**Global installation** — if you answer yes to "Install globally?", files go to `~/.claude` (Claude Code), `~/.config/opencode` (OpenCode), or `~/.codex` (Codex CLI). This lets you share one harness config across all your projects.
 
 ---
 

@@ -49,7 +49,7 @@ docs.search          query                                  → search ./docs fo
    - tasks.get('in_progress') → resume if something is in progress
    - tasks.get('pending') → pick lowest id
 
-2. WORK  (lead → explorer → builder → reviewer)
+2. WORK  (lead → explorer → consultant → builder → reviewer)
    - Each agent calls actions.start(taskId, agentName) → actionId
    - After EVERY tool call: actions.record_tool(actionId, toolName, args, summary)
    - After EVERY file change: actions.record_file(actionId, filePath, operation, notes)
@@ -66,6 +66,7 @@ docs.search          query                                  → search ./docs fo
 |-------|---------------|
 | lead | Decomposes the task into a plan, assigns sub-agents |
 | explorer | Reads and maps relevant code, never writes |
+| consultant | Technical advisor, runs after explorer, before builder. Never writes code. |
 | builder | Implements the plan, writes files |
 | reviewer | Verifies acceptance criteria, approves or blocks |
 

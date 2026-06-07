@@ -38,7 +38,6 @@ tasks.get            [status]                               → list tasks (pend
 tasks.claim          id                                     → atomically claim a pending task
 tasks.update         id status                              → change task status
 tasks.acceptance.update criterionId                        → mark an acceptance criterion as met
-tasks.acceptance.get    taskId                             → list all acceptance criteria for a task with their ids and met status
 docs.search          query                                  → search ./docs for relevant content
 ```
 
@@ -51,7 +50,7 @@ docs.search          query                                  → search ./docs fo
    - tasks.get('pending') → pick lowest id
    - No pending tasks? → ask user, infer fields, call tasks.add, then tasks.claim
 
-2. WORK  (lead → explorer → builder → reviewer)
+2. WORK  (lead → explorer → consultant → builder → reviewer)
    - Each agent calls actions.start(taskId, agentName) → actionId
    - After EVERY tool call: actions.record_tool(actionId, toolName, args, summary)
    - After EVERY file change: actions.record_file(actionId, filePath, operation, notes)
@@ -68,6 +67,7 @@ docs.search          query                                  → search ./docs fo
 |-------|---------------|
 | lead | Decomposes the task into a plan, assigns sub-agents |
 | explorer | Reads and maps relevant code, never writes |
+| consultant | Technical advisor, runs after explorer, before builder. Never writes code. |
 | builder | Implements the plan, writes files |
 | reviewer | Verifies acceptance criteria, approves or blocks |
 
