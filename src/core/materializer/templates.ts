@@ -244,8 +244,8 @@ export function configTs(params: {
 
 export default defineHarness({
   project: {
-    name: '${params.name}',
-    description: '${params.description}',
+    name: '${JSON.stringify(params.name)}',
+    description: ${JSON.stringify(params.description)},
     docsPath: '${params.docsPath}',
   },
 
@@ -304,8 +304,8 @@ export function configCjs(params: {
 
 module.exports = defineHarness({
   project: {
-    name: '${params.name}',
-    description: '${params.description}',
+    name: '${JSON.stringify(params.name)}',
+    description: ${JSON.stringify(params.description)},
     docsPath: '${params.docsPath}',
   },
 

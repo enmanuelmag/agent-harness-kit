@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
-import { featureListJson, translateFrontmatterForOpenCode } from '@/core/materializer/templates'
+import { configCjs, configTs, featureListJson, translateFrontmatterForOpenCode } from '@/core/materializer/templates'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
@@ -154,5 +154,69 @@ describe('translateFrontmatterForOpenCode', () => {
     assert.ok(result.includes('name: explorer'))
     assert.ok(result.includes('description: some desc'))
     assert.ok(result.includes('# Body content'))
+  })
+})
+
+describe('configTs', () => {
+  const base = {
+    name: 'my-app',
+    description: 'placeholder',
+    provider: 'claude-code',
+    docsPath: './docs',
+    tasksAdapter: 'local',
+    port: 3742,
+  }
+
+  test('description with apostrophe produces valid JS', () => {
+    const desc = "it's a playground"
+    const out = configTs({ ...base, description: desc })
+    assert.ok(out.includes(JSON.stringify(desc)), 'description not safely encoded')
+    assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
+  })
+
+  test('description with double quotes produces valid JS', () => {
+    const desc = 'a "test" project'
+    const out = configTs({ ...base, description: desc })
+    assert.ok(out.includes(JSON.stringify(desc)))
+    assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
+  })
+
+  test('description with both apostrophe and double quotes produces valid JS', () => {
+    const desc = `it's a "test" project`
+    const out = configTs({ ...base, description: desc })
+    assert.ok(out.includes(JSON.stringify(desc)))
+    assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
+  })
+})
+
+describe('configCjs', () => {
+  const base = {
+    name: 'my-app',
+    description: 'placeholder',
+    provider: 'claude-code',
+    docsPath: './docs',
+    tasksAdapter: 'local',
+    port: 3742,
+  }
+
+  test('description with apostrophe produces valid JS', () => {
+    const desc = "it's a playground"
+    const out = configCjs({ ...base, description: desc })
+    assert.ok(out.includes(JSON.stringify(desc)))
+    assert.doesNotThrow(() => new Function(out.replace(/^const .+require.+$/m, '//$&')))
+  })
+
+  test('description with double quotes produces valid JS', () => {
+    const desc = 'a "test" project'
+    const out = configCjs({ ...base, description: desc })
+    assert.ok(out.includes(JSON.stringify(desc)))
+    assert.doesNotThrow(() => new Function(out.replace(/^const .+require.+$/m, '//$&')))
+  })
+
+  test('description with both apostrophe and double quotes produces valid JS', () => {
+    const desc = `it's a "test" project`
+    const out = configCjs({ ...base, description: desc })
+    assert.ok(out.includes(JSON.stringify(desc)))
+    assert.doesNotThrow(() => new Function(out.replace(/^const .+require.+$/m, '//$&')))
   })
 })

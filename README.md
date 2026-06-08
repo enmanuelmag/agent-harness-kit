@@ -163,7 +163,7 @@ ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local
 
 Run this once per project. If the project is already initialized, the command prints an 'already initialized' message with suggested next-step commands (`ahk build`, `ahk build --sync`, `ahk reset`, `ahk serve`) and exits without overwriting anything.
 
-The config file extension is chosen automatically: `.ts` if a `tsconfig.json` is present, `.mjs` for ESM-only projects (`"type": "module"` in `package.json`), or `.cjs` otherwise.
+The config file extension is chosen automatically: `.ts` if a `tsconfig.json` is present, `.mjs` for ESM-only projects (`"type": "module"` in `package.json`), or `.mjs` otherwise.
 
 ---
 
