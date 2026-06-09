@@ -17,8 +17,8 @@ export async function runServe(cwd: string, opts: ServeOptions): Promise<void> {
   // Stderr is used for diagnostics.
   process.stderr.write(`[agent-harness-kit] MCP server starting (stdio)\n`)
 
-  const syncResult = checkPermissionsSync(cwd)
-  if (!syncResult.in_sync) {
+  const syncResult = checkPermissionsSync(cwd, config)
+  if (!syncResult.in_sync && syncResult.agents) {
     const affected = Object.entries(syncResult.agents)
       .filter(([, r]) => !r.ok)
       .map(([name, r]) => {

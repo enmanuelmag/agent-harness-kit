@@ -4,7 +4,6 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
-import { syncAgentPermissions } from '@/core/materializer/scaffold-utils'
 
 interface BuildOptions {
   watch?: boolean
@@ -15,7 +14,10 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
   await buildOnce(cwd)
 
   if (opts.sync) {
-    await syncAgentPermissions(cwd)
+    p.log.step('Syncing agent permissions...')
+    const config = await loadConfig(cwd)
+    const materializer = getMaterializer(config.provider)
+    await materializer.syncPermissions(cwd)
   }
 
   if (opts.watch) {
