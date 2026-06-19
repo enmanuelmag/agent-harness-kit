@@ -25,6 +25,10 @@ for (const file of readdirSync(SRC)) {
   }
 }
 
+// ─── Skills ───────────────────────────────────────────────────────────────────
+cpSync('src/core/materializer/skills', 'dist/skills', { recursive: true })
+console.log('copied: skills/')
+
 // ─── Dashboard SPA ────────────────────────────────────────────────────────────
 const DASHBOARD_SRC = 'src/dashboard-dist'
 const DASHBOARD_DEST = 'dist/dashboard-dist'
