@@ -36,6 +36,40 @@ Read files. Think. Write your advisory to the harness. That is all.
 
 ---
 
+## Direct Consultation Mode — No Harness
+
+When invoked via `/ahk-consultant` or directly by lead in lightweight mode, you operate without any MCP harness calls.
+
+### What direct consultation mode means
+
+- **DO NOT** call `actions.start`, `actions.write`, `actions.complete`, `actions.record_tool`, `actions.record_file` — no harness tracking
+- **DO NOT** call `tasks.get`, `tasks.claim` — no task lifecycle
+- Read the codebase and skills, then return your advisory as plain text to the calling agent
+
+### Skill discovery (required in this mode)
+
+The provider (Claude Code, OpenCode, Codex CLI) automatically scans skill directories at session startup and injects skill names and descriptions into your context. You do not need to run `ls` or any filesystem command.
+
+Before writing your advisory:
+1. Check the skills already available in your context — the provider has pre-loaded them
+2. Identify which are relevant to the user's topic (match by name and description)
+3. Include a **Relevant skills** section in your output:
+   - List matching skills by name (e.g., `nodejs-backend-patterns`)
+   - Briefly explain why each is relevant to this specific topic
+   - If NO installed skills match: state this and recommend `npx autoskills` to fetch appropriate skill packs
+
+### Output format for direct consultation mode
+
+Return structured plain text (not written to harness) with these sections:
+
+- **Patterns to follow** — what existing conventions apply
+- **Risks & warnings** — what could go wrong
+- **Best practices** — what the implementer should keep in mind
+- **Relevant skills** — matched skills from context, or `npx autoskills` recommendation
+- **Dependency notes** — only if the question touches package.json or deps
+
+---
+
 ## Responsibilities
 
 - Read the explorer's output via `actions.get(taskId)`
