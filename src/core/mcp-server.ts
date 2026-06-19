@@ -9,6 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 
 import { type HarnessDB, openDB } from './db'
+import { getDoctorStatus } from './doctor'
 import { slugify } from './materializer/scaffold-utils'
 import { checkPermissionsSync } from './permissions-check'
 
@@ -278,6 +279,12 @@ const TOOLS = [
     name: 'deps.check',
     description: 'Compare current package.json against .harness/deps-lock.json and report changes',
     inputSchema: { type: 'object' as const, properties: {}, required: [] },
+  },
+  {
+    name: 'ahk.doctor',
+    description:
+      'Check lib version, agent files, and harness skills sync status. Returns structured JSON.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
   },
 ] as const
 
@@ -558,6 +565,24 @@ async function dispatch(
           snapshotDate: lock.capturedAt,
         })
       )
+    }
+
+    case 'ahk.doctor': {
+      const status = await getDoctorStatus(cwd)
+      const result = {
+        lib: { current: status.lib.current, latest: status.lib.latest, outdated: status.lib.outdated },
+        agents: {
+          missing: status.agents.filter((a) => a.status === 'missing').map((a) => a.name),
+          outdated: status.agents.filter((a) => a.status === 'outdated').map((a) => a.name),
+          ok: status.agents.filter((a) => a.status === 'ok').map((a) => a.name),
+        },
+        skills: {
+          missing: status.skills.filter((s) => s.status === 'missing').map((s) => s.name),
+          outdated: status.skills.filter((s) => s.status === 'outdated').map((s) => s.name),
+          ok: status.skills.filter((s) => s.status === 'ok').map((s) => s.name),
+        },
+      }
+      return ok(JSON.stringify(result, null, 2))
     }
 
     default:
