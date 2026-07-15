@@ -109,6 +109,68 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     provider = val satisfies Provider
   }
 
+  // ─── Per-agent model customization (provider-conditional) ────────────────
+  // OpenCode: no closed enum for models — skip entirely, no prompts at all.
+  const AGENT_LABELS: { key: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'; label: string }[] = [
+    { key: 'lead', label: 'Lead' },
+    { key: 'explorer', label: 'Explorer' },
+    { key: 'consultant', label: 'Consultant' },
+    { key: 'builder', label: 'Builder' },
+    { key: 'reviewer', label: 'Reviewer' },
+  ]
+  const modelOverrides: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>> = {}
+
+  if (provider === 'claude-code' || provider === 'codex-cli') {
+    const wantsModelCustomization = await p.confirm({
+      message: '¿Personalizar el modelo por agente?',
+      initialValue: false,
+    })
+    if (p.isCancel(wantsModelCustomization)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
+
+    if (wantsModelCustomization) {
+      if (provider === 'claude-code') {
+        for (const agent of AGENT_LABELS) {
+          const val = await p.select({
+            message: `Modelo para ${agent.label}`,
+            options: [
+              { value: 'inherit', label: 'inherit (default)' },
+              { value: 'haiku', label: 'haiku' },
+              { value: 'sonnet', label: 'sonnet' },
+              { value: 'opus', label: 'opus' },
+              { value: 'fable', label: 'fable' },
+            ],
+            initialValue: 'inherit',
+          })
+          if (p.isCancel(val)) {
+            p.cancel('Cancelled.')
+            process.exit(0)
+          }
+          modelOverrides[agent.key] = val as string
+        }
+      } else {
+        // codex-cli: free text. Codex does not validate this value client-side —
+        // leaving it blank or under 3 characters means no override will be written.
+        for (const agent of AGENT_LABELS) {
+          const val = await p.text({
+            message: `Modelo para ${agent.label} (Codex no valida este valor)`,
+            placeholder: 'ej. gpt-5 (vacío o <3 caracteres = sin override)',
+          })
+          if (p.isCancel(val)) {
+            p.cancel('Cancelled.')
+            process.exit(0)
+          }
+          const trimmed = (val as string).trim()
+          if (trimmed.length >= 3) {
+            modelOverrides[agent.key] = trimmed
+          }
+        }
+      }
+    }
+  }
+
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string
   if (flags.docs) {
@@ -195,7 +257,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   spinner.start('Scaffolding...')
 
   try {
-    const config = applyConfigDefaults({ name, description, provider, docsPath, tasksAdapter })
+    const config = applyConfigDefaults({ name, description, provider, docsPath, tasksAdapter, models: modelOverrides })
     const materializer = getMaterializer(provider)
 
     const installDir = cwd
@@ -210,6 +272,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       docsPath,
       tasksAdapter,
       port: config.tools.mcp.port,
+      models: modelOverrides,
     })
     writeFileSync(join(installDir, configFileName), configContent, 'utf8')
 

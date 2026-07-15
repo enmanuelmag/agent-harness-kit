@@ -39,7 +39,9 @@ export function applyConfigDefaults(params: {
   provider: Provider
   docsPath: string
   tasksAdapter: string
+  models?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>>
 }): HarnessConfig {
+  const models = params.models ?? {}
   return {
     provider: params.provider,
     project: {
@@ -49,10 +51,19 @@ export function applyConfigDefaults(params: {
       agentsMd: './AGENTS.md',
     },
     agents: {
-      lead: { instructionsPath: null },
-      explorer: { instructionsPath: null, allowedPaths: [params.docsPath, './src'] },
-      builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
-      reviewer: { instructionsPath: null },
+      lead: { instructionsPath: null, ...(models.lead && { model: models.lead }) },
+      explorer: {
+        instructionsPath: null,
+        allowedPaths: [params.docsPath, './src'],
+        ...(models.explorer && { model: models.explorer }),
+      },
+      builder: {
+        instructionsPath: null,
+        writablePaths: ['./src', './tests'],
+        ...(models.builder && { model: models.builder }),
+      },
+      reviewer: { instructionsPath: null, ...(models.reviewer && { model: models.reviewer }) },
+      ...(models.consultant && { consultant: { instructionsPath: null, model: models.consultant } }),
       custom: [],
     },
     database: { type: 'sqlite' as const, path: '.harness/harness.db' },
