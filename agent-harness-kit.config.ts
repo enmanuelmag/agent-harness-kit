@@ -11,8 +11,8 @@ export default defineHarness({
 
   agents: {
     lead: { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'] },
-    builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
+    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src', 'README.md'] },
+    builder: { instructionsPath: null, writablePaths: ['./src', './tests', 'README.md'] },
     reviewer: { instructionsPath: null },
     custom: [],
   },

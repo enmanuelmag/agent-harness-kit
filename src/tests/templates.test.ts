@@ -3,8 +3,20 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
+import { getDoctorStatus } from '@/core/doctor'
+import { getMaterializer } from '@/core/materializer/index'
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
-import { configCjs, configTs, featureListJson, translateFrontmatterForOpenCode } from '@/core/materializer/templates'
+import {
+  agentBuilderToml,
+  agentExplorerToml,
+  configCjs,
+  configMjs,
+  configTs,
+  featureListJson,
+  translateFrontmatterForClaudeCode,
+  translateFrontmatterForOpenCode,
+} from '@/core/materializer/templates'
+import { applyConfigDefaults } from '@/commands/init-helpers'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
@@ -218,5 +230,150 @@ describe('configCjs', () => {
     const out = configCjs({ ...base, description: desc })
     assert.ok(out.includes(JSON.stringify(desc)))
     assert.doesNotThrow(() => new Function(out.replace(/^const .+require.+$/m, '//$&')))
+  })
+})
+
+// ─── agent-model-personalization (task 43) ────────────────────────────────────
+
+describe('agent*Toml — model field emission', () => {
+  test('omits model line for undefined model', () => {
+    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src' })
+    assert.doesNotMatch(out, /model = /)
+  })
+
+  test('omits model line for empty string model', () => {
+    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src', model: '' })
+    assert.doesNotMatch(out, /model = /)
+  })
+
+  test('omits model line for whitespace-only model', () => {
+    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src', model: '   ' })
+    assert.doesNotMatch(out, /model = /)
+  })
+
+  test('omits model line for a 2-char model (below the 3-char minimum)', () => {
+    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src', model: 'ab' })
+    assert.doesNotMatch(out, /model = /)
+  })
+
+  test('includes model line for a valid (>=3 char) model', () => {
+    const out = agentBuilderToml({ projectName: 'demo', writablePaths: './src', model: 'gpt-5' })
+    assert.match(out, /model = "gpt-5"/)
+  })
+
+  test('trims the model value before emitting', () => {
+    const out = agentBuilderToml({ projectName: 'demo', writablePaths: './src', model: '  haiku  ' })
+    assert.match(out, /model = "haiku"/)
+    assert.doesNotMatch(out, /model = "  haiku  "/)
+  })
+})
+
+describe('translateFrontmatterForClaudeCode — model injection', () => {
+  const input = `---\nname: explorer\ndescription: some desc\ntools:\n  - Read\n  - Bash\n---\n\n# Body content\n`
+
+  test('no model configured → no model: line, output unchanged aside from tools block', () => {
+    const result = translateFrontmatterForClaudeCode(input, 'explorer')
+    assert.doesNotMatch(result, /^model:/m)
+  })
+
+  test('model configured → model: line present right after name:', () => {
+    const result = translateFrontmatterForClaudeCode(input, 'explorer', 'haiku')
+    assert.match(result, /^model: haiku$/m)
+    assert.match(result, /name: explorer\nmodel: haiku/)
+  })
+
+  test('tools: block (Task + mcp injection) is unaffected by model injection', () => {
+    const result = translateFrontmatterForClaudeCode(input, 'explorer', 'haiku')
+    assert.ok(result.includes('  - Task'))
+    assert.ok(result.includes('mcp__agent-harness-kit__'))
+  })
+})
+
+describe('doctor.ts — model-aware status (fixes false-positive outdated)', () => {
+  const TMP_DOCTOR = join(import.meta.dirname, '../../.tmp-doctor')
+
+  function makeTmp(suffix: string): string {
+    const dir = join(TMP_DOCTOR, suffix)
+    mkdirSync(dir, { recursive: true })
+    return dir
+  }
+
+  function cleanup(): void {
+    rmSync(TMP_DOCTOR, { recursive: true, force: true })
+  }
+
+  test('reports ok (not outdated) for an agent whose live file model matches configured model', async () => {
+    const dir = makeTmp('ok-case')
+    try {
+      const config = applyConfigDefaults({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'claude-code',
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        models: { explorer: 'haiku', reviewer: 'haiku' },
+      })
+
+      const configContent = configMjs({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'claude-code',
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        port: config.tools.mcp.port,
+        models: { explorer: 'haiku', reviewer: 'haiku' },
+      })
+      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
+
+      const materializer = getMaterializer('claude-code')
+      await materializer.build(config, dir)
+
+      const status = await getDoctorStatus(dir)
+      const explorerStatus = status.agents.find((a) => a.name === 'explorer')
+      const reviewerStatus = status.agents.find((a) => a.name === 'reviewer')
+      assert.equal(explorerStatus?.status, 'ok', 'explorer should be ok when live model matches config')
+      assert.equal(reviewerStatus?.status, 'ok', 'reviewer should be ok when live model matches config')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('reports outdated when the live file model diverges from the configured model', async () => {
+    const dir = makeTmp('outdated-case')
+    try {
+      const config = applyConfigDefaults({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'claude-code',
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        models: { explorer: 'haiku' },
+      })
+
+      const configContent = configMjs({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'claude-code',
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        port: config.tools.mcp.port,
+        models: { explorer: 'haiku' },
+      })
+      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
+
+      const materializer = getMaterializer('claude-code')
+      await materializer.build(config, dir)
+
+      // Simulate drift: live file has a different model than what's configured
+      const explorerPath = join(dir, '.claude/agents/explorer.md')
+      const live = readFileSync(explorerPath, 'utf8')
+      writeFileSync(explorerPath, live.replace('model: haiku', 'model: opus'), 'utf8')
+
+      const status = await getDoctorStatus(dir)
+      const explorerStatus = status.agents.find((a) => a.name === 'explorer')
+      assert.equal(explorerStatus?.status, 'outdated')
+    } finally {
+      cleanup()
+    }
   })
 })

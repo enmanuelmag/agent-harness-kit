@@ -16,6 +16,7 @@ export interface AgentConfig {
   context?: string
   allowedPaths?: string[]
   writablePaths?: string[]
+  model?: string
 }
 
 export interface CustomAgentConfig {
@@ -28,6 +29,9 @@ export interface AgentsConfig {
   explorer: AgentConfig
   builder: AgentConfig
   reviewer: AgentConfig
+  /** Optional — the consultant agent has no dedicated config entry elsewhere;
+   *  this exists primarily to carry a per-agent `model` override. */
+  consultant?: AgentConfig
   custom?: CustomAgentConfig[]
 }
 

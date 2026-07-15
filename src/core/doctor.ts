@@ -49,7 +49,7 @@ const REGISTRY_URL = `https://registry.npmjs.org/${pkg.name}/latest`
 const TIMEOUT_MS = 2000
 const AGENT_NAMES = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 type AgentName = (typeof AGENT_NAMES)[number]
-const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage'] as const
+const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review'] as const
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -104,9 +104,9 @@ function getProviderAgentInfo(provider: string): {
 function generateExpectedAgentContent(
   agentName: AgentName,
   provider: string,
-  vars: { projectName: string; allowedPaths: string; writablePaths: string }
+  vars: { projectName: string; allowedPaths: string; writablePaths: string; model?: string }
 ): string {
-  const { projectName, allowedPaths, writablePaths } = vars
+  const { projectName, allowedPaths, writablePaths, model } = vars
 
   if (provider === 'claude-code') {
     const templateFns = {
@@ -116,7 +116,7 @@ function generateExpectedAgentContent(
       builder: () => agentBuilder({ projectName, writablePaths }),
       reviewer: () => agentReviewer({ projectName }),
     }
-    return translateFrontmatterForClaudeCode(templateFns[agentName](), agentName)
+    return translateFrontmatterForClaudeCode(templateFns[agentName](), agentName, model)
   }
 
   if (provider === 'opencode') {
@@ -127,16 +127,17 @@ function generateExpectedAgentContent(
       builder: () => agentBuilder({ projectName, writablePaths }),
       reviewer: () => agentReviewer({ projectName }),
     }
+    // OpenCode never receives a model override — no injection for this provider.
     return translateFrontmatterForOpenCode(templateFns[agentName]())
   }
 
   // codex-cli: TOML format
   const tomlFns = {
-    lead: () => agentLeadToml({ projectName }),
-    explorer: () => agentExplorerToml({ projectName, allowedPaths }),
-    consultant: () => agentConsultantToml({ projectName }),
-    builder: () => agentBuilderToml({ projectName, writablePaths }),
-    reviewer: () => agentReviewerToml({ projectName }),
+    lead: () => agentLeadToml({ projectName, model }),
+    explorer: () => agentExplorerToml({ projectName, allowedPaths, model }),
+    consultant: () => agentConsultantToml({ projectName, model }),
+    builder: () => agentBuilderToml({ projectName, writablePaths, model }),
+    reviewer: () => agentReviewerToml({ projectName, model }),
   }
   return tomlFns[agentName]()
 }
@@ -146,7 +147,8 @@ function checkAgentFiles(
   provider: string,
   projectName: string,
   allowedPaths: string,
-  writablePaths: string
+  writablePaths: string,
+  models: Partial<Record<AgentName, string | undefined>>
 ): AgentStatus[] {
   const { agentsDir, ext } = getProviderAgentInfo(provider)
 
@@ -163,6 +165,7 @@ function checkAgentFiles(
         projectName,
         allowedPaths,
         writablePaths,
+        model: models[name],
       })
       return { name, status: live === expected ? 'ok' as const : 'outdated' as const }
     } catch {
@@ -230,8 +233,15 @@ export async function getDoctorStatus(cwd: string): Promise<DoctorStatus> {
   const projectName = config.project.name
   const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
   const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
+  const models: Partial<Record<AgentName, string | undefined>> = {
+    lead: config.agents.lead.model,
+    explorer: config.agents.explorer.model,
+    consultant: config.agents.consultant?.model,
+    builder: config.agents.builder.model,
+    reviewer: config.agents.reviewer.model,
+  }
 
-  const agents = checkAgentFiles(cwd, provider, projectName, allowedPaths, writablePaths)
+  const agents = checkAgentFiles(cwd, provider, projectName, allowedPaths, writablePaths, models)
   const skills = checkSkills(cwd, provider)
 
   return { lib, agents, skills }

@@ -154,6 +154,11 @@ ahk init
 
 Interactive scaffold. Asks for your project name, description, AI provider, docs path, task adapter, and an optional first task. Creates all harness files in the current directory.
 
+For Claude Code and Codex CLI (not OpenCode), you'll also be asked whether to personalize the model per agent (lead/explorer/consultant/builder/reviewer):
+
+- Claude Code: pick from `inherit` (default), `haiku`, `sonnet`, `opus`, `fable` per agent.
+- Codex CLI: free-text model name per agent — Codex does not validate this value; leaving it blank or under 3 characters means no override is written to that agent's TOML file.
+
 ```bash
 ahk init
 
@@ -240,7 +245,7 @@ Reports three categories:
 
 - **lib version** — compares installed version against the latest on npm. Shows `[✓]` if up to date, `[!]` if an update is available, or `[~]` if the registry could not be reached.
 - **agent files** — reads each agent file on disk and compares against what `ahk build` would generate. Reports `[!]` with the file name if outdated.
-- **harness skills** — checks that `ahk-ask`, `ahk-consultant`, and `ahk-triage` skills exist and match the bundled source. Reports `[!]` if missing or outdated.
+- **harness skills** — checks that `ahk-ask`, `ahk-consultant`, `ahk-triage`, and `ahk-review` skills exist and match the bundled source. Reports `[!]` if missing or outdated.
 
 Run `ahk build` to fix any reported issues.
 
@@ -458,10 +463,11 @@ export default defineHarness({
   provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli'
 
   agents: {
-    lead: { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'] },
+    lead: { instructionsPath: null, model: 'sonnet' }, // optional per-agent model override
+    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'], model: 'haiku' },
     builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
     reviewer: { instructionsPath: null },
+    consultant: { instructionsPath: null, model: 'haiku' },
     custom: [], // define extra agents here
   },
 
@@ -598,23 +604,23 @@ Good acceptance criteria make the difference — the reviewer agent uses them to
 
 The harness exposes these tools via MCP. Agents use them instead of reading files directly.
 
-| Tool                      | Parameters                                      | Description                                                                                                                                                            |
-| ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tasks.get`               | `status?`                                       | List tasks, optionally filtered by `pending \| in_progress \| done \| blocked`                                                                                         |
-| `tasks.claim`             | `id, agent`                                     | Atomically claim a pending task. Returns `task_already_claimed` if another agent got it first                                                                          |
-| `tasks.update`            | `id, status`                                    | Change task status                                                                                                                                                     |
-| `tasks.add`               | `title, slug?, description?, acceptance?`       | Create a new task directly from MCP (agents can queue work on the fly)                                                                                                 |
-| `tasks.acceptance.update` | `criterionId`                                   | Mark an acceptance criterion as met. Criterion IDs come from `tasks.acceptance_get`                                                                                    |
-| `actions.start`           | `taskId, agent`                                 | Start a new action, returns `actionId`                                                                                                                                 |
-| `actions.write`           | `actionId, sectionType, content`                | Record a text section: `result \| tools_used \| blockers \| next_steps`. Does **not** populate the Files dashboard — use `actions.record_file` for that                |
-| `actions.complete`        | `actionId, summary`                             | Close an action with a one-line summary                                                                                                                                |
-| `actions.get`             | `taskId`                                        | Full action history for a task (all agents, all sections)                                                                                                              |
-| `actions.record_file`     | `actionId, filePath, operation, notes?`         | Register a file touch. The **only** way to populate the Files dashboard. `operation`: `read \| created \| modified \| deleted`                                         |
-| `actions.record_tool`     | `actionId, toolName, argsJson?, resultSummary?` | Register a tool call. The **only** way to populate the Tools dashboard                                                                                                 |
-| `docs.search`             | `query`                                         | Search the `docsPath` folder for content matching the query                                                                                                            |
-| `tasks.acceptance_get`    | `taskId`                                        | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update` |
-| `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                                              |
-| `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                                      |
+| Tool                      | Parameters                                      | Description                                                                                                                                                                         |
+| ------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tasks.get`               | `status?`                                       | List tasks, optionally filtered by `pending \| in_progress \| done \| blocked`                                                                                                      |
+| `tasks.claim`             | `id, agent`                                     | Atomically claim a pending task. Returns `task_already_claimed` if another agent got it first                                                                                       |
+| `tasks.update`            | `id, status`                                    | Change task status                                                                                                                                                                  |
+| `tasks.add`               | `title, slug?, description?, acceptance?`       | Create a new task directly from MCP (agents can queue work on the fly)                                                                                                              |
+| `tasks.acceptance.update` | `criterionId`                                   | Mark an acceptance criterion as met. Criterion IDs come from `tasks.acceptance_get`                                                                                                 |
+| `actions.start`           | `taskId, agent`                                 | Start a new action, returns `actionId`                                                                                                                                              |
+| `actions.write`           | `actionId, sectionType, content`                | Record a text section: `result \| tools_used \| blockers \| next_steps`. Does **not** populate the Files dashboard — use `actions.record_file` for that                             |
+| `actions.complete`        | `actionId, summary`                             | Close an action with a one-line summary                                                                                                                                             |
+| `actions.get`             | `taskId`                                        | Full action history for a task (all agents, all sections)                                                                                                                           |
+| `actions.record_file`     | `actionId, filePath, operation, notes?`         | Register a file touch. The **only** way to populate the Files dashboard. `operation`: `read \| created \| modified \| deleted`                                                      |
+| `actions.record_tool`     | `actionId, toolName, argsJson?, resultSummary?` | Register a tool call. The **only** way to populate the Tools dashboard                                                                                                              |
+| `docs.search`             | `query`                                         | Search the `docsPath` folder for content matching the query                                                                                                                         |
+| `tasks.acceptance_get`    | `taskId`                                        | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update`              |
+| `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                                                           |
+| `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                                                   |
 | `ahk.doctor`              | _(none)_                                        | Check lib version, agent files, and harness skills sync status. Returns `{ lib: { current, latest, outdated }, agents: { outdated, upToDate }, skills: { missing, outdated, ok } }` |
 
 ---
