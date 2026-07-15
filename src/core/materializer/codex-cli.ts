@@ -52,14 +52,19 @@ export class CodexCliMaterializer implements Materializer {
     const projectName = config.project.name
     const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
+    const leadModel = config.agents.lead.model
+    const explorerModel = config.agents.explorer.model
+    const consultantModel = config.agents.consultant?.model
+    const builderModel = config.agents.builder.model
+    const reviewerModel = config.agents.reviewer.model
 
-    writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName }))
-    writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths }))
-    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName }))
-    writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths }))
-    writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName }))
+    writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName, model: leadModel }))
+    writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths, model: explorerModel }))
+    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName, model: consultantModel }))
+    writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths, model: builderModel }))
+    writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName, model: reviewerModel }))
     // Override Codex's built-in `default` agent so `lead` runs when no agent is selected
-    writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName }))
+    writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName, model: leadModel }))
 
     // .codex/config.toml — MERGE, never overwrite whole file
     mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port)
@@ -80,13 +85,18 @@ export class CodexCliMaterializer implements Materializer {
     const projectName = config.project.name
     const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
+    const leadModel = config.agents.lead.model
+    const explorerModel = config.agents.explorer.model
+    const consultantModel = config.agents.consultant?.model
+    const builderModel = config.agents.builder.model
+    const reviewerModel = config.agents.reviewer.model
 
-    writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName }))
-    writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths }))
-    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName }))
-    writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths }))
-    writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName }))
-    writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName }))
+    writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName, model: leadModel }))
+    writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths, model: explorerModel }))
+    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName, model: consultantModel }))
+    writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths, model: builderModel }))
+    writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName, model: reviewerModel }))
+    writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName, model: leadModel }))
 
     mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port)
     writeSkills(cwd, '.agents/skills')

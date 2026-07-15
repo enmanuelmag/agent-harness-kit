@@ -232,6 +232,18 @@ If orchestrating: Agent definition files in .claude/agents/
 
 // ─── agent-harness-kit.config.ts template ───────────────────────────────────────────
 
+export interface AgentModelOverrides {
+  lead?: string
+  explorer?: string
+  consultant?: string
+  builder?: string
+  reviewer?: string
+}
+
+function modelField(model: string | undefined): string {
+  return model ? `, model: ${JSON.stringify(model)}` : ''
+}
+
 export function configTs(params: {
   name: string
   description: string
@@ -239,7 +251,9 @@ export function configTs(params: {
   docsPath: string
   tasksAdapter: string
   port: number
+  models?: AgentModelOverrides
 }): string {
+  const models = params.models ?? {}
   return `import { defineHarness } from '@cardor/agent-harness-kit'
 
 export default defineHarness({
@@ -252,11 +266,11 @@ export default defineHarness({
   provider: '${params.provider}',
 
   agents: {
-    lead:     { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['${params.docsPath}', './src'] },
-    builder:  { instructionsPath: null, writablePaths: ['./src', './tests'] },
-    reviewer: { instructionsPath: null },
-    custom:   [],
+    lead:     { instructionsPath: null${modelField(models.lead)} },
+    explorer: { instructionsPath: null, allowedPaths: ['${params.docsPath}', './src']${modelField(models.explorer)} },
+    builder:  { instructionsPath: null, writablePaths: ['./src', './tests']${modelField(models.builder)} },
+    reviewer: { instructionsPath: null${modelField(models.reviewer)} },
+    ${models.consultant ? `consultant: { instructionsPath: null${modelField(models.consultant)} },\n    ` : ''}custom:   [],
   },
 
   // SQLite (default). Switch to postgres/mysql by changing database.type.
@@ -299,7 +313,9 @@ export function configCjs(params: {
   docsPath: string
   tasksAdapter: string
   port: number
+  models?: AgentModelOverrides
 }): string {
+  const models = params.models ?? {}
   return `const { defineHarness } = require('@cardor/agent-harness-kit')
 
 module.exports = defineHarness({
@@ -312,11 +328,11 @@ module.exports = defineHarness({
   provider: '${params.provider}',
 
   agents: {
-    lead:     { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['${params.docsPath}', './src'] },
-    builder:  { instructionsPath: null, writablePaths: ['./src', './tests'] },
-    reviewer: { instructionsPath: null },
-    custom:   [],
+    lead:     { instructionsPath: null${modelField(models.lead)} },
+    explorer: { instructionsPath: null, allowedPaths: ['${params.docsPath}', './src']${modelField(models.explorer)} },
+    builder:  { instructionsPath: null, writablePaths: ['./src', './tests']${modelField(models.builder)} },
+    reviewer: { instructionsPath: null${modelField(models.reviewer)} },
+    ${models.consultant ? `consultant: { instructionsPath: null${modelField(models.consultant)} },\n    ` : ''}custom:   [],
   },
 
   // SQLite (default). Switch to postgres/mysql by changing database.type.
@@ -372,6 +388,10 @@ export function agentReviewer(vars: { projectName: string }): string {
   return loadAgentTemplate('reviewer', vars)
 }
 
+// Note: agentLead/agentExplorer/agentConsultant/agentBuilder/agentReviewer above produce the
+// raw markdown template (frontmatter without `model:`). The `model:` line is injected downstream
+// by translateFrontmatterForClaudeCode() (Claude Code) — never injected for OpenCode.
+
 // ─── feature_list.json initial seed ──────────────────────────────────────────
 
 export function featureListJson(
@@ -406,17 +426,26 @@ function stripFrontmatter(md: string): { description: string; body: string } {
   return { description, body }
 }
 
+/**
+ * Codex CLI does not validate the `model` value client-side (free text, resolved
+ * at invocation time). Per explicit product rule: if the value is null/undefined/
+ * empty, or its trimmed length is < 3 chars, omit the `model` line entirely —
+ * never emit a placeholder or an 'inherit'-like value.
+ */
 function toCodexToml(
   name: string,
   description: string,
   body: string,
-  sandboxMode: 'workspace-write' | 'read-only'
+  sandboxMode: 'workspace-write' | 'read-only',
+  model?: string
 ): string {
   // TOML multiline basic strings end at `"""` — escape any that appear in content
   const safe = (s: string) => s.replace(/"""/g, '""\\u0022')
+  const trimmedModel = model?.trim() ?? ''
+  const modelLine = trimmedModel.length >= 3 ? `model = "${trimmedModel}"\n` : ''
   return `name = "${name}"
 sandbox_mode = "${sandboxMode}"
-
+${modelLine}
 description = """
 ${safe(description)}
 """
@@ -427,34 +456,34 @@ ${safe(body.trimEnd())}
 `
 }
 
-export function agentLeadToml(vars: { projectName: string }): string {
+export function agentLeadToml(vars: { projectName: string; model?: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  return toCodexToml('lead', description, body, 'read-only')
+  return toCodexToml('lead', description, body, 'read-only', vars.model)
 }
 
-export function agentLeadAsDefaultToml(vars: { projectName: string }): string {
+export function agentLeadAsDefaultToml(vars: { projectName: string; model?: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  return toCodexToml('default', description, body, 'read-only')
+  return toCodexToml('default', description, body, 'read-only', vars.model)
 }
 
-export function agentExplorerToml(vars: { projectName: string; allowedPaths: string }): string {
+export function agentExplorerToml(vars: { projectName: string; allowedPaths: string; model?: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('explorer', vars))
-  return toCodexToml('explorer', description, body, 'read-only')
+  return toCodexToml('explorer', description, body, 'read-only', vars.model)
 }
 
-export function agentBuilderToml(vars: { projectName: string; writablePaths: string }): string {
+export function agentBuilderToml(vars: { projectName: string; writablePaths: string; model?: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('builder', vars))
-  return toCodexToml('builder', description, body, 'workspace-write')
+  return toCodexToml('builder', description, body, 'workspace-write', vars.model)
 }
 
-export function agentReviewerToml(vars: { projectName: string }): string {
+export function agentReviewerToml(vars: { projectName: string; model?: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('reviewer', vars))
-  return toCodexToml('reviewer', description, body, 'read-only')
+  return toCodexToml('reviewer', description, body, 'read-only', vars.model)
 }
 
-export function agentConsultantToml(vars: { projectName: string }): string {
+export function agentConsultantToml(vars: { projectName: string; model?: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('consultant', vars))
-  return toCodexToml('consultant', description, body, 'read-only')
+  return toCodexToml('consultant', description, body, 'read-only', vars.model)
 }
 
 // ─── Claude Code frontmatter translation ─────────────────────────────────────
@@ -468,7 +497,8 @@ export function agentConsultantToml(vars: { projectName: string }): string {
  */
 export function translateFrontmatterForClaudeCode(
   md: string,
-  agentName: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'
+  agentName: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer',
+  model?: string
 ): string {
   const permissionsMap: Record<string, string[]> = {
     lead: [...MCP_CLAUDE_PERMISSIONS_LEAD],
@@ -482,10 +512,32 @@ export function translateFrontmatterForClaudeCode(
 
   // Find the tools: block in frontmatter and append Task + mcp tools after last tool entry
   // We look for the pattern: a line with `  - SomeTool` followed by either `---` or a non-tool line
-  return md.replace(/(tools:\n(?:  - (?!mcp__)[^\n]+\n)+)/, (match) => {
+  let result = md.replace(/(tools:\n(?:  - (?!mcp__)[^\n]+\n)+)/, (match) => {
     const trimmed = match.trimEnd()
     return `${trimmed}\n  - Task\n${mcpLines}\n`
   })
+
+  // Inject a `model:` frontmatter line, independent of the tools: regex above.
+  // Placed right after `name: <agentName>` — matches the shape used when a model
+  // is manually configured today. No model configured → leave frontmatter untouched.
+  if (model) {
+    result = injectModelFrontmatterLine(result, model)
+  }
+
+  return result
+}
+
+/**
+ * Inserts (or replaces) a `model: <value>` line right after the `name:` line
+ * in a template's YAML frontmatter. Never touches the `tools:` block.
+ */
+function injectModelFrontmatterLine(md: string, model: string): string {
+  // Replace an existing `model:` line if present (idempotent re-generation)...
+  if (/^model:\s*.*$/m.test(md)) {
+    return md.replace(/^model:\s*.*$/m, `model: ${model}`)
+  }
+  // ...otherwise insert a new `model:` line right after `name:`.
+  return md.replace(/^(name:.*)$/m, `$1\nmodel: ${model}`)
 }
 
 // ─── OpenCode frontmatter translation ────────────────────────────────────────

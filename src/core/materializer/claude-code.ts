@@ -60,11 +60,16 @@ export class ClaudeCodeMaterializer implements Materializer {
     const projectName = config.project.name
     const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    writeAgentFile(cwd, '.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead'))
-    writeAgentFile(cwd, '.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer'))
-    writeAgentFile(cwd, '.claude/agents/consultant.md', translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant'))
-    writeAgentFile(cwd, '.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder'))
-    writeAgentFile(cwd, '.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer'))
+    const leadModel = config.agents.lead.model
+    const explorerModel = config.agents.explorer.model
+    const consultantModel = config.agents.consultant?.model
+    const builderModel = config.agents.builder.model
+    const reviewerModel = config.agents.reviewer.model
+    writeAgentFile(cwd, '.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead', leadModel))
+    writeAgentFile(cwd, '.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer', explorerModel))
+    writeAgentFile(cwd, '.claude/agents/consultant.md', translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant', consultantModel))
+    writeAgentFile(cwd, '.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder', builderModel))
+    writeAgentFile(cwd, '.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', reviewerModel))
 
     // .mcp.json — MERGE, never overwrite whole file
     mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port)
@@ -93,11 +98,16 @@ export class ClaudeCodeMaterializer implements Materializer {
     const projectName = config.project.name
     const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
     const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    write('.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead'))
-    write('.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer'))
-    write('.claude/agents/consultant.md', translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant'))
-    write('.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder'))
-    write('.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer'))
+    const leadModel = config.agents.lead.model
+    const explorerModel = config.agents.explorer.model
+    const consultantModel = config.agents.consultant?.model
+    const builderModel = config.agents.builder.model
+    const reviewerModel = config.agents.reviewer.model
+    write('.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead', leadModel))
+    write('.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer', explorerModel))
+    write('.claude/agents/consultant.md', translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant', consultantModel))
+    write('.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder', builderModel))
+    write('.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', reviewerModel))
 
     // MCP config: always merge
     mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port)
