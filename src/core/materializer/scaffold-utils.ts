@@ -44,21 +44,3 @@ export function writeSkills(cwd: string, skillsDir: string): void {
     writeFileSync(dest, readFileSync(src, 'utf8'), 'utf8')
   }
 }
-
-/**
- * Writes a single skill under an already-resolved absolute `skillsRoot`,
- * preserving the file if it already exists (same "preserve dev
- * customizations" idempotency criterion as writeAgentFile). Used by the
- * global sync flow, which needs to add only the skills that are missing
- * rather than unconditionally overwriting every skill like writeSkills()
- * does for project-local scaffold/build.
- */
-export function writeSkill(skillsRoot: string, skillName: string): void {
-  const src = join(__dirname, 'skills', skillName, 'SKILL.md')
-  const destDir = join(skillsRoot, skillName)
-  const dest = join(destDir, 'SKILL.md')
-  if (existsSync(dest)) return // preserve — already present
-  mkdirSync(destDir, { recursive: true })
-  writeFileSync(dest, readFileSync(src, 'utf8'), 'utf8')
-}
-

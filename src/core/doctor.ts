@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -19,8 +18,6 @@ import {
   translateFrontmatterForOpenCode,
 } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
-
-import type { HarnessConfig } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -198,7 +195,7 @@ function checkAgentFilesAtRoot(
         writablePaths,
         model: models[name],
       })
-      return { name, status: live === expected ? 'ok' as const : 'outdated' as const }
+      return { name, status: live === expected ? ('ok' as const) : ('outdated' as const) }
     } catch {
       return { name, status: 'outdated' as const }
     }
@@ -268,94 +265,6 @@ function checkSkillsAtRoot(skillsRoot: string): SkillStatus[] {
 function checkSkills(cwd: string, provider: string): SkillStatus[] {
   const skillsDir = getProviderSkillsDir(provider)
   return checkSkillsAtRoot(join(cwd, skillsDir))
-}
-
-// ─── Global (per-provider, home dir) resolution ────────────────────────────────
-//
-// Project-local paths (getProviderAgentInfo / getProviderSkillsDir above) are
-// always relative to the project cwd. Global paths live under the user's home
-// dir and, for some providers, do NOT mirror the local layout 1:1 — most
-// notably Codex CLI, whose skills live in a namespace separate from its
-// agents (`~/.agents/skills`, not `~/.codex/skills`). These functions must
-// stay independent of getProviderAgentInfo/getProviderSkillsDir rather than
-// deriving from them, since the local and global layouts genuinely differ
-// (e.g. OpenCode's global agents dir is XDG-style `~/.config/opencode/agents`,
-// not `~/.opencode/agents`).
-
-export function getGlobalProviderAgentDir(
-  provider: string,
-  homeDir: string
-): { agentsDir: string; ext: string } {
-  switch (provider) {
-    case 'claude-code':
-      return { agentsDir: join(homeDir, '.claude', 'agents'), ext: '.md' }
-    case 'opencode':
-      return { agentsDir: join(homeDir, '.config', 'opencode', 'agents'), ext: '.md' }
-    case 'codex-cli':
-      return { agentsDir: join(homeDir, '.codex', 'agents'), ext: '.toml' }
-    default:
-      return { agentsDir: join(homeDir, '.claude', 'agents'), ext: '.md' }
-  }
-}
-
-export function getGlobalProviderSkillsDir(provider: string, homeDir: string): string {
-  switch (provider) {
-    case 'claude-code':
-      return join(homeDir, '.claude', 'skills')
-    case 'opencode':
-      return join(homeDir, '.config', 'opencode', 'skills')
-    case 'codex-cli':
-      // Codex CLI namespace split: agents live under ~/.codex/agents, but
-      // skills live under ~/.agents/skills — NOT ~/.codex/skills. Mirrors the
-      // project-local convention already used by getProviderSkillsDir().
-      return join(homeDir, '.agents', 'skills')
-    default:
-      return join(homeDir, '.claude', 'skills')
-  }
-}
-
-export interface GlobalDoctorStatus {
-  agents: AgentStatus[]
-  skills: SkillStatus[]
-}
-
-/**
- * Global counterpart to getDoctorStatus() — reuses the same comparison logic
- * (checkAgentFilesAtRoot / checkSkillsAtRoot / generateExpectedAgentContent)
- * against a root resolved from `homeDir` instead of the project cwd. Never
- * mutates the filesystem — detection only.
- */
-export async function getGlobalDoctorStatus(
-  provider: string,
-  config: HarnessConfig,
-  homeDir: string = homedir()
-): Promise<GlobalDoctorStatus> {
-  const projectName = config.project.name
-  const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-  const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-  const models: Partial<Record<AgentName, string | undefined>> = {
-    lead: config.agents.lead.model,
-    explorer: config.agents.explorer.model,
-    consultant: config.agents.consultant?.model,
-    builder: config.agents.builder.model,
-    reviewer: config.agents.reviewer.model,
-  }
-
-  const { agentsDir, ext } = getGlobalProviderAgentDir(provider, homeDir)
-  const agents = checkAgentFilesAtRoot(
-    agentsDir,
-    ext,
-    provider,
-    projectName,
-    allowedPaths,
-    writablePaths,
-    models
-  )
-
-  const skillsDir = getGlobalProviderSkillsDir(provider, homeDir)
-  const skills = checkSkillsAtRoot(skillsDir)
-
-  return { agents, skills }
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────

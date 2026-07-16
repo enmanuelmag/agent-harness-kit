@@ -184,15 +184,7 @@ For Claude Code and Codex CLI (not OpenCode), you'll also be asked whether to pe
 
 Regardless of scope, `.harness/storage-state.json` is always written to the project — it records the *actual* current storage state (`scope`, `projectId`, `dbType`, `migratedAt`), separate from the *desired* state declared in the config file.
 
-When `--storage-scope global` is chosen, `ahk init` also synchronizes your provider's agent and skill files into your home directory (in addition to the project-local files it always writes), so subsequent `ahk init --storage-scope global` runs in *other* projects on the same machine can reuse them instead of re-scaffolding:
-
-| Provider      | Global agents dir           | Global skills dir            |
-| ------------- | ---------------------------- | ----------------------------- |
-| `claude-code` | `~/.claude/agents/`          | `~/.claude/skills/`           |
-| `codex-cli`   | `~/.codex/agents/`           | `~/.agents/skills/` (separate namespace from `~/.codex/agents`) |
-| `opencode`    | `~/.config/opencode/agents/` | `~/.config/opencode/skills/`  |
-
-This sync is idempotent and non-destructive: it only creates files that are missing. If everything is already present, `ahk init` prints a message and skips; if only some files are missing, it creates just those and reports what was added. Files it detects as already customized/outdated are left untouched (same "preserve, don't overwrite" rule used for project-local agent files).
+Agent and skill files always live in the project tree, regardless of storage scope — `--storage-scope` only affects where the harness DB lives.
 
 ```bash
 ahk init

@@ -5,10 +5,9 @@ import pc from 'picocolors'
 
 import { findConfigFile } from '@/core/config'
 import { openDB } from '@/core/db'
-import { syncGlobalAgentsAndSkills } from '@/core/materializer/global-sync'
 import { getMaterializer } from '@/core/materializer/index'
 import { slugify } from '@/core/materializer/scaffold-utils'
-import { configTs, configMjs, configCjs } from '@/core/materializer/templates'
+import { configCjs,configMjs, configTs } from '@/core/materializer/templates'
 import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/init'
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
@@ -113,18 +112,23 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
   // ─── Per-agent model customization (provider-conditional) ────────────────
   // OpenCode: no closed enum for models — skip entirely, no prompts at all.
-  const AGENT_LABELS: { key: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'; label: string }[] = [
+  const AGENT_LABELS: {
+    key: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'
+    label: string
+  }[] = [
     { key: 'lead', label: 'Lead' },
     { key: 'explorer', label: 'Explorer' },
     { key: 'consultant', label: 'Consultant' },
     { key: 'builder', label: 'Builder' },
     { key: 'reviewer', label: 'Reviewer' },
   ]
-  const modelOverrides: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>> = {}
+  const modelOverrides: Partial<
+    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>
+  > = {}
 
   if (provider === 'claude-code' || provider === 'codex-cli') {
     const wantsModelCustomization = await p.confirm({
-      message: '¿Personalizar el modelo por agente?',
+      message: 'Customize the model per agent?',
       initialValue: false,
     })
     if (p.isCancel(wantsModelCustomization)) {
@@ -136,7 +140,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       if (provider === 'claude-code') {
         for (const agent of AGENT_LABELS) {
           const val = await p.select({
-            message: `Modelo para ${agent.label}`,
+            message: `Model for ${agent.label}`,
             options: [
               { value: 'inherit', label: 'inherit (default)' },
               { value: 'haiku', label: 'haiku' },
@@ -157,8 +161,8 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         // leaving it blank or under 3 characters means no override will be written.
         for (const agent of AGENT_LABELS) {
           const val = await p.text({
-            message: `Modelo para ${agent.label} (Codex no valida este valor)`,
-            placeholder: 'ej. gpt-5 (vacío o <3 caracteres = sin override)',
+            message: `Model for ${agent.label} (Codex does not validate this value)`,
+            placeholder: 'e.g. gpt-5 (empty or <3 chars = no override)',
           })
           if (p.isCancel(val)) {
             p.cancel('Cancelled.')
@@ -200,7 +204,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       message: 'Storage scope',
       options: [
         { value: 'local', label: 'Local — .harness/harness.db lives in this project' },
-        { value: 'global', label: 'Global — DB lives under ~/.harness/dbs/<projectId>/, outside the project' },
+        {
+          value: 'global',
+          label: 'Global — DB lives under ~/.harness/dbs/<projectId>/, outside the project',
+        },
       ],
       initialValue: 'local',
     })
@@ -275,7 +282,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
   // ─── Scaffold ─────────────────────────────────────────────────────────────
   let configExt: 'ts' | 'mjs' | 'cjs' = 'ts'
-  let globalSyncResult: Awaited<ReturnType<typeof syncGlobalAgentsAndSkills>> | null = null
   const spinner = p.spinner()
   spinner.start('Scaffolding...')
 
@@ -324,13 +330,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     // Scaffold provider-specific files
     await materializer.scaffold(config, { cwd: installDir, firstTask })
 
-    // Global storage scope also implies globally-installed agents/skills —
-    // sync them into the user's home dir (idempotent: only missing files are
-    // created, already-synced files are left untouched).
-    if (config.storage.scope === 'global') {
-      globalSyncResult = await syncGlobalAgentsAndSkills(config, provider)
-    }
-
     // Seed first task into DB if provided
     if (firstTask) {
       const slug = slugify(firstTask.title)
@@ -360,8 +359,20 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.green(`✓ agent-harness-kit.config.${configExt}`))
   console.log(pc.green('✓ AGENTS.md'))
   console.log(pc.green('✓ health.sh'))
-  console.log(pc.green(storageScope === 'global' ? '✓ ~/.harness/dbs/<projectId>/harness.db' : '✓ .harness/harness.db'))
-  console.log(pc.green(storageScope === 'global' ? '✓ ~/.harness/dbs/<projectId>/current.md' : '✓ .harness/current.md'))
+  console.log(
+    pc.green(
+      storageScope === 'global'
+        ? '✓ ~/.harness/dbs/<projectId>/harness.db'
+        : '✓ .harness/harness.db'
+    )
+  )
+  console.log(
+    pc.green(
+      storageScope === 'global'
+        ? '✓ ~/.harness/dbs/<projectId>/current.md'
+        : '✓ .harness/current.md'
+    )
+  )
   console.log(pc.green('✓ .harness/storage-state.json'))
   console.log(pc.green(`✓ ${agentsDir}lead.md`))
   console.log(pc.green(`✓ ${agentsDir}explorer.md`))
@@ -369,20 +380,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.green(`✓ ${agentsDir}reviewer.md`))
   console.log(pc.green(`✓ ${mcpFile}`))
   console.log(pc.green('✓ .gitignore entries added'))
-
-  if (globalSyncResult) {
-    console.log('')
-    if (globalSyncResult.alreadySynced) {
-      console.log(pc.dim('✓ Global agents/skills already synced — skipped'))
-    } else {
-      for (const name of globalSyncResult.createdAgents) {
-        console.log(pc.green(`✓ ~global agent added: ${name}`))
-      }
-      for (const name of globalSyncResult.createdSkills) {
-        console.log(pc.green(`✓ ~global skill added: ${name}`))
-      }
-    }
-  }
 
   console.log('')
   console.log(pc.cyan('→') + ` Edit ${pc.cyan('health.sh')} with your project checks`)
