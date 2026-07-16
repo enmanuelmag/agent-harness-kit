@@ -142,7 +142,7 @@ Then run the interactive setup inside your project:
 npx ahk init
 ```
 
-> **Local install required.** `ahk` needs to resolve your project's `agent-harness-kit.config.ts` and its dependencies relative to your project's own `node_modules`. A **global-only** install (`npm install -g @cardor/agent-harness-kit`) cannot do this reliably, so every command except `--version`/`--help` will detect a global-only install and exit with an error telling you to run `npm install --save-dev @cardor/agent-harness-kit` (or the `pnpm`/`yarn`/`bun` equivalent) in your project root.
+> **Local install recommended.** The generated `agent-harness-kit.config.ts` uses `import type`, which is erased at compile time, so `ahk` no longer needs to resolve the package from your project's `node_modules` at runtime. If it detects a **global-only** install (`npm install -g @cardor/agent-harness-kit`), it prints a non-blocking warning recommending `npm install --save-dev @cardor/agent-harness-kit` (or the `pnpm`/`yarn`/`bun` equivalent) — the command still runs and exits normally either way. This is only about keeping the CLI version pinned and reproducible across your team and CI, not a functional requirement.
 >
 > This check also works with **Yarn Berry (PnP)** projects, which never create a `node_modules` folder — `ahk` detects `.pnp.cjs`/`.pnp.loader.mjs` and falls back to checking that the package is declared in `package.json` instead of requiring a `node_modules` entry.
 
@@ -522,9 +522,9 @@ The `tasks` table includes an `updated_at` timestamp column, set on creation and
 Everything in the config file is yours to change:
 
 ```ts
-import { defineHarness } from '@cardor/agent-harness-kit'
+import type { HarnessConfig } from '@cardor/agent-harness-kit'
 
-export default defineHarness({
+const config: HarnessConfig = {
   project: {
     name: 'My App',
     description: 'What this project does',
@@ -578,8 +578,12 @@ export default defineHarness({
     mcp: { enabled: true, port: 3742 },
     scripts: { enabled: true, outputDir: './.harness/scripts' },
   },
-})
+}
+
+export default config
 ```
+
+> `defineHarness()` is still exported for anyone who prefers the value-import form (`import { defineHarness } from '@cardor/agent-harness-kit'` + `export default defineHarness({ ... })`) — it's an identity function kept for backward compatibility, and `loadConfig()` supports both shapes.
 
 ### `health.sh`
 

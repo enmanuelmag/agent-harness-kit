@@ -202,13 +202,14 @@ program
     await runDoctor(cwd)
   })
 
-// Blocks any command action (but not --version/--help, which commander
-// handles without invoking actions) when the package is only installed
-// globally and not available in the project's local node_modules.
+// Prints a non-blocking warning (but not for --version/--help, which
+// commander handles without invoking actions) when the package is only
+// installed globally and not available in the project's local
+// node_modules. This is purely informational — the command continues
+// its normal flow regardless of the check's result.
 program.hook('preAction', () => {
   if (!isLocalInstallSatisfied(cwd)) {
     printLocalInstallWarning()
-    process.exit(1)
   }
 })
 
