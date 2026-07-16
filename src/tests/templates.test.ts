@@ -5,7 +5,7 @@ import { describe, test } from 'node:test'
 
 import { getDoctorStatus } from '@/core/doctor'
 import { getMaterializer } from '@/core/materializer/index'
-import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
   agentBuilderToml,
   agentExplorerToml,
@@ -24,7 +24,7 @@ function setup() { mkdirSync(TMP, { recursive: true }) }
 function teardown() { rmSync(TMP, { recursive: true, force: true }) }
 
 describe('mergeClaudeMcpJson', () => {
-  test('creates file when it does not exist', () => {
+  test('creates file when it does not exist (defaults to npm command)', () => {
     setup()
     const path = join(TMP, '.mcp.json')
     mergeClaudeMcpJson(path, 3456)
@@ -32,7 +32,8 @@ describe('mergeClaudeMcpJson', () => {
     const entry = parsed.mcpServers['agent-harness-kit']
     assert.ok(entry)
     assert.equal(entry.type, 'stdio')
-    assert.equal(entry.args[3], '3456')
+    assert.equal(entry.command, 'npx')
+    assert.deepEqual(entry.args, ['--no', 'ahk', 'serve', '--port', '3456'])
     teardown()
   })
 
@@ -47,10 +48,45 @@ describe('mergeClaudeMcpJson', () => {
     assert.ok(parsed.mcpServers['agent-harness-kit'])
     teardown()
   })
+
+  test('generates pnpm command/args when pm is pnpm', () => {
+    setup()
+    const path = join(TMP, '.mcp3.json')
+    mergeClaudeMcpJson(path, 3456, 'pnpm')
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    const entry = parsed.mcpServers['agent-harness-kit']
+    assert.equal(entry.command, 'pnpm')
+    assert.deepEqual(entry.args, ['exec', 'ahk', 'serve', '--port', '3456'])
+    teardown()
+  })
+
+  test('generates yarn command/args for both yarn-classic and yarn-berry', () => {
+    setup()
+    for (const pm of ['yarn-classic', 'yarn-berry'] as const) {
+      const path = join(TMP, `.mcp-${pm}.json`)
+      mergeClaudeMcpJson(path, 3456, pm)
+      const parsed = JSON.parse(readFileSync(path, 'utf8'))
+      const entry = parsed.mcpServers['agent-harness-kit']
+      assert.equal(entry.command, 'yarn')
+      assert.deepEqual(entry.args, ['run', 'ahk', 'serve', '--port', '3456'])
+    }
+    teardown()
+  })
+
+  test('generates bun command/args when pm is bun', () => {
+    setup()
+    const path = join(TMP, '.mcp-bun.json')
+    mergeClaudeMcpJson(path, 3456, 'bun')
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    const entry = parsed.mcpServers['agent-harness-kit']
+    assert.equal(entry.command, 'bunx')
+    assert.deepEqual(entry.args, ['--no-install', 'ahk', 'serve', '--port', '3456'])
+    teardown()
+  })
 })
 
 describe('mergeOpencodeJson', () => {
-  test('creates file when it does not exist', () => {
+  test('creates file when it does not exist (defaults to npm command array)', () => {
     setup()
     const path = join(TMP, 'opencode.json')
     mergeOpencodeJson(path, 3456)
@@ -59,7 +95,7 @@ describe('mergeOpencodeJson', () => {
     assert.ok(entry)
     assert.equal(entry.type, 'local')
     assert.ok(Array.isArray(entry.command))
-    assert.equal(entry.command[entry.command.length - 1], '3456')
+    assert.deepEqual(entry.command, ['npx', '--no', 'ahk', 'serve', '--port', '3456'])
     teardown()
   })
 
@@ -72,6 +108,61 @@ describe('mergeOpencodeJson', () => {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.mcp['other'])
     assert.ok(parsed.mcp['agent-harness-kit'])
+    teardown()
+  })
+
+  test('generates a single command array (not split command/args) per pm', () => {
+    setup()
+    const path = join(TMP, 'opencode3.json')
+    mergeOpencodeJson(path, 3456, 'pnpm')
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    const entry = parsed.mcp['agent-harness-kit']
+    assert.deepEqual(entry.command, ['pnpm', 'exec', 'ahk', 'serve', '--port', '3456'])
+    teardown()
+  })
+})
+
+describe('mergeCodexConfigToml', () => {
+  test('creates file when it does not exist (defaults to npm command)', () => {
+    setup()
+    const path = join(TMP, 'config.toml')
+    mergeCodexConfigToml(path, 3456)
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
+    assert.match(content, /command = "npx"/)
+    assert.match(content, /args = \["--no","ahk","serve","--port","3456"\]/)
+    teardown()
+  })
+
+  test('generates pnpm command/args when pm is pnpm', () => {
+    setup()
+    const path = join(TMP, 'config-pnpm.toml')
+    mergeCodexConfigToml(path, 3456, 'pnpm')
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /command = "pnpm"/)
+    assert.match(content, /args = \["exec","ahk","serve","--port","3456"\]/)
+    teardown()
+  })
+
+  test('generates yarn command/args when pm is yarn-berry', () => {
+    setup()
+    const path = join(TMP, 'config-yarn.toml')
+    mergeCodexConfigToml(path, 3456, 'yarn-berry')
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /command = "yarn"/)
+    assert.match(content, /args = \["run","ahk","serve","--port","3456"\]/)
+    teardown()
+  })
+
+  test('preserves other existing TOML sections when merging', () => {
+    setup()
+    const path = join(TMP, 'config-preserve.toml')
+    writeFileSync(path, '[other_section]\nfoo = "bar"\n')
+    mergeCodexConfigToml(path, 3456)
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /\[other_section\]/)
+    assert.match(content, /foo = "bar"/)
+    assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
     teardown()
   })
 })
@@ -177,6 +268,8 @@ describe('configTs', () => {
     docsPath: './docs',
     tasksAdapter: 'local',
     port: 3742,
+    scope: 'local' as const,
+    projectId: 'test-project-id',
   }
 
   test('description with apostrophe produces valid JS', () => {
@@ -199,6 +292,12 @@ describe('configTs', () => {
     assert.ok(out.includes(JSON.stringify(desc)))
     assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
   })
+
+  test('emits scope and projectId explicitly in generated storage section', () => {
+    const out = configTs({ ...base, scope: 'global', projectId: 'abc-123' })
+    assert.match(out, /scope:\s*'global'/)
+    assert.match(out, /projectId:\s*'abc-123'/)
+  })
 })
 
 describe('configCjs', () => {
@@ -209,7 +308,15 @@ describe('configCjs', () => {
     docsPath: './docs',
     tasksAdapter: 'local',
     port: 3742,
+    scope: 'local' as const,
+    projectId: 'test-project-id',
   }
+
+  test('emits scope and projectId explicitly in generated storage section', () => {
+    const out = configCjs({ ...base, scope: 'global', projectId: 'abc-123' })
+    assert.match(out, /scope:\s*'global'/)
+    assert.match(out, /projectId:\s*'abc-123'/)
+  })
 
   test('description with apostrophe produces valid JS', () => {
     const desc = "it's a playground"
@@ -322,6 +429,8 @@ describe('doctor.ts — model-aware status (fixes false-positive outdated)', () 
         tasksAdapter: 'local',
         port: config.tools.mcp.port,
         models: { explorer: 'haiku', reviewer: 'haiku' },
+        scope: config.storage.scope,
+        projectId: config.storage.projectId,
       })
       writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
 
@@ -358,6 +467,8 @@ describe('doctor.ts — model-aware status (fixes false-positive outdated)', () 
         tasksAdapter: 'local',
         port: config.tools.mcp.port,
         models: { explorer: 'haiku' },
+        scope: config.storage.scope,
+        projectId: config.storage.projectId,
       })
       writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
 
