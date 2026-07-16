@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
-import { isLocalInstallSatisfied } from '@/core/local-install-guard'
+import { isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
 
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-local-install-guard')
@@ -83,5 +83,32 @@ describe('isLocalInstallSatisfied', () => {
     writeFileSync(join(dir, '.pnp.cjs'), '')
     assert.equal(isLocalInstallSatisfied(dir), false)
     cleanTmp()
+  })
+})
+
+describe('guard never forces a non-zero exit by itself', () => {
+  test('printLocalInstallWarning() never calls process.exit, regardless of isLocalInstallSatisfied() result', () => {
+    const originalExit = process.exit
+    let exitCalled = false
+    process.exit = ((..._args: unknown[]) => {
+      exitCalled = true
+      return undefined as never
+    }) as typeof process.exit
+    try {
+      const dir = makeTmp('exit-check-false')
+      assert.equal(isLocalInstallSatisfied(dir), false)
+      printLocalInstallWarning()
+      assert.equal(exitCalled, false, 'printLocalInstallWarning() must never call process.exit')
+      cleanTmp()
+
+      const dir2 = makeTmp('exit-check-true')
+      writeFileSync(join(dir2, 'package.json'), JSON.stringify({ name: pkg.name }))
+      assert.equal(isLocalInstallSatisfied(dir2), true)
+      printLocalInstallWarning()
+      assert.equal(exitCalled, false, 'printLocalInstallWarning() must never call process.exit')
+      cleanTmp()
+    } finally {
+      process.exit = originalExit
+    }
   })
 })

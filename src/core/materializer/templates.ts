@@ -244,7 +244,7 @@ function modelField(model: string | undefined): string {
   return model ? `, model: ${JSON.stringify(model)}` : ''
 }
 
-export function configTs(params: {
+interface ConfigTemplateParams {
   name: string
   description: string
   provider: string
@@ -254,12 +254,16 @@ export function configTs(params: {
   models?: AgentModelOverrides
   scope: 'local' | 'global'
   projectId: string
-}): string {
-  const models = params.models ?? {}
-  return `import { defineHarness } from '@cardor/agent-harness-kit'
+}
 
-export default defineHarness({
-  project: {
+/**
+ * Shared body of the config object literal, reused across the .ts/.mjs/.cjs
+ * templates below. Returns the inner fields only (no wrapping braces) so
+ * each variant can control its own import/export shape around it.
+ */
+function configObjectBody(params: ConfigTemplateParams): string {
+  const models = params.models ?? {}
+  return `  project: {
     name: ${JSON.stringify(params.name)},
     description: ${JSON.stringify(params.description)},
     docsPath: '${params.docsPath}',
@@ -306,75 +310,51 @@ export default defineHarness({
     mcp:     { enabled: true, port: ${params.port} },
     scripts: { enabled: true, outputDir: './.harness/scripts' },
   },
-})
 `
 }
 
-export const configMjs = configTs
+/**
+ * TypeScript config: uses `import type` (type-only, erased at compile time)
+ * instead of a value import of `defineHarness`. This means `loadConfig()`
+ * (via jiti) never needs to resolve `@cardor/agent-harness-kit` as a real
+ * module at runtime just to load the config — only the type is referenced,
+ * which TypeScript strips entirely. `defineHarness()` itself is unaffected
+ * and remains available for anyone who prefers to import and call it
+ * manually; `loadConfig()` supports both shapes (see config.ts).
+ */
+export function configTs(params: ConfigTemplateParams): string {
+  return `import type { HarnessConfig } from '@cardor/agent-harness-kit'
 
-export function configCjs(params: {
-  name: string
-  description: string
-  provider: string
-  docsPath: string
-  tasksAdapter: string
-  port: number
-  models?: AgentModelOverrides
-  scope: 'local' | 'global'
-  projectId: string
-}): string {
-  const models = params.models ?? {}
-  return `const { defineHarness } = require('@cardor/agent-harness-kit')
+const config: HarnessConfig = {
+${configObjectBody(params)}}
 
-module.exports = defineHarness({
-  project: {
-    name: ${JSON.stringify(params.name)},
-    description: ${JSON.stringify(params.description)},
-    docsPath: '${params.docsPath}',
-  },
+export default config
+`
+}
 
-  provider: '${params.provider}',
+/**
+ * .mjs config: plain JavaScript has no compile-time type checking, so there
+ * is no benefit to importing anything from the package here — not even a
+ * type. The object is exported as-is via ESM `export default`.
+ */
+export function configMjs(params: ConfigTemplateParams): string {
+  return `const config = {
+${configObjectBody(params)}}
 
-  agents: {
-    lead:     { instructionsPath: null${modelField(models.lead)} },
-    explorer: { instructionsPath: null, allowedPaths: ['${params.docsPath}', './src']${modelField(models.explorer)} },
-    builder:  { instructionsPath: null, writablePaths: ['./src', './tests']${modelField(models.builder)} },
-    reviewer: { instructionsPath: null${modelField(models.reviewer)} },
-    ${models.consultant ? `consultant: { instructionsPath: null${modelField(models.consultant)} },\n    ` : ''}custom:   [],
-  },
+export default config
+`
+}
 
-  // SQLite (default). Switch to postgres/mysql by changing database.type.
-  // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
-  // database: { type: 'mysql',    connectionString: process.env.DATABASE_URL },
-  database: { type: 'sqlite', path: '.harness/harness.db' },
+/**
+ * .cjs config: same reasoning as configMjs — plain JS, no types to import.
+ * Exported via CommonJS `module.exports`, which `loadConfig()` already
+ * handles through its `mod.default ?? mod` fallback.
+ */
+export function configCjs(params: ConfigTemplateParams): string {
+  return `const config = {
+${configObjectBody(params)}}
 
-  storage: {
-    dir:    '.harness',
-    tasks:  { adapter: '${params.tasksAdapter}' },
-    sections: {
-      toolsUsed:     true,
-      filesModified: true,
-      result:        true,
-      blockers:      true,
-      nextSteps:     false,
-    },
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
-    // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
-    // under ~/.harness/dbs/<projectId>/, outside the project tree.
-    scope:     '${params.scope}',
-    projectId: '${params.projectId}',
-  },
-
-  health: {
-    scriptPath: './health.sh',
-    required:   true,
-  },
-
-  tools: {
-    mcp:     { enabled: true, port: ${params.port} },
-    scripts: { enabled: true, outputDir: './.harness/scripts' },
-  },
-})
+module.exports = config
 `
 }
 

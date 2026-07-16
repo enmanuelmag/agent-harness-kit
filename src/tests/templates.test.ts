@@ -272,31 +272,101 @@ describe('configTs', () => {
     projectId: 'test-project-id',
   }
 
+  // Strips TS-only syntax (the `import type` line and the `: HarnessConfig`
+  // annotation) so the remaining object literal can be validated as plain
+  // JS via `new Function()`.
+  function stripTsSyntax(out: string): string {
+    return out
+      .replace(/^import .+$/gm, '//$&')
+      .replace(/^const config: HarnessConfig = /m, 'const config = ')
+      .replace(/^export default /m, 'const _cfg = ')
+  }
+
   test('description with apostrophe produces valid JS', () => {
     const desc = "it's a playground"
     const out = configTs({ ...base, description: desc })
     assert.ok(out.includes(JSON.stringify(desc)), 'description not safely encoded')
-    assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
+    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
   })
 
   test('description with double quotes produces valid JS', () => {
     const desc = 'a "test" project'
     const out = configTs({ ...base, description: desc })
     assert.ok(out.includes(JSON.stringify(desc)))
-    assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
+    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
   })
 
   test('description with both apostrophe and double quotes produces valid JS', () => {
     const desc = `it's a "test" project`
     const out = configTs({ ...base, description: desc })
     assert.ok(out.includes(JSON.stringify(desc)))
-    assert.doesNotThrow(() => new Function(out.replace(/^import .+$/gm, '//$&').replace(/^export default /m, 'const _cfg = ')))
+    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
   })
 
   test('emits scope and projectId explicitly in generated storage section', () => {
     const out = configTs({ ...base, scope: 'global', projectId: 'abc-123' })
     assert.match(out, /scope:\s*'global'/)
     assert.match(out, /projectId:\s*'abc-123'/)
+  })
+
+  test('uses `import type` for HarnessConfig instead of a value import of defineHarness', () => {
+    const out = configTs(base)
+    assert.match(out, /^import type \{ HarnessConfig \} from '@cardor\/agent-harness-kit'$/m)
+    assert.doesNotMatch(out, /import \{ defineHarness \}/)
+    assert.doesNotMatch(out, /defineHarness\(/)
+    assert.match(out, /^const config: HarnessConfig = \{/m)
+    assert.match(out, /^export default config$/m)
+  })
+})
+
+describe('configTs — loads without the package resolvable in node_modules', () => {
+  test('loadConfig() succeeds on a generated .ts config even with no node_modules/@cardor/agent-harness-kit present', async () => {
+    const dir = join(TMP, 'no-local-install')
+    mkdirSync(dir, { recursive: true })
+    try {
+      const out = configTs({
+        name: 'my-app',
+        description: 'placeholder',
+        provider: 'claude-code',
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        port: 3742,
+        scope: 'local',
+        projectId: 'test-project-id',
+      })
+      writeFileSync(join(dir, 'agent-harness-kit.config.ts'), out, 'utf8')
+      // No node_modules directory at all — the `import type` is erased at
+      // compile time by jiti, so module resolution is never attempted.
+      const { loadConfig } = await import('@/core/config')
+      const config = await loadConfig(dir)
+      assert.equal(config.project.name, 'my-app')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('defineHarness — retrocompatibility with the value-import shape', () => {
+  test('a hand-written config using `import { defineHarness }` still loads via loadConfig()', async () => {
+    const dir = join(TMP, 'value-import-retrocompat')
+    mkdirSync(dir, { recursive: true })
+    try {
+      // Self-dev case: `isLocalInstallSatisfied`/jiti resolve the package
+      // against this repo itself when cwd IS the package, so a real value
+      // import of `defineHarness` from the package resolves correctly here.
+      const legacyConfig = `import { defineHarness } from '@cardor/agent-harness-kit'
+
+export default defineHarness({
+  project: { name: 'legacy-app', description: 'legacy shape' },
+})
+`
+      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), legacyConfig, 'utf8')
+      const { loadConfig } = await import('@/core/config')
+      const config = await loadConfig(dir)
+      assert.equal(config.project.name, 'legacy-app')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

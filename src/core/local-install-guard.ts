@@ -9,12 +9,12 @@ import { pkg } from '@/core/package-data'
  * dependency of the project at `cwd`, or whether `cwd` IS the package
  * itself (self-dev case, e.g. working inside this repo).
  *
- * Commands that call `loadConfig(cwd)` rely on jiti resolving modules
- * relative to the package's own location (`import.meta.url`). When the
- * package is only installed globally, jiti resolves relative to the
- * global install path instead of the project's local `node_modules`,
- * breaking config/dependency resolution. This check lets the CLI warn
- * and exit before running any command logic in that case.
+ * The generated config no longer needs the package resolvable at runtime
+ * (`import type` is erased at compile time, and the .mjs/.cjs templates
+ * don't import the package at all), so this check is no longer required
+ * for `loadConfig(cwd)` to succeed. It is kept as a non-blocking warning
+ * so a team/CI can still pin an explicit local version of the CLI for
+ * reproducibility — the command always continues regardless of the result.
  */
 export function isLocalInstallSatisfied(cwd: string): boolean {
   // Self-dev case: cwd is the agent-harness-kit repo itself, so there is
@@ -55,11 +55,18 @@ export function isLocalInstallSatisfied(cwd: string): boolean {
 }
 
 /**
- * Prints a warning explaining that the package must be installed locally,
- * with the exact command to fix it. Styled to match the rest of the CLI.
+ * Prints a non-blocking warning recommending a local install, with the
+ * exact command to fix it. This is informational only — the command
+ * continues to run either way. A local install is no longer required for
+ * config loading to work; it is still recommended so the version of the
+ * package used stays reproducible and pinned across your team and CI,
+ * instead of drifting with whatever is installed globally on each machine.
  */
 export function printLocalInstallWarning(): void {
-  console.error(pc.red(`✗ ${pkg.name} must be installed locally in this project.`))
+  console.error(pc.yellow(`⚠ ${pkg.name} is not installed locally in this project.`))
+  console.error(pc.dim('  This is only a recommendation for reproducibility: pinning a local'))
+  console.error(pc.dim('  version keeps behavior consistent across your team and CI, instead of'))
+  console.error(pc.dim('  drifting with whatever version is installed globally on each machine.'))
   console.error(pc.dim(`  Run: npm install --save-dev ${pkg.name}`))
   console.error(pc.dim('  (or the equivalent for your package manager: pnpm add -D, yarn add --dev, bun add -d)'))
 }
