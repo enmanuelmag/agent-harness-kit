@@ -115,6 +115,12 @@ export class ActionRepository {
     )
   }
 
+  /** Returns ALL action_files rows regardless of action — used by full DB
+   *  exports (e.g. `ahk migrate storage`) so file-touch records aren't lost. */
+  async getAllFiles(): Promise<ActionFileRow[]> {
+    return this.driver.query<ActionFileRow>(`SELECT * FROM action_files ORDER BY id`)
+  }
+
   // ─── Tools ────────────────────────────────────────────────────────────────
 
   async addTool(
@@ -135,6 +141,12 @@ export class ActionRepository {
       `SELECT * FROM action_tools WHERE action_id = ? ORDER BY called_at`,
       [actionId],
     )
+  }
+
+  /** Returns ALL action_tools rows regardless of action — used by full DB
+   *  exports (e.g. `ahk migrate storage`) so tool-call records aren't lost. */
+  async getAllTools(): Promise<ActionToolRow[]> {
+    return this.driver.query<ActionToolRow>(`SELECT * FROM action_tools ORDER BY id`)
   }
 
   async getTopTools(limit: number): Promise<{ tool_name: string; uses: number }[]> {

@@ -4,7 +4,7 @@ const _require = createRequire(import.meta.url)
 const isBun = 'bun' in process.versions
 
 // ─── Shared interface ─────────────────────────────────────────────────────────
-// Both node:sqlite (DatabaseSync) and bun:sqlite (Database) expose this surface.
+// Both better-sqlite3 (Database) and bun:sqlite (Database) expose this surface.
 
 export type SQLRow = Record<string, unknown>
 
@@ -30,14 +30,12 @@ export function openSQLite(path: string): SQLiteDB {
     return new Database(path) as unknown as SQLiteDB
   }
 
-  const { DatabaseSync } = _require('node:sqlite') as {
-    DatabaseSync: new (path: string) => unknown
-  }
-  return new DatabaseSync(path) as unknown as SQLiteDB
+  const Database = _require('better-sqlite3') as new (path: string) => unknown
+  return new Database(path) as unknown as SQLiteDB
 }
 
 // ─── last_insert_rowid() helper ───────────────────────────────────────────────
-// Both bun:sqlite and node:sqlite have different return types for stmt.run().
+// Both bun:sqlite and better-sqlite3 have different return types for stmt.run().
 // Reading last_insert_rowid() directly avoids the inconsistency.
 
 export function lastInsertId(db: SQLiteDB): number {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createJiti } from 'jiti'
@@ -70,6 +71,8 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
         nextSteps: false,
       },
       markdownFallback: { enabled: true, path: '.harness/current.md' },
+      scope: 'local' as const,
+      projectId: c.storage?.projectId ?? randomUUID(),
       ...c.storage,
     } as HarnessConfig['storage'],
     health: {

@@ -81,6 +81,12 @@ export class TaskRepository {
     )
   }
 
+  /** Returns ALL task_acceptance rows regardless of task — used by full DB
+   *  exports (e.g. `ahk migrate storage`) so criteria aren't silently dropped. */
+  async getAllAcceptance(): Promise<TaskAcceptanceRow[]> {
+    return this.driver.query<TaskAcceptanceRow>(`SELECT * FROM task_acceptance ORDER BY id`)
+  }
+
   async setStatus(id: number, status: TaskStatus, extra?: { started_at?: string; completed_at?: string }): Promise<void> {
     const now = new Date().toISOString()
     if (extra?.started_at) {

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
 import { ActionRepository } from './repositories/ActionRepository'
@@ -11,12 +12,50 @@ import type {
   ActionFileRow,
   ActionRow,
   ActionSectionRow,
+  ActionToolRow,
   AgentName,
   HarnessConfig,
+  StorageState,
   TaskAcceptanceRow,
   TaskRow,
   TaskStatus,
 } from '@/types'
+
+/** Full relational export of every table — used by `ahk migrate storage` and
+ *  `ahk export --json`. MUST include all 6 tables (tasks, task_acceptance,
+ *  actions, action_sections, action_files, action_tools); omitting any of
+ *  them silently drops user data during a migration. */
+export interface FullExport {
+  tasks: TaskRow[]
+  taskAcceptance: TaskAcceptanceRow[]
+  actions: ActionRow[]
+  sections: ActionSectionRow[]
+  actionFiles: ActionFileRow[]
+  actionTools: ActionToolRow[]
+}
+
+/** Tables with an integer autoincrement/serial primary key, in FK-safe
+ *  insertion order (parents before children). `actions` is excluded — its id
+ *  is an application-generated UUID (TEXT), never autoincrement. */
+const AUTOINCREMENT_TABLES = ['tasks', 'task_acceptance', 'action_sections', 'action_files', 'action_tools'] as const
+
+/** Full insertion order across all 6 tables, respecting FK constraints
+ *  (parent before child): tasks -> task_acceptance -> actions ->
+ *  action_sections/action_files/action_tools. */
+const TABLE_INSERT_ORDER = ['tasks', 'task_acceptance', 'actions', 'action_sections', 'action_files', 'action_tools'] as const
+
+/** Reverse of TABLE_INSERT_ORDER — used to TRUNCATE a non-empty destination
+ *  safely (children before parents) when `--force` is used. */
+const TABLE_DELETE_ORDER = [...TABLE_INSERT_ORDER].reverse()
+
+// ─── Global storage path resolution ────────────────────────────────────────
+
+/** Resolves the directory used for 'global' scope storage: ~/.harness/dbs/<projectId>/
+ *  Uses os.homedir() (not $HOME env var) for portability. Callers are
+ *  responsible for creating the directory (mkdirSync recursive) before use. */
+export function resolveGlobalStorageDir(config: HarnessConfig, homeDir: string = homedir()): string {
+  return join(homeDir, '.harness', 'dbs', config.storage.projectId)
+}
 
 // ─── DB class ─────────────────────────────────────────────────────────────────
 
@@ -26,10 +65,13 @@ export class HarnessDB {
   readonly stats: StatsRepository
   private driver: DBDriver
   private config: HarnessConfig
+  /** Overridable home directory, used to keep 'global' scope tests off the real $HOME. */
+  private homeDir: string
 
-  constructor(driver: DBDriver, config: HarnessConfig) {
+  constructor(driver: DBDriver, config: HarnessConfig, homeDir: string = homedir()) {
     this.driver = driver
     this.config = config
+    this.homeDir = homeDir
     this.tasks = new TaskRepository(driver)
     this.actions = new ActionRepository(driver)
     this.stats = new StatsRepository(driver)
@@ -212,7 +254,10 @@ export class HarnessDB {
   async regenerateCurrentMd(): Promise<void> {
     if (!this.config.storage.markdownFallback.enabled) return
 
-    const mdPath = resolve(this.config.storage.markdownFallback.path)
+    const mdPath =
+      this.config.storage.scope === 'global'
+        ? join(resolveGlobalStorageDir(this.config, this.homeDir), 'current.md')
+        : resolve(this.config.storage.markdownFallback.path)
     mkdirSync(dirname(mdPath), { recursive: true })
 
     const inProgress = await this.tasks.getAll('in_progress')
@@ -274,12 +319,34 @@ export class HarnessDB {
 
   // ─── Export helpers ───────────────────────────────────────────────────────
 
-  async exportJson(): Promise<{ tasks: TaskRow[]; actions: ActionRow[]; sections: ActionSectionRow[] }> {
+  /** Full relational export of ALL 6 tables (tasks, task_acceptance, actions,
+   *  action_sections, action_files, action_tools). Extended for task #47 —
+   *  the previous version (tasks/actions/sections only) silently dropped
+   *  acceptance criteria and file/tool records on export/migrate. */
+  async exportJson(): Promise<FullExport> {
     return {
       tasks: await this.tasks.getAll(undefined, true),
+      taskAcceptance: await this.tasks.getAllAcceptance(),
       actions: await this.actions.getAll(),
       sections: await this.actions.getAllSections(),
+      actionFiles: await this.actions.getAllFiles(),
+      actionTools: await this.actions.getAllTools(),
     }
+  }
+
+  /** Row counts for all 6 tables against THIS db's driver — used to decide
+   *  whether a destination is "empty" (safe to import into directly) before
+   *  a migration. Counts are queried directly (COUNT(*)), never inferred
+   *  from storage-state.json. */
+  async getRowCounts(): Promise<Record<(typeof TABLE_INSERT_ORDER)[number], number>> {
+    return getRowCounts(this.driver)
+  }
+
+  /** Imports a full export into THIS db's driver — see standalone
+   *  `importFullExport()` for the transactional/rollback/sequence-reset
+   *  guarantees. `dbType` must match `this.config.database.type`. */
+  async importFullExport(data: FullExport, dbType: 'sqlite' | 'postgres' | 'mysql', opts?: { truncateFirst: boolean }): Promise<void> {
+    return importFullExport(this.driver, data, dbType, opts)
   }
 
   async reconnect(): Promise<void> {
@@ -323,11 +390,206 @@ export class HarnessDB {
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, JSON.stringify(list, null, 2) + '\n', 'utf8')
   }
+
+  // ─── storage-state.json (real storage state, for `ahk migrate storage`) ──
+
+  /** Writes .harness/storage-state.json, ALWAYS project-local regardless of
+   *  scope. Reflects the REAL current storage state (scope/projectId/dbType
+   *  actually in use right now), as opposed to agent-harness-kit.config.ts
+   *  which reflects the DESIRED state. Format is stable — task #47 (ahk
+   *  migrate storage) depends on it; do not change field names/shape. */
+  async writeStorageState(cwd: string): Promise<void> {
+    writeStorageStateFile(cwd, this.config.storage.dir, {
+      scope: this.config.storage.scope,
+      projectId: this.config.storage.projectId,
+      dbType: this.config.database.type,
+      migratedAt: new Date().toISOString(),
+    })
+  }
+}
+
+// ─── Full DB migration helpers (task #47 — `ahk migrate storage`) ─────────
+
+/** Row counts for all 6 tables, queried directly (never inferred). Used to
+ *  decide whether a destination DB is "empty" before an sqlite↔remote
+ *  migration. */
+export async function getRowCounts(driver: DBDriver): Promise<Record<(typeof TABLE_INSERT_ORDER)[number], number>> {
+  const counts = {} as Record<(typeof TABLE_INSERT_ORDER)[number], number>
+  for (const table of TABLE_INSERT_ORDER) {
+    const row = await driver.queryOne<{ n: number }>(`SELECT COUNT(*) as n FROM ${table}`)
+    counts[table] = Number(row?.n ?? 0)
+  }
+  return counts
+}
+
+/** True if every table is empty (COUNT(*) = 0 for all 6 tables). */
+export async function isEmptyDatabase(driver: DBDriver): Promise<boolean> {
+  const counts = await getRowCounts(driver)
+  return Object.values(counts).every((n) => n === 0)
+}
+
+/** Deletes all rows from all 6 tables, children-before-parents, so FK
+ *  constraints never block the delete. Only ever called immediately before
+ *  a `--force` import, inside the same transaction as the import itself —
+ *  never on its own. */
+async function truncateAllTables(tx: DBDriver): Promise<void> {
+  for (const table of TABLE_DELETE_ORDER) {
+    await tx.exec(`DELETE FROM ${table}`)
+  }
+}
+
+/** Re-synchronizes the destination's internal autoincrement/serial counter
+ *  with the highest id actually present, AFTER inserting rows with explicit
+ *  ids. Required because inserting explicit ids does NOT advance
+ *  Postgres SERIAL sequences or SQLite's `sqlite_sequence` table — without
+ *  this, the first unrelated `INSERT ... (no id)` after a migration (e.g.
+ *  `tasksRepository.add()`) would collide with an imported id.
+ *  MySQL AUTO_INCREMENT advances automatically on explicit-id inserts
+ *  greater than the current counter — no action needed there. */
+async function resetAutoincrementSequences(
+  tx: DBDriver,
+  dbType: 'sqlite' | 'postgres' | 'mysql',
+): Promise<void> {
+  if (dbType === 'mysql') return // AUTO_INCREMENT self-advances on explicit-id insert — verified in tests.
+
+  for (const table of AUTOINCREMENT_TABLES) {
+    const row = await tx.queryOne<{ max: number | null }>(`SELECT MAX(id) as max FROM ${table}`)
+    const max = row?.max
+    if (!max) continue // table stayed empty — nothing to advance
+
+    if (dbType === 'postgres') {
+      await tx.execRaw(`SELECT setval(pg_get_serial_sequence('${table}','id'), ${max}, true)`)
+    } else {
+      // sqlite: sqlite_sequence only gets a row once a real AUTOINCREMENT
+      // insert happens; explicit-id inserts bypass that, so upsert it.
+      await tx.execRaw(
+        `INSERT INTO sqlite_sequence (name, seq) SELECT '${table}', ${max} WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = '${table}')`,
+      )
+      await tx.execRaw(`UPDATE sqlite_sequence SET seq = ${max} WHERE name = '${table}'`)
+    }
+  }
+}
+
+/** Imports a full export (all 6 tables) into `destDriver`, preserving
+ *  original ids (required to keep foreign keys intact — see task #47
+ *  consultant advisory). The ENTIRE import (and, when `truncateFirst` is
+ *  set, the pre-import wipe) runs inside a single `destDriver.transaction()`
+ *  call: if anything fails partway, the whole operation rolls back and the
+ *  destination is left exactly as it was found.
+ *
+ *  Callers MUST only mark the migration successful (e.g. call
+ *  `db.writeStorageState()`) AFTER this promise resolves without throwing —
+ *  never inside the transaction callback, never in a `finally`. */
+export async function importFullExport(
+  destDriver: DBDriver,
+  data: FullExport,
+  destDbType: 'sqlite' | 'postgres' | 'mysql',
+  opts: { truncateFirst: boolean } = { truncateFirst: false },
+): Promise<void> {
+  await destDriver.transaction(async (tx) => {
+    if (opts.truncateFirst) {
+      await truncateAllTables(tx)
+    }
+
+    for (const task of data.tasks) {
+      await tx.exec(
+        `INSERT INTO tasks (id, slug, title, description, status, assigned_to, created_at, started_at, completed_at, archived_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          task.id,
+          task.slug,
+          task.title,
+          task.description,
+          task.status,
+          task.assigned_to,
+          task.created_at,
+          task.started_at,
+          task.completed_at,
+          task.archived_at,
+          task.updated_at,
+        ],
+      )
+    }
+
+    for (const ta of data.taskAcceptance) {
+      await tx.exec(
+        `INSERT INTO task_acceptance (id, task_id, criterion, met) VALUES (?, ?, ?, ?)`,
+        [ta.id, ta.task_id, ta.criterion, ta.met],
+      )
+    }
+
+    for (const action of data.actions) {
+      await tx.exec(
+        `INSERT INTO actions (id, task_id, agent, status, created_at, completed_at, summary) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [action.id, action.task_id, action.agent, action.status, action.created_at, action.completed_at, action.summary],
+      )
+    }
+
+    for (const section of data.sections) {
+      await tx.exec(
+        `INSERT INTO action_sections (id, action_id, section_type, content, created_at) VALUES (?, ?, ?, ?, ?)`,
+        [section.id, section.action_id, section.section_type, section.content, section.created_at],
+      )
+    }
+
+    for (const file of data.actionFiles) {
+      await tx.exec(
+        `INSERT INTO action_files (id, action_id, file_path, operation, notes) VALUES (?, ?, ?, ?, ?)`,
+        [file.id, file.action_id, file.file_path, file.operation, file.notes],
+      )
+    }
+
+    for (const tool of data.actionTools) {
+      await tx.exec(
+        `INSERT INTO action_tools (id, action_id, tool_name, args_json, result_summary, called_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        [tool.id, tool.action_id, tool.tool_name, tool.args_json, tool.result_summary, tool.called_at],
+      )
+    }
+
+    await resetAutoincrementSequences(tx, destDbType)
+  })
+}
+
+/** Resolves the physical sqlite file path for a given scope, sharing the
+ *  exact convention `openDB()` uses — extracted so `ahk migrate storage` can
+ *  locate the OLD file (by scope) without duplicating path logic. Does not
+ *  create any directories or files. */
+export function resolveSqlitePathForScope(
+  scope: 'local' | 'global',
+  sqlitePath: string,
+  cwd: string,
+  config: HarnessConfig,
+  homeDir: string,
+): string {
+  return scope === 'global'
+    ? join(resolveGlobalStorageDir(config, homeDir), 'harness.db')
+    : resolve(cwd, sqlitePath)
+}
+
+/** Writes `<storageDir>/storage-state.json` under `cwd`. Standalone (not tied
+ *  to a live HarnessDB instance) so it can be called during init before a DB
+ *  connection exists, and reused by future migration tooling. */
+export function writeStorageStateFile(cwd: string, storageDir: string, state: StorageState): void {
+  const path = join(resolve(cwd), storageDir, 'storage-state.json')
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, JSON.stringify(state, null, 2) + '\n', 'utf8')
+}
+
+/** Reads `<storageDir>/storage-state.json` under `cwd`. Returns `null` if it
+ *  doesn't exist or is malformed. Used by future migration tooling (#47) to
+ *  determine the real current storage state before migrating. */
+export function readStorageStateFile(cwd: string, storageDir: string): StorageState | null {
+  try {
+    const path = join(resolve(cwd), storageDir, 'storage-state.json')
+    if (!existsSync(path)) return null
+    return JSON.parse(readFileSync(path, 'utf8')) as StorageState
+  } catch {
+    return null
+  }
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
-export async function openDB(config: HarnessConfig, cwd: string): Promise<HarnessDB> {
+export async function openDB(config: HarnessConfig, cwd: string, homeDir: string = homedir()): Promise<HarnessDB> {
   const dbConfig = config.database
   let driver: DBDriver
 
@@ -342,9 +604,36 @@ export async function openDB(config: HarnessConfig, cwd: string): Promise<Harnes
     if (dbConfig.type !== 'sqlite') {
       throw new Error('Invalid database type')
     }
-    driver = new SQLiteDriver(resolve(cwd, dbConfig.path))
+
+    let dbPath: string
+    if (config.storage.scope === 'global') {
+      const globalDir = resolveGlobalStorageDir(config, homeDir)
+      // Defensive check: a UUID collision is negligible, but if the target
+      // dir already exists with a DIFFERENT project's state, don't silently
+      // reuse it — surface the conflict instead of assuming it's free.
+      const existingStatePath = join(globalDir, 'storage-state.json')
+      if (existsSync(existingStatePath)) {
+        try {
+          const existingState = JSON.parse(readFileSync(existingStatePath, 'utf8')) as StorageState
+          if (existingState.projectId !== config.storage.projectId) {
+            throw new Error(
+              `Global storage dir ${globalDir} already holds a different project (projectId: ${existingState.projectId}). Refusing to reuse it.`,
+            )
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('already holds a different project')) throw err
+          // Malformed/unreadable state file — ignore and proceed, mkdirSync below is idempotent.
+        }
+      }
+      mkdirSync(globalDir, { recursive: true })
+      dbPath = join(globalDir, 'harness.db')
+    } else {
+      dbPath = resolve(cwd, dbConfig.path)
+    }
+
+    driver = new SQLiteDriver(dbPath)
   }
 
   await driver.ensureSchema()
-  return new HarnessDB(driver, config)
+  return new HarnessDB(driver, config, homeDir)
 }
