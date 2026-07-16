@@ -61,6 +61,7 @@ npx ahk init
   - [Runtime compatibility](#runtime-compatibility)
   - [Contributing \& local development](#contributing--local-development)
     - [Testing the local build in another project](#testing-the-local-build-in-another-project)
+  - [Security Policy](#security-policy)
   - [Roadmap](#roadmap)
 
 ---
@@ -840,6 +841,12 @@ chore(ci): update Node version to 22
 ```
 
 Types: `feat fix chore refactor docs test perf style build ci revert`
+
+---
+
+## Security Policy
+
+See [SECURITY.md](./SECURITY.md) for the vulnerability reporting process, supported versions, and coordinated-disclosure policy.
 
 ---
 
