@@ -5,6 +5,7 @@ import pc from 'picocolors'
 
 import { findConfigFile } from '@/core/config'
 import { openDB } from '@/core/db'
+import { syncGlobalAgentsAndSkills } from '@/core/materializer/global-sync'
 import { getMaterializer } from '@/core/materializer/index'
 import { slugify } from '@/core/materializer/scaffold-utils'
 import { configTs, configMjs, configCjs } from '@/core/materializer/templates'
@@ -27,6 +28,7 @@ interface InitOptions {
   provider?: string
   docs?: string
   tasks?: string
+  storageScope?: string
 }
 
 export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
@@ -189,6 +191,26 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     }, initDocsSchema)
   }
 
+  // ─── Storage scope ────────────────────────────────────────────────────────
+  let storageScope: 'local' | 'global'
+  if (flags.storageScope && ['local', 'global'].includes(flags.storageScope)) {
+    storageScope = flags.storageScope as 'local' | 'global'
+  } else {
+    const val = await p.select({
+      message: 'Storage scope',
+      options: [
+        { value: 'local', label: 'Local — .harness/harness.db lives in this project' },
+        { value: 'global', label: 'Global — DB lives under ~/.harness/dbs/<projectId>/, outside the project' },
+      ],
+      initialValue: 'local',
+    })
+    if (p.isCancel(val)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
+    storageScope = val as 'local' | 'global'
+  }
+
   // ─── Task adapter ─────────────────────────────────────────────────────────
   let tasksAdapter: string
   if (flags.tasks && ['local', 'jira', 'linear'].includes(flags.tasks)) {
@@ -253,11 +275,20 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
   // ─── Scaffold ─────────────────────────────────────────────────────────────
   let configExt: 'ts' | 'mjs' | 'cjs' = 'ts'
+  let globalSyncResult: Awaited<ReturnType<typeof syncGlobalAgentsAndSkills>> | null = null
   const spinner = p.spinner()
   spinner.start('Scaffolding...')
 
   try {
-    const config = applyConfigDefaults({ name, description, provider, docsPath, tasksAdapter, models: modelOverrides })
+    const config = applyConfigDefaults({
+      name,
+      description,
+      provider,
+      docsPath,
+      tasksAdapter,
+      models: modelOverrides,
+      scope: storageScope,
+    })
     const materializer = getMaterializer(provider)
 
     const installDir = cwd
@@ -273,17 +304,32 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       tasksAdapter,
       port: config.tools.mcp.port,
       models: modelOverrides,
+      scope: config.storage.scope,
+      projectId: config.storage.projectId,
     })
     writeFileSync(join(installDir, configFileName), configContent, 'utf8')
 
-    // Create .harness dir
+    // Create .harness dir (always project-local, regardless of storage scope —
+    // this is where health.sh, scripts, and storage-state.json live)
     mkdirSync(join(installDir, config.storage.dir), { recursive: true })
 
-    // Initialize SQLite DB
+    // Initialize SQLite DB (scope-aware: local → .harness/harness.db, global → ~/.harness/dbs/<projectId>/harness.db)
     const db = await openDB(config, installDir)
+
+    // Always write .harness/storage-state.json — reflects the REAL current
+    // storage state (project-local regardless of scope). Consumed by the
+    // future `ahk migrate storage` command.
+    await db.writeStorageState(installDir)
 
     // Scaffold provider-specific files
     await materializer.scaffold(config, { cwd: installDir, firstTask })
+
+    // Global storage scope also implies globally-installed agents/skills —
+    // sync them into the user's home dir (idempotent: only missing files are
+    // created, already-synced files are left untouched).
+    if (config.storage.scope === 'global') {
+      globalSyncResult = await syncGlobalAgentsAndSkills(config, provider)
+    }
 
     // Seed first task into DB if provided
     if (firstTask) {
@@ -314,14 +360,30 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.green(`✓ agent-harness-kit.config.${configExt}`))
   console.log(pc.green('✓ AGENTS.md'))
   console.log(pc.green('✓ health.sh'))
-  console.log(pc.green('✓ .harness/harness.db'))
-  console.log(pc.green('✓ .harness/current.md'))
+  console.log(pc.green(storageScope === 'global' ? '✓ ~/.harness/dbs/<projectId>/harness.db' : '✓ .harness/harness.db'))
+  console.log(pc.green(storageScope === 'global' ? '✓ ~/.harness/dbs/<projectId>/current.md' : '✓ .harness/current.md'))
+  console.log(pc.green('✓ .harness/storage-state.json'))
   console.log(pc.green(`✓ ${agentsDir}lead.md`))
   console.log(pc.green(`✓ ${agentsDir}explorer.md`))
   console.log(pc.green(`✓ ${agentsDir}builder.md`))
   console.log(pc.green(`✓ ${agentsDir}reviewer.md`))
   console.log(pc.green(`✓ ${mcpFile}`))
   console.log(pc.green('✓ .gitignore entries added'))
+
+  if (globalSyncResult) {
+    console.log('')
+    if (globalSyncResult.alreadySynced) {
+      console.log(pc.dim('✓ Global agents/skills already synced — skipped'))
+    } else {
+      for (const name of globalSyncResult.createdAgents) {
+        console.log(pc.green(`✓ ~global agent added: ${name}`))
+      }
+      for (const name of globalSyncResult.createdSkills) {
+        console.log(pc.green(`✓ ~global skill added: ${name}`))
+      }
+    }
+  }
+
   console.log('')
   console.log(pc.cyan('→') + ` Edit ${pc.cyan('health.sh')} with your project checks`)
   console.log(pc.cyan('→') + ` ${pc.cyan('ahk task add')} to queue work for agents`)

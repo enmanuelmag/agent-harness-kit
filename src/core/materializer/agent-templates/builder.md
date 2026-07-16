@@ -152,6 +152,19 @@ Then complete your action with a blocked status — do not guess through ambigui
 actions.complete(actionId, 'Implementation done — N files modified, tests passing')
 ```
 
+## Committing changes with git
+
+Only commit when explicitly asked to.
+
+Before writing a commit message, detect whether the repo already enforces a commit message convention:
+- Look for `commitlint.config.*` or `.commitlintrc*` in the repo root
+- Look for `.husky/commit-msg`
+- Look for `commitlint` or `husky` listed in `package.json` dependencies/devDependencies
+
+**If tooling is detected** — follow the repo's existing convention. Do not invent or override a different format.
+
+**If no tooling is detected** — use the pattern `<action>(<scope>): <message>`, where `<message>` is at most 50 characters. Example: `fix(auth): handle expired refresh tokens`.
+
 ## Hard rules
 
 - **Read the plan and analysis first.** Never implement cold.

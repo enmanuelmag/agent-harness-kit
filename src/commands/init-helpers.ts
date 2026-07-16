@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import pc from 'picocolors'
@@ -40,6 +41,11 @@ export function applyConfigDefaults(params: {
   docsPath: string
   tasksAdapter: string
   models?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>>
+  /** Storage scope chosen during init. Defaults to 'local' for backward compat. */
+  scope?: 'local' | 'global'
+  /** Reuse an existing projectId (e.g. re-running init logic). If omitted, a
+   *  fresh UUID is generated — NEVER derive it from the project path/hash. */
+  projectId?: string
 }): HarnessConfig {
   const models = params.models ?? {}
   return {
@@ -78,6 +84,8 @@ export function applyConfigDefaults(params: {
         nextSteps: false,
       },
       markdownFallback: { enabled: true, path: '.harness/current.md' },
+      scope: params.scope ?? 'local',
+      projectId: params.projectId ?? randomUUID(),
     },
     health: {
       scriptPath: './health.sh',
