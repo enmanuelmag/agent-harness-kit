@@ -323,7 +323,7 @@ npm run dev         # Development watch mode
 
 ## Compatibility
 
-- **Node.js**: ≥ 22 (uses `node:sqlite` built-in)
+- **Node.js**: ≥ 22 (uses `better-sqlite3` native SQLite driver)
 - **Bun**: Any recent version (uses `bun:sqlite` built-in)  
 - **Browser**: None - requires Node.js or Bun runtime
 - **Operating Systems**: Linux, macOS, Windows (through WSL)

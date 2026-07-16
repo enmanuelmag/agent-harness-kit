@@ -30,6 +30,7 @@ npx ahk init
   - [Features](#features)
   - [Requirements](#requirements)
   - [Installation](#installation)
+  - [MCP command per package manager](#mcp-command-per-package-manager)
   - [Commands](#commands)
     - [`ahk init`](#ahk-init)
     - [`ahk build`](#ahk-build)
@@ -114,7 +115,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Health gate** — agents must run `health.sh` and get a green exit before starting or closing any task. You define what "healthy" means.
 - **Markdown fallback** — `current.md` is always regenerated so agents can understand the session state even without the MCP server.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
-- **Multi-database support** — SQLite by default (zero native deps, uses `node:sqlite` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
+- **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
 - **Incremental scaffold** — `ahk init` preserves files you've already customized (agent definitions you've edited are kept). `ahk build` always regenerates agent files from the latest templates so they stay up to date.
 - **Global installation** — `ahk init` can scaffold the harness into your home directory (`~/.claude` or `~/.config/opencode`) to share it across all projects.
 - **Input validation** — CLI prompts validate all inputs (name length, path format, task title, etc.) and retry with the error message instead of silently accepting bad values.
@@ -131,20 +132,37 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 ## Installation
 
 ```bash
-# Install in your project as a dev dependency
+# Install in your project as a dev dependency (recommended)
 npm install --save-dev @cardor/agent-harness-kit
-
-# Or globally
-npm install -g @cardor/agent-harness-kit
 ```
 
 Then run the interactive setup inside your project:
 
 ```bash
 npx ahk init
-# or, if installed globally:
-ahk init
 ```
+
+> **Local install required.** `ahk` needs to resolve your project's `agent-harness-kit.config.ts` and its dependencies relative to your project's own `node_modules`. A **global-only** install (`npm install -g @cardor/agent-harness-kit`) cannot do this reliably, so every command except `--version`/`--help` will detect a global-only install and exit with an error telling you to run `npm install --save-dev @cardor/agent-harness-kit` (or the `pnpm`/`yarn`/`bun` equivalent) in your project root.
+>
+> This check also works with **Yarn Berry (PnP)** projects, which never create a `node_modules` folder — `ahk` detects `.pnp.cjs`/`.pnp.loader.mjs` and falls back to checking that the package is declared in `package.json` instead of requiring a `node_modules` entry.
+
+---
+
+## MCP command per package manager
+
+`ahk init` and `ahk build` detect which package manager your project uses and generate the MCP server launch command (`.mcp.json`, `opencode.json`, or `.codex/config.toml`) accordingly, instead of hardcoding `npx`:
+
+| Package manager           | Detected via                                                              | Generated command                             |
+| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| npm                        | `packageManager` field, `package-lock.json`, or fallback                    | `npx --no ahk serve --port <port>`             |
+| pnpm                       | `packageManager` field or `pnpm-lock.yaml`                                  | `pnpm exec ahk serve --port <port>`            |
+| yarn classic (v1)          | `packageManager` field (major 1) or `yarn.lock` without `.yarnrc.yml`       | `yarn run ahk serve --port <port>`             |
+| yarn berry (v2+, PnP or node-modules) | `packageManager` field (major ≥ 2) or `yarn.lock` + `.yarnrc.yml` | `yarn run ahk serve --port <port>`             |
+| bun                        | `packageManager` field or `bun.lockb`/`bun.lock`                            | `bunx --no-install ahk serve --port <port>`    |
+
+Detection order: the `packageManager` field in your `package.json` (e.g. `"packageManager": "pnpm@8.15.0"`) takes priority when present; otherwise `ahk` falls back to lockfile heuristics; if nothing is detected, it defaults to npm.
+
+**Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` (or `ahk build --sync`), including if you've since switched package managers.
 
 ---
 
@@ -152,19 +170,36 @@ ahk init
 
 ### `ahk init`
 
-Interactive scaffold. Asks for your project name, description, AI provider, docs path, task adapter, and an optional first task. Creates all harness files in the current directory.
+Interactive scaffold. Asks for your project name, description, AI provider, docs path, storage scope, task adapter, and an optional first task. Creates all harness files in the current directory.
 
 For Claude Code and Codex CLI (not OpenCode), you'll also be asked whether to personalize the model per agent (lead/explorer/consultant/builder/reviewer):
 
 - Claude Code: pick from `inherit` (default), `haiku`, `sonnet`, `opus`, `fable` per agent.
 - Codex CLI: free-text model name per agent — Codex does not validate this value; leaving it blank or under 3 characters means no override is written to that agent's TOML file.
 
+**Storage scope** — where the harness DB (and its `current.md` fallback) physically lives:
+
+- `local` (default) — `.harness/harness.db`, inside the project.
+- `global` — `~/.harness/dbs/<projectId>/harness.db`, outside the project tree (useful to keep the DB out of version control entirely, or to centralize storage for many projects). `<projectId>` is a UUID generated once at init and persisted in `agent-harness-kit.config.ts` — it's never regenerated on subsequent runs.
+
+Regardless of scope, `.harness/storage-state.json` is always written to the project — it records the *actual* current storage state (`scope`, `projectId`, `dbType`, `migratedAt`), separate from the *desired* state declared in the config file.
+
+When `--storage-scope global` is chosen, `ahk init` also synchronizes your provider's agent and skill files into your home directory (in addition to the project-local files it always writes), so subsequent `ahk init --storage-scope global` runs in *other* projects on the same machine can reuse them instead of re-scaffolding:
+
+| Provider      | Global agents dir           | Global skills dir            |
+| ------------- | ---------------------------- | ----------------------------- |
+| `claude-code` | `~/.claude/agents/`          | `~/.claude/skills/`           |
+| `codex-cli`   | `~/.codex/agents/`           | `~/.agents/skills/` (separate namespace from `~/.codex/agents`) |
+| `opencode`    | `~/.config/opencode/agents/` | `~/.config/opencode/skills/`  |
+
+This sync is idempotent and non-destructive: it only creates files that are missing. If everything is already present, `ahk init` prints a message and skips; if only some files are missing, it creates just those and reports what was added. Files it detects as already customized/outdated are left untouched (same "preserve, don't overwrite" rule used for project-local agent files).
+
 ```bash
 ahk init
 
 # Skip prompts with flags
-ahk init --name "my-app" --provider claude-code --docs ./docs --tasks local
-ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local
+ahk init --name "my-app" --provider claude-code --docs ./docs --tasks local --storage-scope local
+ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local --storage-scope global
 ```
 
 Run this once per project. If the project is already initialized, the command prints an 'already initialized' message with suggested next-step commands (`ahk build`, `ahk build --sync`, `ahk reset`, `ahk serve`) and exits without overwriting anything.
@@ -336,13 +371,47 @@ After a reset, run `ahk init` to scaffold a fresh harness.
 
 ### `ahk migrate`
 
+`ahk migrate` has two subcommands: `provider` (migrate scaffold files to a different AI provider) and `storage` (migrate the harness database between storage backends). `ahk migrate --to <provider>` (no subcommand) is kept as a backward-compatible alias for `ahk migrate provider --to <provider>` — existing scripts/CI using the old form keep working unchanged.
+
+#### `ahk migrate provider`
+
 Migrates provider-specific files from one AI provider to another. Useful when switching from Claude Code to OpenCode or vice versa.
 
 ```bash
+ahk migrate provider --to opencode
+ahk migrate provider --to claude-code
+ahk migrate provider --to codex-cli
+
+# Backward-compatible alias (identical behavior):
 ahk migrate --to opencode
-ahk migrate --to claude-code
-ahk migrate --to codex-cli
 ```
+
+#### `ahk migrate storage` — ⚠️ sensitive, reads/writes real harness data
+
+Migrates the harness database between storage backends: **local↔global scope** (moving `.harness/harness.db` in/out of `~/.harness/dbs/<projectId>/`) and **sqlite↔postgres/mysql** (dumping and reloading all 6 tables — tasks, task_acceptance, actions, action_sections, action_files, action_tools — inside a single transaction). It is **not interactive** — `agent-harness-kit.config.ts` (`storage.scope`, `database.type`/`path`/`connectionString`) is the only source of truth for the desired target, compared against the real current state recorded in `.harness/storage-state.json`.
+
+```bash
+ahk migrate storage             # migrate to whatever agent-harness-kit.config.ts declares
+ahk migrate storage --dry-run   # preview what would happen, without touching anything
+ahk migrate storage --force     # required whenever the destination already has data
+```
+
+What it does, case by case:
+
+| Situation | Behavior |
+|---|---|
+| Config and real storage state already match | No-op — reports "nothing to migrate" |
+| Only `storage.scope` differs (same DB engine) | Copies the `.db` file (+ WAL/SHM) and `current.md` directly to the new location, verifies the copy, then removes the original |
+| Only `database.type` differs (sqlite → postgres/mysql) | Full export/import of all 6 tables inside one transaction; on failure, the destination is rolled back exactly as it was found |
+| Destination already has data | **Requires `--force`.** Without it, the command aborts and touches nothing. With it, the destination's current content is backed up to `.harness/backups/pre-migrate-<timestamp>.json` **before** anything is overwritten — if the backup can't be written, the whole command aborts |
+| Both source and destination have diverging data (not just empty vs. full) | Same as above (`--force` + backup required) — the command never attempts to auto-merge two independent histories |
+| `.harness/storage-state.json` is missing | Never assumed to mean "safe, empty destination." Both the local and global sqlite candidate locations are inspected for real data first; if both have data, the command refuses to guess and asks for manual resolution |
+
+**Limitations (by design, matches the current scope):**
+- No connection pooling or incremental/partial migrations — always a full dump/load.
+- After inserting rows with their original ids, the destination's internal id sequence is explicitly re-synced (`setval` on Postgres, `sqlite_sequence` update on SQLite; MySQL's `AUTO_INCREMENT` advances on its own) so that the next normal task/action created after migrating never collides with an imported id.
+- Migrating *away from* a previously remote (postgres/mysql) database isn't supported automatically — `storage-state.json` intentionally never stores connection credentials, so there's nothing to reconnect to. Export manually with `ahk export --json` while still connected to the old database first.
+- The original sqlite file is **not** deleted after a sqlite→remote migration — remove it manually once you've verified the migrated data.
 
 ---
 
@@ -370,8 +439,9 @@ your-project/
 ├── CLAUDE.md
 ├── health.sh
 ├── .harness/
-│   ├── harness.db                 ← gitignored
-│   ├── current.md                 ← gitignored
+│   ├── harness.db                 ← gitignored (local scope only — absent when scope: 'global')
+│   ├── current.md                 ← gitignored (local scope only — absent when scope: 'global')
+│   ├── storage-state.json         ← always present, reflects the REAL current storage scope/projectId
 │   └── feature_list.json
 └── .claude/
     ├── agents/
@@ -426,8 +496,9 @@ your-project/
 | `AGENTS.md`                   | Navigation map agents read first. Regenerated by `ahk build`                          | No — changes will be overwritten                            |
 | `health.sh`                   | Shell script agents run before starting work. Must exit 0                             | **Yes — implement your checks here**                        |
 | `.harness/feature_list.json`  | Task backlog in JSON. Humans edit this, `ahk sync` loads it into SQLite               | Yes — add tasks here                                        |
-| `.harness/harness.db`         | SQLite database. Source of truth for tasks, actions, sections                         | No — managed by the harness                                 |
-| `.harness/current.md`         | Auto-generated session snapshot for agents without MCP access                         | No — regenerated automatically                              |
+| `.harness/harness.db`         | SQLite database (local scope only). Source of truth for tasks, actions, sections      | No — managed by the harness                                 |
+| `.harness/current.md`         | Auto-generated session snapshot for agents without MCP access (local scope only)      | No — regenerated automatically                              |
+| `.harness/storage-state.json` | Always project-local. Records the REAL current storage state (`scope`, `projectId`, `dbType`, `migratedAt`) — used by migration tooling | No — managed by the harness |
 | `.claude/agents/*.md`         | Agent role definitions (Claude Code). Created once, never overwritten                 | **Yes — customize agent behavior**                          |
 | `.claude/mcp.json`            | MCP server registration for Claude Code. Merged by `ahk build`                        | Yes, carefully — don't remove the `agent-harness-kit` entry |
 | `.claude/settings.json`       | Sets `agent: "lead"` so lead runs as the default session agent. Merged by `ahk build` | Yes, carefully                                              |
@@ -492,6 +563,10 @@ export default defineHarness({
       nextSteps: false, // optional next steps field
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
+    // 'local' (default) — DB lives in .harness/ (project-relative).
+    // 'global' — DB lives under ~/.harness/dbs/<projectId>/, outside the project.
+    scope: 'local', // 'local' | 'global'
+    projectId: '5f2c...', // UUID, generated once at init, never regenerated
   },
 
   health: {
@@ -621,7 +696,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `tasks.acceptance_get`    | `taskId`                                        | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update`              |
 | `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                                                           |
 | `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                                                   |
-| `ahk.doctor`              | _(none)_                                        | Check lib version, agent files, and harness skills sync status. Returns `{ lib: { current, latest, outdated }, agents: { outdated, upToDate }, skills: { missing, outdated, ok } }` |
+| `ahk.doctor`              | _(none)_                                        | Check lib version, agent files, and harness skills sync status. Returns `{ lib: { current, latest, outdated }, agents: { missing, outdated, ok }, skills: { missing, outdated, ok } }`. The `lib` version lookup (npm registry check) is cached in-memory with a 5-minute TTL — repeated calls within that window do not hit the network again. |
 
 ---
 
@@ -681,10 +756,11 @@ Each agent role has a scoped set of MCP tools enforced through the agent definit
 | `opencode.json`               | Yes                 |
 | `.codex/agents/*.toml`        | Yes                 |
 | `.codex/config.toml`          | Yes                 |
-| `.harness/harness.db`         | **No** (gitignored) |
-| `.harness/current.md`         | **No** (gitignored) |
+| `.harness/harness.db`         | **No** (gitignored, local scope only) |
+| `.harness/current.md`         | **No** (gitignored, local scope only) |
+| `.harness/storage-state.json` | Yes (metadata, not gitignored — always present regardless of scope) |
 
-The rule: commit inputs (config, task definitions, agent instructions). Ignore outputs (DB, auto-generated snapshots).
+The rule: commit inputs (config, task definitions, agent instructions). Ignore outputs (DB, auto-generated snapshots). `storage-state.json` is metadata about *where* those outputs live, not an output itself — it's committed so the harness can detect storage drift.
 
 ---
 
@@ -692,11 +768,11 @@ The rule: commit inputs (config, task definitions, agent instructions). Ignore o
 
 | Runtime          | SQLite                         | PostgreSQL                | MySQL                   |
 | ---------------- | ------------------------------ | ------------------------- | ----------------------- |
-| Node.js ≥ 22     | ✅ uses `node:sqlite` built-in | ✅ via `postgres` package | ✅ via `mysql2` package |
-| Bun (any recent) | ✅ uses `bun:sqlite` built-in  | ✅ via `postgres` package | ✅ via `mysql2` package |
-| Node.js < 22     | ❌ `node:sqlite` not available | ✅                        | ✅                      |
+| Node.js ≥ 22     | ✅ uses `better-sqlite3` package | ✅ via `postgres` package | ✅ via `mysql2` package |
+| Bun (any recent) | ✅ uses `bun:sqlite` built-in    | ✅ via `postgres` package | ✅ via `mysql2` package |
+| Node.js < 22     | ❌ blocked by `engines.node` (not by the SQLite driver) | ✅ | ✅ |
 
-SQLite requires no additional packages. For PostgreSQL install `postgres`, for MySQL install `mysql2`:
+SQLite is included via the `better-sqlite3` dependency (installed automatically). For PostgreSQL install `postgres`, for MySQL install `mysql2`:
 
 ```bash
 npm install postgres    # for PostgreSQL

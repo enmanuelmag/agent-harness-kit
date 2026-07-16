@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import pc from 'picocolors'
 
 import { runBuild } from '@/commands/build'
 import { runDashboard } from '@/commands/dashboard'
@@ -7,11 +8,13 @@ import { runExport } from '@/commands/export'
 import { runHealth } from '@/commands/health'
 import { runInit } from '@/commands/init'
 import { runMigrate } from '@/commands/migrate'
+import { runMigrateStorage } from '@/commands/migrate-storage'
 import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
 import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskEdit, runTaskList } from '@/commands/task/index'
+import { isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
 
@@ -34,6 +37,7 @@ program
   .option('--provider <provider>', 'AI provider: claude-code | opencode (skip prompt)')
   .option('--docs <path>', 'Docs folder path (skip prompt)')
   .option('--tasks <adapter>', 'Task adapter: local | jira | linear (skip prompt)')
+  .option('--storage-scope <scope>', 'Storage scope: local | global (skip prompt)')
   .action(async (opts) => {
     await runInit(cwd, opts)
   })
@@ -130,12 +134,42 @@ program
   })
 
 // ─── migrate ──────────────────────────────────────────────────────────────────
-program
+// `ahk migrate` is a pure router (no options/action of its own — commander
+// does not reliably support an identical flag declared on both a parent
+// command and its subcommand, see the argv rewrite below) with two
+// subcommands:
+//   - `migrate provider --to <x>` — migrate provider-specific scaffold files.
+//   - `migrate storage [--force] [--dry-run]` — migrate harness DB storage
+//     (local↔global scope, sqlite↔postgres/mysql). See migrate-storage.ts.
+// `ahk migrate --to <x>` (no subcommand) and bare `ahk migrate` are kept as
+// backward-compatible aliases for `migrate provider [--to <x>]` — see the
+// argv rewrite just before `program.parse()` below.
+const migrate = program
   .command('migrate')
+  .description('Migrate provider files to a different provider, or migrate harness storage (see subcommands)')
+
+migrate
+  .command('provider')
   .description('Migrate provider-specific files to a different provider')
-  .option('--to <provider>', 'Target provider: claude-code | opencode')
+  .option('--to <provider>', 'Target provider: claude-code | opencode | codex-cli')
   .action(async (opts) => {
     await runMigrate(cwd, opts)
+  })
+
+migrate
+  .command('storage')
+  .description(
+    'Migrate harness DB storage between local/global scope or sqlite/postgres/mysql, based on agent-harness-kit.config.ts vs the real current state',
+  )
+  .option('--force', 'Required to overwrite a non-empty destination (a backup is written first)')
+  .option('--dry-run', 'Preview what would migrate without applying any changes')
+  .action(async (opts) => {
+    try {
+      await runMigrateStorage(cwd, { force: opts.force, dryRun: opts['dry-run'] })
+    } catch (err) {
+      console.error(pc.red(`✗ ${err instanceof Error ? err.message : String(err)}`))
+      process.exit(1)
+    }
   })
 
 // ─── export ───────────────────────────────────────────────────────────────────
@@ -168,9 +202,35 @@ program
     await runDoctor(cwd)
   })
 
+// Blocks any command action (but not --version/--help, which commander
+// handles without invoking actions) when the package is only installed
+// globally and not available in the project's local node_modules.
+program.hook('preAction', () => {
+  if (!isLocalInstallSatisfied(cwd)) {
+    printLocalInstallWarning()
+    process.exit(1)
+  }
+})
+
 program.hook('postAction', async () => {
   const update = await updateCheck
   if (update) printUpdateMessage(update)
 })
 
-program.parse()
+// ─── backward-compat argv rewrite for `ahk migrate` ────────────────────────
+// Bare `ahk migrate` and `ahk migrate --to <x>` (no subcommand token) must
+// keep working exactly as before subcommands were introduced — rewrite them
+// to `ahk migrate provider [--to <x>]` before commander parses argv.
+// `ahk migrate provider ...` and `ahk migrate storage ...` are untouched.
+function rewriteLegacyMigrateArgv(argv: string[]): string[] {
+  const migrateIdx = argv.indexOf('migrate')
+  if (migrateIdx === -1) return argv
+  const next = argv[migrateIdx + 1]
+  const isLegacyForm = next === undefined || next === '--to'
+  if (!isLegacyForm) return argv
+  const rewritten = [...argv]
+  rewritten.splice(migrateIdx + 1, 0, 'provider')
+  return rewritten
+}
+
+program.parse(rewriteLegacyMigrateArgv(process.argv))

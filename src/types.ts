@@ -65,6 +65,26 @@ export interface StorageConfig {
   tasks: { adapter: TasksAdapter; [key: string]: unknown }
   sections: ActionSections
   markdownFallback: { enabled: boolean; path: string }
+  /** Where the harness DB (and current.md fallback) physically lives.
+   *  'local' — project-relative, in .harness/ (default, backward compatible).
+   *  'global' — under ~/.harness/dbs/<projectId>/, outside the project tree. */
+  scope: 'local' | 'global'
+  /** Stable UUID identifying this project's storage. Generated once at init
+   *  via randomUUID() and never regenerated. Used to namespace the global
+   *  storage directory (~/.harness/dbs/<projectId>/). */
+  projectId: string
+}
+
+/** Shape of .harness/storage-state.json — always written to the project,
+ *  regardless of scope. Reflects the REAL current state of storage (as
+ *  opposed to agent-harness-kit.config.ts, which reflects the DESIRED
+ *  state). Consumed by `ahk migrate storage` (future). Format is stable —
+ *  do not change field names/shape without a migration plan. */
+export interface StorageState {
+  scope: 'local' | 'global'
+  projectId: string
+  dbType: 'sqlite' | 'postgres' | 'mysql'
+  migratedAt: string
 }
 
 export interface HealthConfig {

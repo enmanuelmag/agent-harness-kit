@@ -5,7 +5,7 @@ This document provides detailed implementation information for developers and ma
 ## System Requirements
 
 ### Software Dependencies
-- **Node.js**: Version 22 or higher (uses `node:sqlite` built-in)
+- **Node.js**: Version 22 or higher (uses `better-sqlite3` native SQLite driver)
 - **Alternative runtimes**: Bun (any recent version) - uses `bun:sqlite` built-in  
 - **Package Manager**: npm ≥ 9 or pnpm ≥ 8 (for development)
 

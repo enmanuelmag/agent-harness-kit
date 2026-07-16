@@ -12,5 +12,6 @@ export default defineConfig({
   dts:       true,
   sourcemap: true,
   clean:     true,
+  external:  ['better-sqlite3'],
   // tsup resolves path aliases from tsconfig.json automatically
 })
