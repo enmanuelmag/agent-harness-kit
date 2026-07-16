@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import { detectPackageManager } from './detect-package-manager'
 import { mergeCodexConfigToml } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile, writeSkills } from './scaffold-utils'
 import {
@@ -66,8 +67,9 @@ export class CodexCliMaterializer implements Materializer {
     // Override Codex's built-in `default` agent so `lead` runs when no agent is selected
     writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName, model: leadModel }))
 
-    // .codex/config.toml — MERGE, never overwrite whole file
-    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port)
+    // .codex/config.toml — MERGE, never overwrite whole file. Detect the
+    // project's package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
+    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, detectPackageManager(cwd))
 
     appendGitignore(cwd)
     writeSkills(cwd, '.agents/skills')
@@ -98,7 +100,9 @@ export class CodexCliMaterializer implements Materializer {
     writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName, model: reviewerModel }))
     writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName, model: leadModel }))
 
-    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port)
+    // Re-detecting on every build self-corrects the command if the user
+    // switched package managers since `ahk init` — no migration flag needed.
+    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, detectPackageManager(cwd))
     writeSkills(cwd, '.agents/skills')
   }
 

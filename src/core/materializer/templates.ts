@@ -252,6 +252,8 @@ export function configTs(params: {
   tasksAdapter: string
   port: number
   models?: AgentModelOverrides
+  scope: 'local' | 'global'
+  projectId: string
 }): string {
   const models = params.models ?? {}
   return `import { defineHarness } from '@cardor/agent-harness-kit'
@@ -289,6 +291,10 @@ export default defineHarness({
       nextSteps:     false,
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
+    // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
+    // under ~/.harness/dbs/<projectId>/, outside the project tree.
+    scope:     '${params.scope}',
+    projectId: '${params.projectId}',
   },
 
   health: {
@@ -314,6 +320,8 @@ export function configCjs(params: {
   tasksAdapter: string
   port: number
   models?: AgentModelOverrides
+  scope: 'local' | 'global'
+  projectId: string
 }): string {
   const models = params.models ?? {}
   return `const { defineHarness } = require('@cardor/agent-harness-kit')
@@ -351,6 +359,10 @@ module.exports = defineHarness({
       nextSteps:     false,
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
+    // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
+    // under ~/.harness/dbs/<projectId>/, outside the project tree.
+    scope:     '${params.scope}',
+    projectId: '${params.projectId}',
   },
 
   health: {

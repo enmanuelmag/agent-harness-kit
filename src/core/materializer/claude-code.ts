@@ -3,6 +3,7 @@ import { join, resolve } from 'path'
 
 import { write } from '@/utils/file'
 
+import { detectPackageManager } from './detect-package-manager'
 import {
   mergeClaudeMcpJson,
   mergeClaudeSettingsJson,
@@ -71,8 +72,9 @@ export class ClaudeCodeMaterializer implements Materializer {
     writeAgentFile(cwd, '.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder', builderModel))
     writeAgentFile(cwd, '.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', reviewerModel))
 
-    // .mcp.json — MERGE, never overwrite whole file
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port)
+    // .mcp.json — MERGE, never overwrite whole file. Detect the project's
+    // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
+    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, detectPackageManager(cwd))
     // .claude/settings.json — set `agent: "lead"` (the official Claude Code default-agent field)
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     // .claude/settings.local.json — merge MCP tool permissions
@@ -109,8 +111,11 @@ export class ClaudeCodeMaterializer implements Materializer {
     write('.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder', builderModel))
     write('.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', reviewerModel))
 
-    // MCP config: always merge
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port)
+    // MCP config: always merge. Re-detecting the package manager on every
+    // build means a stale/hardcoded command self-corrects the next time the
+    // user runs `ahk build`, even if they switched package managers after
+    // the initial `ahk init` — no separate migration flag needed.
+    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, detectPackageManager(cwd))
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
     writeSkills(cwd, '.claude/skills')

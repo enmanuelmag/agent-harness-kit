@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import { detectPackageManager } from './detect-package-manager'
 import { mergeOpencodeJson } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile, writeSkills } from './scaffold-utils'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, featureListJson, HEALTH_SH, translateFrontmatterForOpenCode } from './templates'
@@ -48,8 +49,9 @@ export class OpenCodeMaterializer implements Materializer {
     writeAgentFile(cwd, '.opencode/agents/builder.md', translateFrontmatterForOpenCode(agentBuilder({ projectName, writablePaths })))
     writeAgentFile(cwd, '.opencode/agents/reviewer.md', translateFrontmatterForOpenCode(agentReviewer({ projectName })))
 
-    // opencode.json — MERGE, never overwrite whole file
-    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port)
+    // opencode.json — MERGE, never overwrite whole file. Detect the project's
+    // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
+    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, detectPackageManager(cwd))
 
     appendGitignore(cwd)
     writeSkills(cwd, '.opencode/skills')
@@ -73,7 +75,9 @@ export class OpenCodeMaterializer implements Materializer {
     writeAgentFile(cwd, '.opencode/agents/builder.md', translateFrontmatterForOpenCode(agentBuilder({ projectName, writablePaths })))
     writeAgentFile(cwd, '.opencode/agents/reviewer.md', translateFrontmatterForOpenCode(agentReviewer({ projectName })))
 
-    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port)
+    // Re-detecting on every build self-corrects the command if the user
+    // switched package managers since `ahk init` — no migration flag needed.
+    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, detectPackageManager(cwd))
     writeSkills(cwd, '.opencode/skills')
   }
 
