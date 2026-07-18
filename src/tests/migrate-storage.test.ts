@@ -17,7 +17,7 @@ import { TaskRepository } from '@/core/repositories/TaskRepository'
 import { MockRemoteDriver } from '@/tests/helpers/mock-remote-driver'
 
 import type { HarnessDB } from '@/core/db'
-import type { HarnessConfig } from '@/types'
+import type { HarnessConfig, LocalStorageConfig } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-migrate-storage-test')
 
@@ -32,7 +32,7 @@ function baseConfig(overrides: Partial<HarnessConfig> = {}): HarnessConfig {
       reviewer: { instructionsPath: null },
       custom: [],
     },
-    database: { type: 'sqlite', path: '.harness/harness.db' },
+    database: { type: 'sqlite' },
     storage: {
       dir: '.harness',
       tasks: { adapter: 'local' },
@@ -53,6 +53,48 @@ function baseConfig(overrides: Partial<HarnessConfig> = {}): HarnessConfig {
       scripts: { enabled: false, outputDir: '.harness/scripts' },
     },
     ...overrides,
+  }
+}
+
+const SHARED_STORAGE_FIELDS = {
+  dir: '.harness',
+  tasks: { adapter: 'local' as const },
+  sections: {
+    toolsUsed: true,
+    filesModified: true,
+    result: true,
+    blockers: true,
+    nextSteps: false,
+  },
+}
+
+/** Builds a `LocalStorageConfig`-shaped storage override for `baseConfig()`.
+ *  NOT a spread of `baseConfig().storage` — that property's static type is
+ *  the `StorageConfig` union (not narrowed to a specific member just because
+ *  the runtime value happens to be 'local'), so spreading it and overriding
+ *  `scope` doesn't type-check cleanly against either union member (task #56).
+ *  Building the object from known-local fields sidesteps that entirely. */
+function localStorage(projectId: string, overrides: Partial<Omit<LocalStorageConfig, 'scope' | 'projectId'>> = {}): HarnessConfig['storage'] {
+  return {
+    ...SHARED_STORAGE_FIELDS,
+    markdownFallback: { enabled: true, path: '.harness/current.md' },
+    scope: 'local',
+    projectId,
+    ...overrides,
+  }
+}
+
+/** Builds a `GlobalStorageConfig`-shaped storage override for `baseConfig()`.
+ *  Not a spread of `baseConfig().storage` — that's the 'local' branch of the
+ *  discriminated union (has `markdownFallback.path`), and per task #56 there
+ *  is no valid way to spread a LocalStorageConfig into a GlobalStorageConfig
+ *  (the union forbids `markdownFallback.path` under scope='global'). */
+function globalStorage(projectId: string): HarnessConfig['storage'] {
+  return {
+    ...SHARED_STORAGE_FIELDS,
+    markdownFallback: { enabled: true },
+    scope: 'global',
+    projectId,
   }
 }
 
@@ -81,7 +123,7 @@ describe('exportJson — full 6-table export (task #47)', () => {
 
   test('includes tasks, task_acceptance, actions, action_sections, action_files, action_tools', async () => {
     mkdirSync(dir, { recursive: true })
-    const config = baseConfig({ database: { type: 'sqlite', path: join(dir, 'harness.db') } })
+    const config = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'harness.db') }) })
     const db = await openDB(config, dir)
     try {
       await seedData(db)
@@ -104,7 +146,7 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('imports all 6 tables into an empty sqlite destination with matching row counts', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ database: { type: 'sqlite', path: join(dir, 'src.db') } })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src.db') }) })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -134,7 +176,7 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('a failing insert rolls back the ENTIRE import — destination left exactly as found', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ database: { type: 'sqlite', path: join(dir, 'src2.db') } })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src2.db') }) })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -168,7 +210,7 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('sqlite: after import, a subsequent TaskRepository.add() (no explicit id) does not collide with imported ids', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ database: { type: 'sqlite', path: join(dir, 'src3.db') } })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src3.db') }) })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -199,7 +241,7 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('mocked remote (postgres-dialect) destination: sequence reset prevents id collision on next insert', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ database: { type: 'sqlite', path: join(dir, 'src4.db') } })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src4.db') }) })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -247,7 +289,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: scope + dbType already match config → "nothing to migrate", storage-state written', async () => {
     const projectDir = join(TMP_CMD, 'match')
     const config = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'match-project' },
+      storage: localStorage('match-project'),
     })
     await writeConfigFile(projectDir, config)
 
@@ -262,7 +304,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: local -> global scope migration moves the .db file and current.md, preserves task data', async () => {
     const projectDir = join(TMP_CMD, 'local-to-global')
     const localConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'l2g-project' },
+      storage: localStorage('l2g-project'),
     })
     await writeConfigFile(projectDir, localConfig)
 
@@ -277,7 +319,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
 
     // Now flip config to scope=global and run the migration.
     const globalConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'global', projectId: 'l2g-project' },
+      storage: globalStorage('l2g-project'),
     })
     await writeConfigFile(projectDir, globalConfig)
 
@@ -309,7 +351,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: global -> local scope migration moves data back', async () => {
     const projectDir = join(TMP_CMD, 'global-to-local')
     const globalConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'global', projectId: 'g2l-project' },
+      storage: globalStorage('g2l-project'),
     })
     await writeConfigFile(projectDir, globalConfig)
 
@@ -322,7 +364,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     assert.ok(existsSync(join(globalDir, 'harness.db')))
 
     const localConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'g2l-project' },
+      storage: localStorage('g2l-project'),
     })
     await writeConfigFile(projectDir, localConfig)
 
@@ -350,7 +392,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: destination has data, no --force → aborts cleanly, touches NOTHING', async () => {
     const projectDir = join(TMP_CMD, 'force-required')
     const localConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'force-project' },
+      storage: localStorage('force-project'),
     })
     await writeConfigFile(projectDir, localConfig)
 
@@ -361,7 +403,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
 
     // Pre-create a global destination that ALSO has data (diverging).
     const globalConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'global', projectId: 'force-project' },
+      storage: globalStorage('force-project'),
     })
     const globalDb = await openDB(globalConfig, projectDir, FAKE_HOME)
     await seedData(globalDb)
@@ -403,7 +445,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: destination has data + --force → backs up destination JSON before overwriting, then migrates', async () => {
     const projectDir = join(TMP_CMD, 'force-backup')
     const localConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'force-backup-project' },
+      storage: localStorage('force-backup-project'),
     })
     await writeConfigFile(projectDir, localConfig)
 
@@ -413,7 +455,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     await db.close()
 
     const globalConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'global', projectId: 'force-backup-project' },
+      storage: globalStorage('force-backup-project'),
     })
     const globalDb = await openDB(globalConfig, projectDir, FAKE_HOME)
     await seedData(globalDb) // destination has different, pre-existing data
@@ -441,7 +483,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: storage-state.json missing, no data anywhere → records state, nothing to migrate', async () => {
     const projectDir = join(TMP_CMD, 'missing-state-empty')
     const config = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'missing-empty-project' },
+      storage: localStorage('missing-empty-project'),
     })
     await writeConfigFile(projectDir, config)
     mkdirSync(projectDir, { recursive: true })
@@ -458,7 +500,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('case: storage-state.json missing, BOTH candidate locations have data → refuses to guess, touches nothing', async () => {
     const projectDir = join(TMP_CMD, 'missing-state-both')
     const localConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'missing-both-project' },
+      storage: localStorage('missing-both-project'),
     })
     await writeConfigFile(projectDir, localConfig)
 
@@ -469,7 +511,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     await localDb.close()
 
     const globalConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'global', projectId: 'missing-both-project' },
+      storage: globalStorage('missing-both-project'),
     })
     const globalDb = await openDB(globalConfig, projectDir, FAKE_HOME)
     await seedData(globalDb)
@@ -489,7 +531,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
   test('--dry-run previews a scope migration without moving anything', async () => {
     const projectDir = join(TMP_CMD, 'dry-run')
     const localConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'local', projectId: 'dry-run-project' },
+      storage: localStorage('dry-run-project'),
     })
     await writeConfigFile(projectDir, localConfig)
 
@@ -499,7 +541,7 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     await db.close()
 
     const globalConfig = baseConfig({
-      storage: { ...baseConfig().storage, scope: 'global', projectId: 'dry-run-project' },
+      storage: globalStorage('dry-run-project'),
     })
     await writeConfigFile(projectDir, globalConfig)
 

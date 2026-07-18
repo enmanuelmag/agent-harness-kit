@@ -50,6 +50,21 @@ const TABLE_DELETE_ORDER = [...TABLE_INSERT_ORDER].reverse()
 
 // ─── Global storage path resolution ────────────────────────────────────────
 
+/** Default relative sqlite path used whenever `LocalStorageConfig.sqlitePath`
+ *  is omitted, and as the fallback filename component for `scope: 'global'`
+ *  (which never reads a configured path at all — see resolveSqlitePath()).
+ *  Centralized here (task #56) to stop the literal '.harness/harness.db'
+ *  from drifting across config.ts/templates.ts/tests. */
+export const DEFAULT_SQLITE_PATH = '.harness/harness.db'
+
+/** Default relative current.md fallback path, used as the fallback filename
+ *  component whenever a caller needs "the local markdown path" for a scope
+ *  that ISN'T `config.storage`'s own current scope — `markdownFallback.path`
+ *  only exists on `LocalStorageConfig`, so there's no field to read it from
+ *  when `config.storage.scope === 'global'`. See `defaultMarkdownPathForConfig`
+ *  usage in src/commands/migrate-storage.ts. */
+export const DEFAULT_MARKDOWN_PATH = '.harness/current.md'
+
 /** Resolves the directory used for 'global' scope storage: ~/.harness/dbs/<projectId>/
  *  Uses os.homedir() (not $HOME env var) for portability. Callers are
  *  responsible for creating the directory (mkdirSync recursive) before use. */
@@ -565,6 +580,29 @@ export function resolveSqlitePathForScope(
     : resolve(cwd, sqlitePath)
 }
 
+/** Resolves the physical sqlite file path for `config`'s OWN current scope
+ *  (as opposed to `resolveSqlitePathForScope`, which resolves an arbitrary
+ *  scope — used by `ahk migrate storage` to probe both candidates). This is
+ *  the single mandatory entry point every call site should use instead of
+ *  reading `config.database`/`config.storage.sqlitePath` directly — routing
+ *  everything through here is what keeps new call sites from re-introducing
+ *  the "reads a local-only field while scope=global" bug class (task #55/#56). */
+export function resolveSqlitePath(config: HarnessConfig, cwd: string, homeDir: string = homedir()): string {
+  const sqlitePath = config.storage.scope === 'local' ? (config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH) : DEFAULT_SQLITE_PATH
+  return resolveSqlitePathForScope(config.storage.scope, sqlitePath, cwd, config, homeDir)
+}
+
+/** Resolves the physical current.md fallback path for `config`'s OWN current
+ *  scope, sharing the exact convention `HarnessDB.regenerateCurrentMd()`
+ *  uses. Mirrors `resolveSqlitePath()` — call sites (materializers, reset,
+ *  health) should use this instead of reading `storage.markdownFallback.path`
+ *  directly, since that field doesn't exist at all under scope='global'. */
+export function resolveMarkdownFallbackPath(config: HarnessConfig, cwd: string, homeDir: string = homedir()): string {
+  return config.storage.scope === 'global'
+    ? join(resolveGlobalStorageDir(config, homeDir), 'current.md')
+    : resolve(cwd, config.storage.markdownFallback.path)
+}
+
 /** Writes `<storageDir>/storage-state.json` under `cwd`. Standalone (not tied
  *  to a live HarnessDB instance) so it can be called during init before a DB
  *  connection exists, and reused by future migration tooling. */
@@ -628,7 +666,7 @@ export async function openDB(config: HarnessConfig, cwd: string, homeDir: string
       mkdirSync(globalDir, { recursive: true })
       dbPath = join(globalDir, 'harness.db')
     } else {
-      dbPath = resolve(cwd, dbConfig.path)
+      dbPath = resolve(cwd, config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH)
     }
 
     driver = new SQLiteDriver(dbPath)

@@ -93,4 +93,27 @@ describe('applyConfigDefaults — storage scope', () => {
     const config = applyConfigDefaults({ ...baseParams, projectId: fixedId })
     assert.equal(config.storage.projectId, fixedId)
   })
+
+  // ─── discriminated StorageConfig shape (task #56) ───────────────────────
+
+  test('scope=local emits markdownFallback.path and no sqlitePath override by default', () => {
+    const config = applyConfigDefaults({ ...baseParams, scope: 'local' })
+    assert.equal(config.storage.scope, 'local')
+    if (config.storage.scope === 'local') {
+      assert.equal(config.storage.markdownFallback.path, '.harness/current.md')
+      assert.equal(config.storage.sqlitePath, undefined)
+    }
+    assert.ok(!('path' in config.database), 'database.type=sqlite must never carry a path field')
+  })
+
+  test('scope=global omits markdownFallback.path entirely (not present, not empty string)', () => {
+    const config = applyConfigDefaults({ ...baseParams, scope: 'global' })
+    assert.equal(config.storage.scope, 'global')
+    assert.ok(
+      !('path' in config.storage.markdownFallback),
+      'GlobalStorageConfig.markdownFallback must not declare a path field',
+    )
+    assert.ok(!('sqlitePath' in config.storage), 'GlobalStorageConfig must not declare a sqlitePath field')
+    assert.ok(!('path' in config.database), 'database.type=sqlite must never carry a path field')
+  })
 })

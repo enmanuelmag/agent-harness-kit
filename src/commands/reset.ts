@@ -1,9 +1,11 @@
 import { existsSync, readdirSync, rmSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
+import { resolveSqlitePath } from '@/core/db'
 
 interface ResetOptions {
   force?: boolean
@@ -76,7 +78,7 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
   }
 
   const storageDir = config.storage.dir || '.harness'
-  const dbPath = config.database.type === 'sqlite' ? resolve(cwd, config.database.path) : null
+  const dbPath = config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
   const featureListPath = resolve(cwd, storageDir, 'feature_list.json')
 
   let resetDb = false
@@ -95,7 +97,7 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
         resetDb = false
       } else {
         const confirm = await p.confirm({
-          message: `Delete database (${config.database.path})?`,
+          message: `Delete database (${dbPath})?`,
           initialValue: true,
         })
         if (p.isCancel(confirm)) {

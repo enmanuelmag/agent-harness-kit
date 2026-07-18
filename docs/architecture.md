@@ -201,9 +201,11 @@ export default defineHarness({
     reviewer: { instructionsPath: null },
     custom:   [], // Define additional agents here
   },
+  // `database` never carries a file path — physical location is a `storage`
+  // concern (see `storage.sqlitePath` below), not a `database` one.
+  database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    dbPath: '.harness/harness.db',
     tasks: { adapter: 'local' },
     sections: {
       toolsUsed: true,        // log which tools agents used
@@ -213,6 +215,9 @@ export default defineHarness({
       nextSteps: false,       // optional next steps field
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
+    scope: 'local',           // 'local' | 'global'
+    projectId: '5f2c...',     // UUID, generated once at init, never regenerated
+    // sqlitePath: '.harness/harness.db', // optional — only valid under scope: 'local'
   },
   health: {
     scriptPath: './health.sh',
@@ -224,6 +229,29 @@ export default defineHarness({
   },
 })
 ```
+
+### `StorageConfig` — a discriminated union on `scope`
+
+`StorageConfig` (`src/types.ts`) is `LocalStorageConfig | GlobalStorageConfig`, narrowed on the `scope` field:
+
+- **`scope: 'local'`** (shown above) — the sqlite DB and `current.md` fallback live project-relative, under `.harness/`. `sqlitePath` (optional, defaults to `.harness/harness.db` via `DEFAULT_SQLITE_PATH` in `src/core/db.ts`) and `markdownFallback.path` exist only on this branch.
+- **`scope: 'global'`** — both live under `~/.harness/dbs/<projectId>/`, outside the project tree. Neither `sqlitePath` nor `markdownFallback.path` exist on this branch at all — declaring them is a compile-time error, not a silently-ignored field:
+
+```typescript
+storage: {
+  dir: '.harness',
+  tasks: { adapter: 'local' },
+  sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
+  markdownFallback: { enabled: true }, // no `path`
+  scope: 'global',
+  projectId: '5f2c...',
+  // sqlitePath is NOT a valid field on GlobalStorageConfig
+}
+```
+
+`DatabaseConfig` (`SQLiteConfig | RemoteDBConfig`) stays engine-only and scope-agnostic — `RemoteDBConfig`'s `connectionString` is the same regardless of local/global scope, so it's untouched by this split.
+
+Because `loadConfig()` loads `agent-harness-kit.config.ts` via `jiti.import()` at runtime (types are stripped before the module is evaluated), an on-disk config that still has the old contradictory shape (`scope: 'global'` alongside `database.path`/`storage.markdownFallback.path`) gets no compile-time protection. `applyDefaults()` (`src/core/config.ts`) detects that shape at runtime, strips the offending fields, and emits a `console.warn` rather than crashing.
 
 ## Implementation Details
 

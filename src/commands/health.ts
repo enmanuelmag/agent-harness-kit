@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
+import { resolveSqlitePath } from '@/core/db'
 
 import type { HarnessConfig } from '@/types'
 
@@ -27,9 +29,9 @@ export async function runHealth(cwd: string): Promise<void> {
   // ─── [checking DB] ──────────────────────────────────────────────────────────
   let dbOk: boolean
   if (config.database.type === 'sqlite') {
-    const dbPath = resolve(cwd, config.database.path)
+    const dbPath = resolveSqlitePath(config, cwd, homedir())
     dbOk = existsSync(dbPath)
-    checkLine('checking DB', dbOk, `${config.database.path} reachable`)
+    checkLine('checking DB', dbOk, `${dbPath} reachable`)
   } else {
     // For remote DBs we can't check the file — assume reachable (openDB will fail fast if not)
     dbOk = true

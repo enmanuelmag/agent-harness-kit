@@ -5,14 +5,14 @@ import { write } from '@/utils/file'
 
 import { detectPackageManager } from './detect-package-manager'
 import {
+  MCP_CLAUDE_PERMISSIONS_BUILDER,
+  MCP_CLAUDE_PERMISSIONS_CONSULTANT,
+  MCP_CLAUDE_PERMISSIONS_EXPLORER,
+  MCP_CLAUDE_PERMISSIONS_LEAD,
+  MCP_CLAUDE_PERMISSIONS_REVIEWER,
   mergeClaudeMcpJson,
   mergeClaudeSettingsJson,
   mergeClaudeSettingsLocalJson,
-  MCP_CLAUDE_PERMISSIONS_LEAD,
-  MCP_CLAUDE_PERMISSIONS_EXPLORER,
-  MCP_CLAUDE_PERMISSIONS_CONSULTANT,
-  MCP_CLAUDE_PERMISSIONS_BUILDER,
-  MCP_CLAUDE_PERMISSIONS_REVIEWER,
 } from './mcp-merge'
 import { appendGitignore, slugify, writeAgentFile, writeSkills } from './scaffold-utils'
 import {
@@ -48,8 +48,11 @@ export class ClaudeCodeMaterializer implements Materializer {
     const tasks = opts.firstTask ? [{ slug: slugify(opts.firstTask.title), ...opts.firstTask }] : []
     write(cwd, 'feature_list.json', featureListJson(tasks))
 
-    // .harness/current.md placeholder
-    if (!existsSync(join(cwd, config.storage.markdownFallback.path))) {
+    // .harness/current.md placeholder — scope='global' — current.md lives
+    // under ~/.harness/dbs/<projectId>/ (see resolveGlobalStorageDir in
+    // db.ts), not in the project tree, and `markdownFallback.path` doesn't
+    // exist on GlobalStorageConfig at all. Skip for that scope.
+    if (config.storage.scope === 'local' && !existsSync(join(cwd, config.storage.markdownFallback.path))) {
       write(
         cwd,
         config.storage.markdownFallback.path,

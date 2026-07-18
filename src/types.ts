@@ -47,8 +47,6 @@ export interface ActionSections {
 
 export interface SQLiteConfig {
   type: 'sqlite'
-  /** Path to the .db file, relative to cwd */
-  path: string
 }
 
 export interface RemoteDBConfig {
@@ -57,23 +55,51 @@ export interface RemoteDBConfig {
   connectionString: string
 }
 
+/** Describes which DB *engine* to use. Physical location (where the sqlite
+ *  file lives) is a `storage` concern, not a `database` one — see
+ *  `LocalStorageConfig.sqlitePath` / `DEFAULT_SQLITE_PATH` (src/core/db.ts).
+ *  `RemoteDBConfig` is scope-independent (a connection string is the same
+ *  regardless of local/global) and is untouched by that split. */
 export type DatabaseConfig = SQLiteConfig | RemoteDBConfig
 
-export interface StorageConfig {
+interface BaseStorageConfig {
   /** Directory for local harness files: current.md, feature_list.json, scripts */
   dir: string
   tasks: { adapter: TasksAdapter; [key: string]: unknown }
   sections: ActionSections
-  markdownFallback: { enabled: boolean; path: string }
-  /** Where the harness DB (and current.md fallback) physically lives.
-   *  'local' — project-relative, in .harness/ (default, backward compatible).
-   *  'global' — under ~/.harness/dbs/<projectId>/, outside the project tree. */
-  scope: 'local' | 'global'
   /** Stable UUID identifying this project's storage. Generated once at init
    *  via randomUUID() and never regenerated. Used to namespace the global
    *  storage directory (~/.harness/dbs/<projectId>/). */
   projectId: string
 }
+
+/** scope: 'local' — DB (and current.md fallback) live project-relative, in
+ *  .harness/ (default, backward compatible). */
+export interface LocalStorageConfig extends BaseStorageConfig {
+  scope: 'local'
+  markdownFallback: { enabled: boolean; path: string }
+  /** Relative path to the sqlite .db file, resolved against cwd. Only
+   *  meaningful when `database.type === 'sqlite'`. Optional — defaults to
+   *  `DEFAULT_SQLITE_PATH` ('.harness/harness.db', see src/core/db.ts) when
+   *  omitted. */
+  sqlitePath?: string
+}
+
+/** scope: 'global' — DB (and current.md fallback) live under
+ *  ~/.harness/dbs/<projectId>/, outside the project tree. There is no
+ *  meaningful local path to declare for either the sqlite file or the
+ *  markdown fallback under this scope — both are computed via
+ *  `resolveGlobalStorageDir()` (src/core/db.ts). */
+export interface GlobalStorageConfig extends BaseStorageConfig {
+  scope: 'global'
+  markdownFallback: { enabled: boolean }
+}
+
+/** Where the harness DB (and current.md fallback) physically lives.
+ *  Discriminated on `scope` so that `scope: 'global'` configs cannot declare
+ *  the now-meaningless local-only path fields (`sqlitePath`,
+ *  `markdownFallback.path`) without a type error. */
+export type StorageConfig = LocalStorageConfig | GlobalStorageConfig
 
 /** Shape of .harness/storage-state.json — always written to the project,
  *  regardless of scope. Reflects the REAL current state of storage (as

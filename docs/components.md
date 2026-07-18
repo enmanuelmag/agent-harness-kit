@@ -197,10 +197,16 @@ Each agent can have custom settings:
 - `writablePaths`: Directories builder is allowed to write to
 
 **Storage Settings**
+
+`database` never carries a file path — physical location is a `storage`
+concern (`storage.sqlitePath`), not a `database` one. `storage.scope`
+determines which fields are valid: `sqlitePath`/`markdownFallback.path` only
+exist under `scope: 'local'`.
+
 ```typescript
+database: { type: 'sqlite' },
 storage: {
   dir: '.harness',
-  dbPath: '.harness/h harness.db',
   tasks: { adapter: 'local' },
   sections: {
     toolsUsed: true,
@@ -209,7 +215,10 @@ storage: {
     blockers: true,
     nextSteps: false
   },
-  markdownFallback: { enabled: true, path: '.harness/current.md' }
+  markdownFallback: { enabled: true, path: '.harness/current.md' },
+  scope: 'local', // 'local' | 'global'
+  projectId: '5f2c...', // UUID, generated once at init
+  // sqlitePath: '.harness/harness.db', // optional override, local scope only
 }
 ```
 

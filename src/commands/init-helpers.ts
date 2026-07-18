@@ -48,6 +48,24 @@ export function applyConfigDefaults(params: {
   projectId?: string
 }): HarnessConfig {
   const models = params.models ?? {}
+  const scope = params.scope ?? 'local'
+  const projectId = params.projectId ?? randomUUID()
+  const baseStorage = {
+    dir: '.harness',
+    tasks: { adapter: params.tasksAdapter as 'local' },
+    sections: {
+      toolsUsed: true,
+      filesModified: true,
+      result: true,
+      blockers: true,
+      nextSteps: false,
+    },
+  }
+  const storage: HarnessConfig['storage'] =
+    scope === 'global'
+      ? { ...baseStorage, markdownFallback: { enabled: true }, scope: 'global', projectId }
+      : { ...baseStorage, markdownFallback: { enabled: true, path: '.harness/current.md' }, scope: 'local', projectId }
+
   return {
     provider: params.provider,
     project: {
@@ -72,21 +90,8 @@ export function applyConfigDefaults(params: {
       ...(models.consultant && { consultant: { instructionsPath: null, model: models.consultant } }),
       custom: [],
     },
-    database: { type: 'sqlite' as const, path: '.harness/harness.db' },
-    storage: {
-      dir: '.harness',
-      tasks: { adapter: params.tasksAdapter as 'local' },
-      sections: {
-        toolsUsed: true,
-        filesModified: true,
-        result: true,
-        blockers: true,
-        nextSteps: false,
-      },
-      markdownFallback: { enabled: true, path: '.harness/current.md' },
-      scope: params.scope ?? 'local',
-      projectId: params.projectId ?? randomUUID(),
-    },
+    database: { type: 'sqlite' as const },
+    storage,
     health: {
       scriptPath: './health.sh',
       required: true,

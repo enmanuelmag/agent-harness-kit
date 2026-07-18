@@ -107,9 +107,12 @@ export default defineHarness({
     custom: [], // Define additional agents here
   },
 
+  // `database` never carries a file path — physical location is a `storage`
+  // concern (see `storage.sqlitePath` below), not a `database` one.
+  database: { type: 'sqlite' },
+
   storage: {
     dir: '.harness',
-    dbPath: '.harness/harness.db',
     tasks: { adapter: 'local' },
     sections: {
       toolsUsed: true,        // log which tools agents used
@@ -122,6 +125,12 @@ export default defineHarness({
       enabled: true, 
       path: '.harness/current.md' 
     },
+    // scope: 'local' (shown here) — sqlitePath/markdownFallback.path only
+    // exist on this branch of the StorageConfig union. 'global' moves both
+    // under ~/.harness/dbs/<projectId>/ and drops both fields entirely.
+    scope: 'local',
+    projectId: '5f2c...', // UUID, generated once at init, never regenerated
+    // sqlitePath: '.harness/harness.db', // optional override, defaults to this
   },
 
   health: {

@@ -381,7 +381,7 @@ ahk migrate --to opencode
 
 #### `ahk migrate storage` — ⚠️ sensitive, reads/writes real harness data
 
-Migrates the harness database between storage backends: **local↔global scope** (moving `.harness/harness.db` in/out of `~/.harness/dbs/<projectId>/`) and **sqlite↔postgres/mysql** (dumping and reloading all 6 tables — tasks, task_acceptance, actions, action_sections, action_files, action_tools — inside a single transaction). It is **not interactive** — `agent-harness-kit.config.ts` (`storage.scope`, `database.type`/`path`/`connectionString`) is the only source of truth for the desired target, compared against the real current state recorded in `.harness/storage-state.json`.
+Migrates the harness database between storage backends: **local↔global scope** (moving `.harness/harness.db` in/out of `~/.harness/dbs/<projectId>/`) and **sqlite↔postgres/mysql** (dumping and reloading all 6 tables — tasks, task_acceptance, actions, action_sections, action_files, action_tools — inside a single transaction). It is **not interactive** — `agent-harness-kit.config.ts` (`storage.scope`, `storage.sqlitePath` (local scope only), `database.type`/`connectionString`) is the only source of truth for the desired target, compared against the real current state recorded in `.harness/storage-state.json`.
 
 ```bash
 ahk migrate storage             # migrate to whatever agent-harness-kit.config.ts declares
@@ -536,8 +536,10 @@ const config: HarnessConfig = {
   },
 
   // ── Database ──────────────────────────────────────────────────────────────
-  // SQLite (default — zero native deps, Node 22+ or Bun)
-  database: { type: 'sqlite', path: '.harness/harness.db' },
+  // SQLite (default — zero native deps, Node 22+ or Bun). Note: `database`
+  // never carries a file path — where the .db file physically lives is a
+  // `storage` concern (see `storage.sqlitePath` below), not a `database` one.
+  database: { type: 'sqlite' },
 
   // PostgreSQL — uncomment to use instead:
   // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
@@ -545,6 +547,10 @@ const config: HarnessConfig = {
   // MySQL — uncomment to use instead:
   // database: { type: 'mysql', connectionString: process.env.DATABASE_URL },
 
+  // ── Storage — scope: 'local' (default) ─────────────────────────────────────
+  // DB and current.md live project-relative, in .harness/. `sqlitePath` and
+  // `markdownFallback.path` are only valid (and only exist on the type) when
+  // `scope: 'local'`.
   storage: {
     dir: '.harness',
     tasks: { adapter: 'local' }, // 'local' | 'jira' | 'linear' | 'mcp'
@@ -556,10 +562,9 @@ const config: HarnessConfig = {
       nextSteps: false, // optional next steps field
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
-    // 'local' (default) — DB lives in .harness/ (project-relative).
-    // 'global' — DB lives under ~/.harness/dbs/<projectId>/, outside the project.
-    scope: 'local', // 'local' | 'global'
+    scope: 'local',
     projectId: '5f2c...', // UUID, generated once at init, never regenerated
+    // sqlitePath: '.harness/harness.db', // optional — defaults to '.harness/harness.db' when omitted
   },
 
   health: {
@@ -575,6 +580,22 @@ const config: HarnessConfig = {
 
 export default config
 ```
+
+**`scope: 'global'`** — DB and current.md live under `~/.harness/dbs/<projectId>/`, outside the project tree. Under this scope, `sqlitePath` and `markdownFallback.path` don't exist on the type at all (a type error, not just a no-op) — there's nothing local to declare a path for:
+
+```ts
+storage: {
+  dir: '.harness',
+  tasks: { adapter: 'local' },
+  sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
+  markdownFallback: { enabled: true }, // no `path` — auto-managed under ~/.harness/dbs/<projectId>/
+  scope: 'global',
+  projectId: '5f2c...',
+  // sqlitePath is NOT a valid field here — omit it entirely
+},
+```
+
+> `StorageConfig` is a discriminated union on `scope` (`LocalStorageConfig | GlobalStorageConfig`, see `src/types.ts`) — this is what makes declaring `sqlitePath`/`markdownFallback.path` under `scope: 'global'` a compile-time error instead of a silently-ignored field. If you're loading a config file at runtime (via `loadConfig()`, which uses `jiti` and does not type-check), an existing `scope: 'global'` config that still has these fields set gets normalized automatically with a `console.warn` rather than crashing — see `applyDefaults()` in `src/core/config.ts`.
 
 > `defineHarness()` is still exported for anyone who prefers the value-import form (`import { defineHarness } from '@cardor/agent-harness-kit'` + `export default defineHarness({ ... })`) — it's an identity function kept for backward compatibility, and `loadConfig()` supports both shapes.
 

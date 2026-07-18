@@ -5,6 +5,8 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import {
+  DEFAULT_MARKDOWN_PATH,
+  DEFAULT_SQLITE_PATH,
   type FullExport,
   getRowCounts,
   isEmptyDatabase,
@@ -35,12 +37,42 @@ function fail(msg: string): never {
   throw new Error(msg)
 }
 
+/** The relative markdown-fallback path to use as the base for
+ *  `currentMdPathForScope()` below. Mirrors `defaultSqlitePathForConfig()` —
+ *  `LocalStorageConfig.markdownFallback.path` only exists (and only means
+ *  anything) when `config.storage.scope === 'local'`; for a config CURRENTLY
+ *  in scope='global' there's no field to read a custom path from, so this
+ *  always falls back to `DEFAULT_MARKDOWN_PATH` in that case. */
+function defaultMarkdownPathForConfig(config: HarnessConfig): string {
+  return config.storage.scope === 'local' ? config.storage.markdownFallback.path : DEFAULT_MARKDOWN_PATH
+}
+
 /** Physical location of a project's harness `current.md`, following the same
  *  scope convention `HarnessDB.regenerateCurrentMd()` uses. */
 function currentMdPathForScope(scope: 'local' | 'global', config: HarnessConfig, cwd: string, homeDir: string): string {
   return scope === 'global'
     ? join(resolveGlobalStorageDir(config, homeDir), 'current.md')
-    : resolve(cwd, config.storage.markdownFallback.path)
+    : resolve(cwd, defaultMarkdownPathForConfig(config))
+}
+
+/** The relative sqlite path override to use as the base for
+ *  `resolveSqlitePathForScope()` calls in this file. `LocalStorageConfig.sqlitePath`
+ *  only exists (and only means anything) when `config.storage.scope ===
+ *  'local'` — for a config CURRENTLY in scope='global', there is no field to
+ *  read a custom local filename from at all, so this always falls back to
+ *  `DEFAULT_SQLITE_PATH` in that case.
+ *
+ *  Known UX tradeoff (accepted, see task #56 consultant advisory): a custom
+ *  local sqlite filename (`storage.sqlitePath`) does NOT survive a
+ *  global -> local round trip — migrating back to local always lands at
+ *  `DEFAULT_SQLITE_PATH` unless the user re-sets `storage.sqlitePath`
+ *  afterward. This is a deliberate consequence of making `sqlitePath`
+ *  local-only in the type system (see StorageConfig in src/types.ts) rather
+ *  than leaving it unenforceable across scopes. */
+function defaultSqlitePathForConfig(config: HarnessConfig): string {
+  return config.storage.scope === 'local' && config.database.type === 'sqlite'
+    ? (config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH)
+    : DEFAULT_SQLITE_PATH
 }
 
 /** Backs up the destination's current content (all 6 tables, via
@@ -95,7 +127,7 @@ export async function runMigrateStorage(
   let realDbType: DbType
 
   if (!state) {
-    const defaultSqlitePath = config.database.type === 'sqlite' ? config.database.path : '.harness/harness.db'
+    const defaultSqlitePath = defaultSqlitePathForConfig(config)
     const localPath = resolveSqlitePathForScope('local', defaultSqlitePath, cwd, config, homeDir)
     const globalPath = resolveSqlitePathForScope('global', defaultSqlitePath, cwd, config, homeDir)
 
@@ -197,7 +229,7 @@ async function migrateScopeOnly(
   toScope: 'local' | 'global',
   opts: MigrateStorageOptions,
 ): Promise<void> {
-  const sqlitePath = config.database.type === 'sqlite' ? config.database.path : '.harness/harness.db'
+  const sqlitePath = defaultSqlitePathForConfig(config)
   const srcDb = resolveSqlitePathForScope(fromScope, sqlitePath, cwd, config, homeDir)
   const destDb = resolveSqlitePathForScope(toScope, sqlitePath, cwd, config, homeDir)
   const srcMd = currentMdPathForScope(fromScope, config, cwd, homeDir)
@@ -232,7 +264,13 @@ async function migrateScopeOnly(
       try {
         await backupDriver.ensureSchema()
         const { HarnessDB } = await import('@/core/db')
-        const tmpDb = new HarnessDB(backupDriver, { ...config, storage: { ...config.storage, scope: toScope } }, homeDir)
+        // `config` is passed unmodified (not re-scoped to `toScope`) — safe
+        // because exportJson() only queries `backupDriver`'s tables and never
+        // reads `this.config.storage` at all. Re-scoping here would also no
+        // longer type-check cleanly against the StorageConfig discriminated
+        // union (task #56) since `sqlitePath` only exists on the 'local'
+        // branch.
+        const tmpDb = new HarnessDB(backupDriver, config, homeDir)
         data = await tmpDb.exportJson()
       } finally {
         await backupDriver.close()
@@ -282,7 +320,7 @@ async function migrateAcrossDbType(
   sourceScope: 'local' | 'global',
   opts: MigrateStorageOptions,
 ): Promise<void> {
-  const sqlitePath = config.database.type === 'sqlite' ? config.database.path : '.harness/harness.db'
+  const sqlitePath = defaultSqlitePathForConfig(config)
   const srcPath = resolveSqlitePathForScope(sourceScope, sqlitePath, cwd, config, homeDir)
   if (!existsSync(srcPath)) {
     fail(`Source sqlite database not found at ${srcPath} (expected ${sourceScope} scope) — nothing to migrate.`)
@@ -296,7 +334,11 @@ async function migrateAcrossDbType(
     await srcDriver.ensureSchema()
     sourceCounts = await getRowCounts(srcDriver)
     const { HarnessDB } = await import('@/core/db')
-    const srcDb = new HarnessDB(srcDriver, { ...config, storage: { ...config.storage, scope: sourceScope }, database: { type: 'sqlite', path: sqlitePath } }, homeDir)
+    // `config` is passed unmodified (not re-scoped/re-typed to sqlite) — safe
+    // because exportJson() only queries `srcDriver`'s tables and never reads
+    // `this.config` at all. See the identical comment above in
+    // migrateScopeOnly() for why re-scoping isn't attempted here anymore.
+    const srcDb = new HarnessDB(srcDriver, config, homeDir)
     sourceData = await srcDb.exportJson()
   } finally {
     await srcDriver.close()

@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
+import { applyConfigDefaults } from '@/commands/init-helpers'
 import { getDoctorStatus } from '@/core/doctor'
 import { getMaterializer } from '@/core/materializer/index'
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
@@ -16,7 +17,6 @@ import {
   translateFrontmatterForClaudeCode,
   translateFrontmatterForOpenCode,
 } from '@/core/materializer/templates'
-import { applyConfigDefaults } from '@/commands/init-helpers'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
@@ -309,6 +309,29 @@ describe('configTs', () => {
     assert.match(out, /projectId:\s*'abc-123'/)
   })
 
+  // ─── scope-conditional shape (task #56) ────────────────────────────────
+
+  test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
+    const out = configTs({ ...base, scope: 'local' })
+    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/)
+    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
+  })
+
+  test('scope=global omits markdownFallback.path (GlobalStorageConfig shape)', () => {
+    const out = configTs({ ...base, scope: 'global' })
+    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true\s*\}/)
+    assert.doesNotMatch(out, /markdownFallback:[^\n]*path:/)
+    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
+  })
+
+  test('never emits database.path, regardless of scope', () => {
+    for (const scope of ['local', 'global'] as const) {
+      const out = configTs({ ...base, scope })
+      assert.match(out, /database:\s*\{\s*type:\s*'sqlite'\s*\}/)
+      assert.doesNotMatch(out, /database:[^\n]*path:/)
+    }
+  })
+
   test('uses `import type` for HarnessConfig instead of a value import of defineHarness', () => {
     const out = configTs(base)
     assert.match(out, /^import type \{ HarnessConfig \} from '@cardor\/agent-harness-kit'$/m)
@@ -386,6 +409,21 @@ describe('configCjs', () => {
     const out = configCjs({ ...base, scope: 'global', projectId: 'abc-123' })
     assert.match(out, /scope:\s*'global'/)
     assert.match(out, /projectId:\s*'abc-123'/)
+  })
+
+  // ─── scope-conditional shape (task #56) ────────────────────────────────
+
+  test('scope=global omits markdownFallback.path and database.path (GlobalStorageConfig shape)', () => {
+    const out = configCjs({ ...base, scope: 'global' })
+    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true\s*\}/)
+    assert.doesNotMatch(out, /markdownFallback:[^\n]*path:/)
+    assert.doesNotMatch(out, /database:[^\n]*path:/)
+    assert.doesNotThrow(() => new Function(out.replace(/^const .+require.+$/m, '//$&')))
+  })
+
+  test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
+    const out = configCjs({ ...base, scope: 'local' })
+    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/)
   })
 
   test('description with apostrophe produces valid JS', () => {

@@ -1,10 +1,11 @@
-import { dirname, join, resolve } from 'node:path'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { startDashboardServer } from '@/core/dashboard-server'
-import { openDB } from '@/core/db'
+import { openDB, resolveSqlitePath } from '@/core/db'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -16,7 +17,7 @@ interface DashboardOptions {
 export async function runDashboard(cwd: string, opts: DashboardOptions): Promise<void> {
   const config = await loadConfig(cwd)
   const db = await openDB(config, cwd)
-  const dbPath = config.database.type === 'sqlite' ? resolve(cwd, config.database.path) : null
+  const dbPath = config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
   const staticPath = join(__dirname, 'dashboard-dist')
 
   const { url } = await startDashboardServer(db, dbPath, staticPath, opts.port)

@@ -19,7 +19,7 @@ const config: HarnessConfig = {
     reviewer: { instructionsPath: null },
     custom: [],
   },
-  database: { type: 'sqlite', path: join(TMP, 'test.db') },
+  database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
     tasks: { adapter: 'local' },
@@ -27,6 +27,7 @@ const config: HarnessConfig = {
     markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
     scope: 'local',
     projectId: 'test-project-id-local',
+    sqlitePath: join(TMP, 'test.db'),
   },
   health: { scriptPath: './health.sh', required: false },
   tools: {
@@ -300,8 +301,16 @@ describe('openDB — storage scope resolution', () => {
 
     const localConfig: HarnessConfig = {
       ...config,
-      database: { type: 'sqlite', path: '.harness/harness.db' },
-      storage: { ...config.storage, scope: 'local', projectId: 'local-scope-project' },
+      database: { type: 'sqlite' },
+      storage: {
+        dir: config.storage.dir,
+        tasks: config.storage.tasks,
+        sections: config.storage.sections,
+        markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
+        scope: 'local',
+        projectId: 'local-scope-project',
+        sqlitePath: '.harness/harness.db',
+      },
     }
 
     const db = await openDB(localConfig, projectDir, FAKE_HOME)
@@ -320,8 +329,15 @@ describe('openDB — storage scope resolution', () => {
     const projectId = 'global-scope-project-uuid'
     const globalConfig: HarnessConfig = {
       ...config,
-      database: { type: 'sqlite', path: '.harness/harness.db' },
-      storage: { ...config.storage, scope: 'global', projectId },
+      database: { type: 'sqlite' },
+      storage: {
+        dir: config.storage.dir,
+        tasks: config.storage.tasks,
+        sections: config.storage.sections,
+        markdownFallback: { enabled: true },
+        scope: 'global',
+        projectId,
+      },
     }
 
     const db = await openDB(globalConfig, projectDir, FAKE_HOME)
@@ -342,12 +358,14 @@ describe('openDB — storage scope resolution', () => {
     const projectId = 'global-md-project-uuid'
     const globalConfig: HarnessConfig = {
       ...config,
-      database: { type: 'sqlite', path: '.harness/harness.db' },
+      database: { type: 'sqlite' },
       storage: {
-        ...config.storage,
+        dir: config.storage.dir,
+        tasks: config.storage.tasks,
+        sections: config.storage.sections,
         scope: 'global',
         projectId,
-        markdownFallback: { enabled: true, path: '.harness/current.md' },
+        markdownFallback: { enabled: true },
       },
     }
 
@@ -381,8 +399,15 @@ describe('storage-state.json', () => {
     const projectId = 'storage-state-project-uuid'
     const globalConfig: HarnessConfig = {
       ...config,
-      database: { type: 'sqlite', path: '.harness/harness.db' },
-      storage: { ...config.storage, scope: 'global', projectId },
+      database: { type: 'sqlite' },
+      storage: {
+        dir: config.storage.dir,
+        tasks: config.storage.tasks,
+        sections: config.storage.sections,
+        markdownFallback: { enabled: true },
+        scope: 'global',
+        projectId,
+      },
     }
 
     const db = await openDB(globalConfig, projectDir, homeDir)
@@ -410,8 +435,16 @@ describe('storage-state.json', () => {
 
     const localConfig: HarnessConfig = {
       ...config,
-      database: { type: 'sqlite', path: '.harness/harness.db' },
-      storage: { ...config.storage, scope: 'local', projectId: 'read-back-project' },
+      database: { type: 'sqlite' },
+      storage: {
+        dir: config.storage.dir,
+        tasks: config.storage.tasks,
+        sections: config.storage.sections,
+        markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
+        scope: 'local',
+        projectId: 'read-back-project',
+        sqlitePath: '.harness/harness.db',
+      },
     }
 
     const db = await openDB(localConfig, projectDir, homeDir)

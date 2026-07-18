@@ -20,7 +20,7 @@ export default defineHarness({
   // SQLite (default). Switch to postgres/mysql by changing database.type.
   // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
   // database: { type: 'mysql',    connectionString: process.env.DATABASE_URL },
-  database: { type: 'sqlite', path: '.harness/harness.db' },
+  database: { type: 'sqlite' },
 
   storage: {
     dir: '.harness',
@@ -33,6 +33,10 @@ export default defineHarness({
       nextSteps: false,
     },
     markdownFallback: { enabled: true, path: '.harness/current.md' },
+    // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
+    // under ~/.harness/dbs/<projectId>/, outside the project tree.
+    scope: 'local',
+    projectId: '9f2e6b3a-2c9f-4b4a-8f7f-2a0a6e5c9d21',
   },
 
   health: {

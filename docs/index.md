@@ -126,9 +126,11 @@ export default defineHarness({
     },
     reviewer: { instructionsPath: null },
   },
+  // `database` never carries a file path — physical location is a `storage`
+  // concern (see `storage.sqlitePath` below), not a `database` one.
+  database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    dbPath: '.harness/harness.db',
     tasks: { adapter: 'local' },
     sections: {
       toolsUsed: true,
@@ -137,7 +139,13 @@ export default defineHarness({
       blockers: true,
       nextSteps: false
     },
+    // scope: 'local' (shown here) — sqlitePath and markdownFallback.path are
+    // only valid under this scope. Defaults to '.harness/harness.db' when
+    // sqlitePath is omitted.
     markdownFallback: { enabled: true, path: '.harness/current.md' },
+    scope: 'local',
+    projectId: '5f2c...', // UUID, generated once at init, never regenerated
+    // sqlitePath: '.harness/harness.db', // optional override
   },
   health: {
     scriptPath: './health.sh',
@@ -149,6 +157,13 @@ export default defineHarness({
   },
 })
 ```
+
+> `scope: 'global'` moves the DB (and current.md fallback) under
+> `~/.harness/dbs/<projectId>/`, outside the project tree. Under that scope,
+> `sqlitePath` and `markdownFallback.path` don't exist on the type at all —
+> `storage: { ..., markdownFallback: { enabled: true }, scope: 'global',
+> projectId: '5f2c...' }` (no `path`, no `sqlitePath`). See
+> [architecture.md](./architecture.md) for the full discriminated-union shape.
 
 ### Health Checks
 

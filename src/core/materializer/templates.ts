@@ -263,6 +263,17 @@ interface ConfigTemplateParams {
  */
 function configObjectBody(params: ConfigTemplateParams): string {
   const models = params.models ?? {}
+  const isGlobal = params.scope === 'global'
+
+  // scope='global' — the sqlite file and current.md fallback both live under
+  // ~/.harness/dbs/<projectId>/ (see resolveGlobalStorageDir in db.ts), so
+  // there is no local path to declare for either. Emitting a `sqlitePath`
+  // (local-only field) or `markdownFallback.path` for this scope would be
+  // silently ignored at runtime — omit them entirely for this scope.
+  const markdownFallbackLine = isGlobal
+    ? `markdownFallback: { enabled: true },`
+    : `markdownFallback: { enabled: true, path: '.harness/current.md' },`
+
   return `  project: {
     name: ${JSON.stringify(params.name)},
     description: ${JSON.stringify(params.description)},
@@ -282,7 +293,7 @@ function configObjectBody(params: ConfigTemplateParams): string {
   // SQLite (default). Switch to postgres/mysql by changing database.type.
   // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
   // database: { type: 'mysql',    connectionString: process.env.DATABASE_URL },
-  database: { type: 'sqlite', path: '.harness/harness.db' },
+  database: { type: 'sqlite' },
 
   storage: {
     dir:    '.harness',
@@ -294,7 +305,7 @@ function configObjectBody(params: ConfigTemplateParams): string {
       blockers:      true,
       nextSteps:     false,
     },
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
+    ${markdownFallbackLine}
     // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
     // under ~/.harness/dbs/<projectId>/, outside the project tree.
     scope:     '${params.scope}',
