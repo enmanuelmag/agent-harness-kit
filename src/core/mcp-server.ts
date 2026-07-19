@@ -48,7 +48,11 @@ const TOOLS = [
           description:
             'Section name: result | tools_used | blockers | next_steps | <custom>. Do NOT use files_modified to track files — it is stored as plain text only. Use actions.record_file instead.',
         },
-        content: { type: 'string', description: 'Content for this section' },
+        content: {
+          type: 'string',
+          description:
+            "Content for this section. No length limit — include all information that's relevant and necessary, but avoid unnecessary padding to prevent context bottlenecks between agents.",
+        },
       },
       required: ['actionId', 'sectionType', 'content'],
     },
@@ -191,11 +195,16 @@ const TOOLS = [
           description:
             'URL-safe identifier (lowercase, hyphens). Auto-derived from title if omitted.',
         },
-        description: { type: 'string', description: 'Longer description of the task goal' },
+        description: {
+          type: 'string',
+          description:
+            "Longer description of the task goal. No length limit — include all information that's relevant and necessary, but avoid unnecessary padding to prevent context bottlenecks between agents.",
+        },
         acceptance: {
           type: 'array',
           items: { type: 'string' },
-          description: 'List of acceptance criteria (plain sentences)',
+          description:
+            "List of acceptance criteria (plain sentences). No length limit — include all information that's relevant and necessary, but avoid unnecessary padding to prevent context bottlenecks between agents.",
         },
       },
       required: ['title'],

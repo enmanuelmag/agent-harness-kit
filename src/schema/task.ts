@@ -10,5 +10,4 @@ export const taskTitleSchema = v.pipe(
 export const taskDescriptionSchema = v.pipe(
   v.string(),
   v.nonEmpty('Description is required'),
-  v.maxLength(1000, 'Description must be at most 1000 characters'),
 )
