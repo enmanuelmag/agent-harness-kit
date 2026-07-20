@@ -12,7 +12,11 @@
 bash health.sh
 ```
 
+Runs, in order: **lint** (`eslint src/`, non-mutating), **build**, **test**. Any non-zero step fails the gate.
+
 If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green.
+
+> The lint step uses `npm run lint:check`, never `npm run lint` — the latter is `eslint . --fix` and would rewrite sources during a check. health.sh must observe, never mutate, because the reviewer runs it to verify a builder's work.
 
 ## Harness data (source of truth)
 

@@ -1,10 +1,10 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { findConfigFile } from '@/core/config'
-import { openDB } from '@/core/db'
+import { type HarnessDB, openDB } from '@/core/db'
 import { getMaterializer } from '@/core/materializer/index'
 import { slugify } from '@/core/materializer/scaffold-utils'
 import { configCjs, configJson, configMjs, configTs } from '@/core/materializer/templates'
@@ -28,6 +28,65 @@ interface InitOptions {
   docs?: string
   tasks?: string
   storageScope?: string
+}
+
+/**
+ * Reconcile `.harness/feature_list.json` — the "human-editable task seed list".
+ *
+ * This file is accumulable user data, so init MERGES rather than overwrites:
+ * any hand-written backlog is absorbed into the DB (dedup by slug) alongside the
+ * optional firstTask, then the canonical file is re-emitted. This is the same
+ * round-trip `ahk sync both` performs, so init and sync agree on what the file
+ * means. Merge is non-destructive by construction: it never destroys an existing
+ * backlog and never drops a supplied firstTask.
+ *
+ * A malformed feature_list.json is still the user's data: it is left
+ * byte-for-byte intact (never overwritten, never a process.exit), a supplied
+ * firstTask is still seeded into the DB, and `parseFailed` is returned so the
+ * caller can warn.
+ */
+export async function reconcileFeatureList(
+  db: HarnessDB,
+  installDir: string,
+  storageDir: string,
+  firstTask?: { title: string; description?: string; acceptance?: string[] }
+): Promise<{ parseFailed: boolean }> {
+  const featureListPath = join(installDir, storageDir, 'feature_list.json')
+
+  let existingSeeds: { slug: string; title: string; description?: string; acceptance?: string[] }[] = []
+  let parseFailed = false
+  if (existsSync(featureListPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(featureListPath, 'utf8'))
+      if (!Array.isArray(parsed)) throw new Error('feature_list.json is not a JSON array')
+      existingSeeds = parsed
+    } catch {
+      parseFailed = true
+    }
+  }
+
+  const firstTaskSeed = firstTask
+    ? {
+        slug: slugify(firstTask.title),
+        title: firstTask.title,
+        description: firstTask.description,
+        acceptance: firstTask.acceptance,
+      }
+    : undefined
+
+  if (parseFailed) {
+    // Do NOT touch the malformed file. Still seed the supplied firstTask into
+    // the DB so it is not dropped.
+    if (firstTaskSeed) await db.syncFromFeatureList([firstTaskSeed])
+  } else {
+    const seeds = firstTaskSeed ? [...existingSeeds, firstTaskSeed] : existingSeeds
+    // Single dedup-by-slug merge (absorbs backlog + firstTask, collapses a
+    // firstTask whose slug already exists), then re-emit the canonical file.
+    await db.syncFromFeatureList(seeds)
+    await db.writeFeatureList(installDir)
+  }
+
+  return { parseFailed }
 }
 
 export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
@@ -221,6 +280,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
   // ─── Scaffold ─────────────────────────────────────────────────────────────
   let configExt: 'json' | 'ts' | 'mjs' | 'cjs' = 'ts'
+  let featureListParseFailedPath: string | null = null
   const spinner = p.spinner()
   spinner.start('Scaffolding...')
 
@@ -274,15 +334,12 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     // Scaffold provider-specific files
     await materializer.scaffold(config, { cwd: installDir, firstTask })
 
-    // Seed first task into DB if provided
-    if (firstTask) {
-      const slug = slugify(firstTask.title)
-      await db.addTask({
-        slug,
-        title: firstTask.title,
-        description: firstTask.description,
-        acceptance: firstTask.acceptance,
-      })
+    // Reconcile .harness/feature_list.json — the "human-editable task seed
+    // list". Owned by init (not the scaffold), and MERGED rather than
+    // overwritten. See reconcileFeatureList for the full contract.
+    const { parseFailed } = await reconcileFeatureList(db, installDir, config.storage.dir, firstTask)
+    if (parseFailed) {
+      featureListParseFailedPath = join(config.storage.dir, 'feature_list.json')
     }
 
     await db.close()
@@ -291,6 +348,15 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     spinner.stop('Failed')
     p.log.error(err instanceof Error ? err.message : String(err))
     throw err
+  }
+
+  if (featureListParseFailedPath) {
+    console.log(
+      pc.yellow('⚠') +
+        ' Existing ' +
+        pc.bold(featureListParseFailedPath) +
+        ' is not valid JSON — left untouched. Fix it and run `ahk sync`.'
+    )
   }
 
   console.log(pc.green('✓ Scaffolded harness in current directory'))

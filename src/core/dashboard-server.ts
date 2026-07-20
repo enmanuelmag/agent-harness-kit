@@ -5,9 +5,10 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { WebSocketServer } from 'ws'
 
-import { findFreePort } from './port-utils'
+import { DASHBOARD_BIND_HOST, findFreePort } from './port-utils'
 
 import type { HarnessDB } from './db'
+import type { EventEmitter } from 'node:events'
 import type { IncomingMessage } from 'node:http'
 import type { Socket } from 'node:net'
 
@@ -36,6 +37,68 @@ function fileResponse(filePath: string): Response {
 }
 
 // ─── Server ───────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve once the server has actually bound, or reject with an actionable
+ * message if the bind fails.
+ *
+ * `@hono/node-server`'s `serve()` returns synchronously before the bind
+ * settles and attaches no `'error'` listener, so a failed bind lands as an
+ * unhandled `'error'` event that terminates the process. Awaiting this turns
+ * that crash into a rejected promise the caller can report, and also closes the
+ * TOCTOU window between the free-port probe and the real bind.
+ */
+/**
+ * The subset of `http.Server` this helper needs: the `EventEmitter` surface for
+ * the one-shot `'error'`/`'listening'` race, plus `close()` so a failed bind can
+ * release the handle. `@hono/node-server`'s `serve()` return (`Server`,
+ * `Http2Server`, or `Http2SecureServer`) and a bare `node:http` server both
+ * satisfy this, so widening the parameter to it breaks no caller.
+ */
+type ClosableServer = EventEmitter & {
+  close: (callback?: (err?: Error) => void) => void
+}
+
+export function awaitServerListening(server: ClosableServer, port: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    // Best-effort teardown so a failed bind never leaves the http.Server handle
+    // dangling. The server may never have bound (close() then reports
+    // ERR_SERVER_NOT_RUNNING): pass a noop callback so that error is delivered to
+    // the callback rather than re-emitted as an unhandled 'error' event, and
+    // guard any synchronous throw. This must never mask the original
+    // bind-failure rejection below, nor settle the promise a second time — the
+    // one-shot onError has already been removed by the time it fires, so close()
+    // cannot re-enter it.
+    const closeQuietly = () => {
+      try {
+        server.close(() => {
+          // swallow ERR_SERVER_NOT_RUNNING / any close error — best-effort
+        })
+      } catch {
+        // handle was never open; nothing to release
+      }
+    }
+    const onError = (err: NodeJS.ErrnoException) => {
+      server.off('listening', onListening)
+      closeQuietly()
+      if (err.code === 'EADDRINUSE') {
+        reject(
+          new Error(
+            `Port ${port} was taken by another process while starting the dashboard. Please retry, or pick a different port with --port.`
+          )
+        )
+        return
+      }
+      reject(new Error(`Failed to start the dashboard on port ${port}: ${err.message}`))
+    }
+    const onListening = () => {
+      server.off('error', onError)
+      resolve()
+    }
+    server.once('error', onError)
+    server.once('listening', onListening)
+  })
+}
 
 export interface DashboardServerResult {
   url: string
@@ -195,11 +258,30 @@ export async function startDashboardServer(
   })
 
   // ─── Start HTTP server ────────────────────────────────────────────────────
-  const resolvedPort = await findFreePort(port)
+  // The probe and the real bind MUST use the same host, otherwise the probe can
+  // report an occupied port as free (see DASHBOARD_BIND_HOST).
+  const resolvedPort = await findFreePort(port, { host: DASHBOARD_BIND_HOST })
   if (resolvedPort !== port) {
     console.log(`Port ${port} in use, using ${resolvedPort}`)
   }
-  const httpServer = serve({ fetch: app.fetch, port: resolvedPort })
+
+  const httpServer = serve({
+    fetch: app.fetch,
+    port: resolvedPort,
+    hostname: DASHBOARD_BIND_HOST,
+  })
+
+  // serve() returns before the bind settles and attaches no 'error' listener,
+  // so an EADDRINUSE would otherwise surface as an unhandled event that kills
+  // the process *after* the caller already printed a success banner. Wait for
+  // the bind to resolve one way or the other before returning.
+  await awaitServerListening(httpServer, resolvedPort)
+
+  // Keep a handler attached for the server's lifetime so a later runtime error
+  // is reported rather than crashing the process as an unhandled event.
+  httpServer.on('error', (err: NodeJS.ErrnoException) => {
+    console.error(`Dashboard server error: ${err.message}`)
+  })
 
   // ─── WebSocket ────────────────────────────────────────────────────────────
   const wss = new WebSocketServer({ noServer: true })

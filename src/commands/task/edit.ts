@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
+
 import { loadConfig } from '@/core/config'
 import { openDB } from '@/core/db'
 import { slugify } from '@/core/materializer/scaffold-utils'

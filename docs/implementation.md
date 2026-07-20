@@ -208,9 +208,10 @@ ahk build --watch           # Watch for changes and rebuild automatically
 Opens the web dashboard in your browser:
 ```bash
 ahk dashboard                 # Opens http://localhost:4242 
-ahk dashboard --port 8080    # Custom port
+ahk dashboard --port 8080    # Custom port (must be an integer 1-65535)
 ahk dashboard --no-open      # Start without opening browser
 ```
+`--port` is validated at the CLI: a non-integer or out-of-range value (e.g. `abc`, `0`, `99999`) is rejected with a clear error naming the flag and the valid range (1-65535).
 
 #### `ahk status`
 Shows current task and agent status:
@@ -238,8 +239,9 @@ ahk sync --dry-run           # Preview changes without applying
 Starts the MCP server:
 ```bash
 ahk serve                   # Start MCP server (auto-spawned by AI tools)
-ahk serve --port 3456      # Specify custom port for MCP
+ahk serve --port 3456      # Specify custom port for MCP (integer 1-65535)
 ```
+`--port` is validated at the CLI just like `ahk dashboard`; an invalid value is rejected with a clear error.
 
 #### `ahk task add`
 Adds new tasks to the backlog:

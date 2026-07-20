@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { existsSync } from 'fs'
+import { join } from 'path'
 
 import { write } from '@/utils/file'
 
@@ -9,7 +9,7 @@ import {
   mergeClaudeSettingsJson,
   mergeClaudeSettingsLocalJson,
 } from './mcp-merge'
-import { appendGitignore, slugify, writeAgentFiles, writeSkills } from './scaffold-utils'
+import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilder,
   agentConsultant,
@@ -18,7 +18,6 @@ import {
   agentReviewer,
   agentsMd,
   claudeMd,
-  featureListJson,
   HEALTH_SH,
   translateFrontmatterForClaudeCode,
 } from './templates'
@@ -46,18 +45,24 @@ export class ClaudeCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
     const { cwd } = opts
 
-    // AGENTS.md and CLAUDE.md — always overwrite (generated from config)
-    write(cwd, 'AGENTS.md', agentsMd(config))
-    write(cwd, 'CLAUDE.md', claudeMd(config))
+    // AGENTS.md and CLAUDE.md — fresh project, write unconditionally, but STAMP
+    // the provenance marker so the first `ahk build` recognizes these as our own
+    // output and keeps propagating config changes (a markerless file would be
+    // treated as human-edited and frozen from day one).
+    write(cwd, 'AGENTS.md', stampGenerated(agentsMd(config)))
+    write(cwd, 'CLAUDE.md', stampGenerated(claudeMd(config)))
 
     // health.sh — only create if it doesn't exist
     if (!existsSync(join(cwd, 'health.sh'))) {
       write(cwd, 'health.sh', HEALTH_SH, 0o755)
     }
 
-    // .harness/feature_list.json
-    const tasks = opts.firstTask ? [{ slug: slugify(opts.firstTask.title), ...opts.firstTask }] : []
-    write(cwd, 'feature_list.json', featureListJson(tasks))
+    // .harness/feature_list.json is owned by `runInit`, not the scaffold.
+    // It is accumulable user data (the "human-editable task seed list"), so it
+    // is reconciled via the DB round-trip in init.ts (syncFromFeatureList →
+    // writeFeatureList) rather than written unconditionally here — which used
+    // to clobber a hand-written backlog and mis-path the file to the project
+    // root instead of .harness/.
 
     // .harness/current.md placeholder — scope='global' — current.md lives
     // under ~/.harness/dbs/<projectId>/ (see resolveGlobalStorageDir in
@@ -88,15 +93,18 @@ export class ClaudeCodeMaterializer implements Materializer {
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
-    const write = (relPath: string, content: string) => {
-      const abs = join(cwd, relPath)
-      mkdirSync(resolve(abs, '..'), { recursive: true })
-      writeFileSync(abs, content, 'utf8')
-    }
-
-    // build always regenerates AGENTS.md and CLAUDE.md (derived from config)
-    write('AGENTS.md', agentsMd(config))
-    write('CLAUDE.md', claudeMd(config))
+    // AGENTS.md and CLAUDE.md are DERIVED FROM CONFIG. Reconcile against the
+    // provenance marker: untouched files propagate config changes automatically,
+    // hand-edited files are preserved (and reported), --force regenerates them
+    // after backing up. See reconcileGeneratedFiles in scaffold-utils.
+    const derived = reconcileGeneratedFiles(
+      cwd,
+      [
+        { relPath: 'AGENTS.md', content: agentsMd(config) },
+        { relPath: 'CLAUDE.md', content: claudeMd(config) },
+      ],
+      { force: opts.force, backupRoot: join(cwd, config.storage.dir, 'backups') },
+    )
 
     // Agent files are USER-OWNED. Without --force they are created when
     // missing and never touched again; --force regenerates them, backing up
@@ -115,7 +123,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
     writeSkills(cwd, '.claude/skills')
 
-    return { agents }
+    return { agents, derived }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

@@ -1,4 +1,4 @@
-import { Command } from 'commander'
+import { Command, InvalidArgumentError } from 'commander'
 import pc from 'picocolors'
 
 import { runBuild } from '@/commands/build'
@@ -16,9 +16,34 @@ import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskEdit, runTaskList } from '@/commands/task/index'
 import { isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
+import { isExecutableOnPath, printMissingGlobalBinaryWarning } from '@/core/path-probe'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
 
 const cwd = process.cwd()
+
+/**
+ * Strict CLI-boundary coercion for `--port`. Shared by every command that
+ * accepts a port so the validation (and the user-facing error) is identical
+ * everywhere. Rejects anything that is not a base-10 integer in 1..65535:
+ *  - non-numeric ('abc'), empty/whitespace, and trailing garbage ('4242abc')
+ *    are refused (plain `parseInt` would silently accept '4242abc' as 4242),
+ *  - out-of-range values (0, negatives, 65536+) are refused.
+ * Throwing commander's `InvalidArgumentError` makes commander print a clean
+ * `error: option '--port <port>' argument '<val>' is invalid. …` and exit
+ * non-zero with no stack trace.
+ */
+function parsePort(raw: string): number {
+  const trimmed = raw.trim()
+  const rangeHint = 'must be an integer between 1 and 65535'
+  if (!/^\d+$/.test(trimmed)) {
+    throw new InvalidArgumentError(`--port ${rangeHint} (received "${raw}").`)
+  }
+  const port = Number(trimmed)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new InvalidArgumentError(`--port ${rangeHint} (received "${raw}").`)
+  }
+  return port
+}
 
 const updateCheck = checkForUpdate(pkg.version)
 
@@ -88,7 +113,7 @@ program
 program
   .command('serve')
   .description('Start the MCP server (stdio)')
-  .option('--port <port>', 'Port hint stored in config (default: 3742)', parseInt)
+  .option('--port <port>', 'Port hint stored in config (default: 3742)', parsePort)
   .action(async (opts) => {
     await runServe(cwd, { port: opts.port })
   })
@@ -132,10 +157,10 @@ task
 program
   .command('dashboard')
   .description('Open web dashboard to visualize harness data')
-  .option('-p, --port <port>', 'Port to listen on', '4242')
+  .option('-p, --port <port>', 'Port to listen on', parsePort, 4242)
   .option('--no-open', 'Do not open browser automatically')
-  .action(async (opts: { port: string; open: boolean }) => {
-    await runDashboard(cwd, { port: parseInt(opts.port), open: opts.open })
+  .action(async (opts: { port: number; open: boolean }) => {
+    await runDashboard(cwd, { port: opts.port, open: opts.open })
   })
 
 // ─── migrate ──────────────────────────────────────────────────────────────────
@@ -215,6 +240,12 @@ program
 program.hook('preAction', () => {
   if (!isLocalInstallSatisfied(cwd)) {
     printLocalInstallWarning()
+    // Global-install path only: the generated MCP config launches the bare
+    // `ahk serve` command, so warn early (never block) if `ahk` is not
+    // resolvable on PATH and would therefore fail later at spawn time.
+    if (!isExecutableOnPath('ahk')) {
+      printMissingGlobalBinaryWarning()
+    }
   }
 })
 

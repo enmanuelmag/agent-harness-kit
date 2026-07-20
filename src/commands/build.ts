@@ -47,7 +47,44 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
     const materializer = getMaterializer(config.provider)
     const report = await materializer.build(config, cwd, { force })
     spinner.stop(pc.green('Build complete'))
-    p.log.success('AGENTS.md')
+
+    // ── Config-derived files (AGENTS.md, and CLAUDE.md for claude-code) ──
+    // Report the ACTUAL per-file outcome rather than a static line. Files that
+    // are up to date (created / already current / config propagated) are
+    // announced quietly; hand-edited files are called out LOUDLY so a user who
+    // expects config to propagate is not left thinking it silently did.
+    const d = report.derived
+    const upToDate = [...d.created, ...d.current, ...d.propagated]
+    if (upToDate.length > 0) {
+      p.log.success(upToDate.join(', '))
+    }
+    if (d.propagated.length > 0) {
+      p.log.info(`Propagated config changes to ${d.propagated.length} generated file(s):\n  ${d.propagated.join('\n  ')}`)
+    }
+    if (d.overwritten.length > 0) {
+      p.log.warn(
+        pc.yellow(
+          `--force REGENERATED ${d.overwritten.length} hand-edited generated file(s), discarding your edits:\n  ` +
+            d.overwritten.join('\n  '),
+        ),
+      )
+      if (d.backupDir) {
+        p.log.info(pc.yellow(`  Previous content backed up → ${d.backupDir}`))
+      }
+    }
+    if (d.preserved.length > 0) {
+      // The anti-"silently stale" guard: these files diverge from the current
+      // config but were hand-edited, so build left them alone. Say so loudly.
+      p.log.warn(
+        pc.yellow(
+          `Left ${d.preserved.length} hand-edited generated file(s) UNTOUCHED — your edits are safe:\n  ` +
+            d.preserved.join('\n  ') +
+            `\n  These no longer match the current config. Re-run with --force to regenerate them\n  ` +
+            `(this DESTROYS your edits; a backup is written first).`,
+        ),
+      )
+    }
+
     p.log.success(`Agent definitions (${config.provider})`)
     p.log.success('MCP config')
 

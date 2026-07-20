@@ -10,6 +10,15 @@ command -v npm >/dev/null 2>&1 || { echo "FAIL: npm not found"; exit 1; }
 # Check that package.json exists
 [ -f package.json ] || { echo "FAIL: package.json not found"; exit 1; }
 
+# Lint src/ — non-mutating check. Must NOT be `npm run lint`, which uses --fix
+# and would rewrite sources during a health check.
+npm run lint:check
+
+if [ $? -ne 0 ]; then
+  echo "FAIL: Lint failed"
+  exit 1
+fi
+
 npm run build
 
 if [ $? -ne 0 ]; then

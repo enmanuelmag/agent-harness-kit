@@ -2,7 +2,7 @@ import { ClaudeCodeMaterializer } from './claude-code'
 import { CodexCliMaterializer } from './codex-cli'
 import { OpenCodeMaterializer } from './opencode'
 
-import type { WriteAgentFilesResult } from './scaffold-utils'
+import type { ReconcileResult, WriteAgentFilesResult } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 
 export interface BuildMaterializerOptions {
@@ -15,6 +15,10 @@ export interface BuildMaterializerOptions {
 export interface BuildReport {
   /** What happened to the provider's agent files during this build. */
   agents: WriteAgentFilesResult
+  /** What happened to the config-derived files (AGENTS.md, and CLAUDE.md for
+   *  claude-code) during this build. Untouched files propagate config changes
+   *  automatically; hand-edited files are preserved and reported. */
+  derived: ReconcileResult
 }
 
 export interface Materializer {

@@ -119,7 +119,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Markdown fallback** — `current.md` is always regenerated so agents can understand the session state even without the MCP server.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
 - **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
-- **Incremental scaffold** — `ahk init` preserves files you've already customized (agent definitions you've edited are kept). `ahk build` does too: it creates missing agent files and never touches existing ones. Use `ahk build --force` to regenerate them from the latest templates, discarding your edits (a backup is written first).
+- **Incremental scaffold** — `ahk init` preserves files you've already customized (agent definitions you've edited are kept). A hand-written `.harness/feature_list.json` backlog is **merged, never overwritten** — existing tasks survive and any first task you add during init is folded in (deduplicated by slug). `ahk build` also creates missing agent files and never touches existing ones. Use `ahk build --force` to regenerate them from the latest templates, discarding your edits (a backup is written first).
 - **Global installation** — `ahk init` can scaffold the harness into your home directory (`~/.claude` or `~/.config/opencode`) to share it across all projects.
 - **Input validation** — CLI prompts validate all inputs (name length, path format, task title, etc.) and retry with the error message instead of silently accepting bad values.
 
@@ -177,7 +177,7 @@ npx ahk init
 
 Detection order: the `packageManager` field in your `package.json` (e.g. `"packageManager": "pnpm@8.15.0"`) takes priority when present; otherwise `ahk` falls back to lockfile heuristics; if nothing is detected, it defaults to npm.
 
-**Global installs bypass the package manager entirely.** Every command in the table above asks your package manager to resolve a *locally installed* `ahk` binary — `npx --no` deliberately refuses to download one, and `pnpm exec`/`yarn run`/`bunx --no-install` have nothing to point at. If you installed the CLI globally and never added it to the project, all five of those commands fail. So `ahk` checks for the local install first (the same check that decides your config file format, above) and, when there is none, generates the bare `ahk serve --port <port>` — resolved from your `PATH` like any other global binary. The package-manager-specific commands are used only when a local install actually exists.
+**Global installs bypass the package manager entirely.** Every command in the table above asks your package manager to resolve a *locally installed* `ahk` binary — `npx --no` deliberately refuses to download one, and `pnpm exec`/`yarn run`/`bunx --no-install` have nothing to point at. If you installed the CLI globally and never added it to the project, all five of those commands fail. So `ahk` checks for the local install first (the same check that decides your config file format, above) and, when there is none, generates the bare `ahk serve --port <port>` — resolved from your `PATH` like any other global binary. The package-manager-specific commands are used only when a local install actually exists. If, on that global-install path, `ahk` is not resolvable on your `PATH` at generation time, `ahk` prints a non-blocking warning (the command still succeeds) pointing you at `npm i -g @cardor/agent-harness-kit` or a local install — moving the "binary not found" failure earlier instead of surfacing it later when the MCP server is spawned.
 
 Working inside the `agent-harness-kit` repository itself counts as a local install: the package manager can resolve the workspace binary, so the `pnpm exec` form is generated rather than the bare one.
 
@@ -234,7 +234,23 @@ ahk build --sync     # kept for backwards compatibility — now a no-op on every
 
 `ahk build` **creates agent files that are missing and never modifies ones that already exist.** Edit `.claude/agents/<role>.md` (or `.opencode/agents/<role>.md`, or `.codex/agents/<role>.toml`) freely — change the role prompt, set a `model:` line, adjust the restriction fields. Rebuilding will not revert your work. `ahk doctor` does not report hand-edited files either; it checks existence only.
 
-Everything else `build` writes — `AGENTS.md`, `CLAUDE.md`, MCP config, skills — is derived from your config and **is** regenerated on every run.
+Everything else `build` writes — MCP config and skills — is derived from your config and **is** regenerated on every run.
+
+### `AGENTS.md` and `CLAUDE.md` — derived, but your edits are safe
+
+`AGENTS.md` (all providers) and `CLAUDE.md` (Claude Code only) are generated from your config, so a config change should flow into them — but they are also files people hand-edit. `build` reconciles both concerns with a **provenance marker**: every generated file ends with a comment holding a checksum of the exact bytes we wrote, e.g.
+
+```
+<!-- ahk:generated 3f7a…c1 -->
+```
+
+On each build the marker lets `build` tell its own untouched output apart from a human edit, byte-for-byte:
+
+- **Untouched since we wrote it, config changed** → the file is regenerated so your config propagates. No prompt, no backup — it was provably our own output.
+- **Already up to date** → no-op.
+- **You edited the body** (the checksum no longer matches) **or the file has no marker** (written by an older version, e.g. a `CLAUDE.md` you customized before upgrading) → **left untouched**, and `build` prints a loud notice naming the file and telling you to run `--force` if you actually want it regenerated.
+
+Because the checksum is over the exact bytes, *any* change — even one space — counts as an edit and is preserved. The behavior is identical with or without a terminal (there is no prompt), so it is safe in scripts and CI. Leave the marker comment in place; deleting it just makes `build` treat the file as hand-edited (preserve it) on the next run.
 
 > **If you use OpenCode or Codex CLI, your agent files may be out of date right now.** Those two providers have always preserved existing agent files on build, which means they have never picked up template improvements shipped in newer versions of this package. Claude Code, by contrast, used to overwrite them on every build — that inconsistency was a bug, and it is now fixed in favour of preserving your edits. To pull in the current templates, run `ahk build --force` (read the warning below first).
 
@@ -247,8 +263,10 @@ ahk build --force
 ```
 
 - **It discards your customizations.** Every agent file is rewritten from the template. Prompt edits, `model:` lines, and restriction tweaks are all lost.
-- **It backs up first.** Before overwriting anything, the current content of every affected file is copied to `.harness/backups/agents-<timestamp>/`. If that backup cannot be written, the command aborts and **no file is modified** — the same fail-safe as [`ahk migrate storage --force`](#storage-migration).
+- **It backs up first.** Before overwriting anything, the current content of every affected file is copied under `.harness/backups/` — agent files to `agents-<timestamp>/`, hand-edited `AGENTS.md`/`CLAUDE.md` to `derived-<timestamp>/`. If that backup cannot be written, the command aborts and **no file is modified** — the same fail-safe as [`ahk migrate storage --force`](#storage-migration).
 - **It names what it touched.** The command prints every file it overwrote and the backup location, so you can diff or restore.
+
+`--force` also regenerates a hand-edited `AGENTS.md` or `CLAUDE.md` (backing it up first) — the only time you need it for those files, since an *unedited* one already re-generates on its own when config changes.
 
 `--watch` never forces, even if you pass both flags: an automatic rebuild triggered by a file change must not destroy your edits in the background.
 
@@ -266,7 +284,11 @@ ahk dashboard --port 8080      # custom port
 ahk dashboard --no-open        # start server without opening browser
 ```
 
-If the requested port (default `4242`) is already in use, `ahk dashboard` automatically tries up to 10 sequential ports (e.g. `4242 → 4243 → … → 4251`). The actual port opened is printed to the console. If all 10 ports are exhausted, the command exits with a clear error message showing which port range was attempted.
+`--port` must be an integer between `1` and `65535`; an invalid value (e.g. `ahk dashboard --port abc` or `--port 99999`) is rejected at the CLI with a clear error naming the flag and the valid range, rather than silently failing.
+
+If the requested port (default `4242`) is already in use, `ahk dashboard` automatically tries up to 10 sequential ports (e.g. `4242 → 4243 → … → 4251`), printing `Port 4242 in use, using 4243`. The actual port opened is printed to the console. If all 10 ports are exhausted, the command exits with a clear error message showing which port range was attempted.
+
+Port availability is checked against the same network interface the dashboard actually binds to, so an already-running `ahk dashboard` — or any other server holding that port — is reliably detected. The success banner is printed only after the server has genuinely bound; if the bind fails (for example, the port was claimed by another process in the moment between the check and the bind), the command reports an actionable error instead of crashing.
 
 The dashboard includes:
 
@@ -344,6 +366,8 @@ Starts the MCP server on stdio. **You never need to call this manually.** After 
 ahk serve
 ahk serve --port 3456    # store a port hint in config (stdio transport only)
 ```
+
+`--port` must be an integer between `1` and `65535`; an invalid value is rejected at the CLI with a clear error.
 
 ---
 
@@ -770,6 +794,8 @@ The equivalent constraint under Claude Code is expressed as `disallowedTools: [W
 ### `.harness/feature_list.json`
 
 The human-editable task backlog. Add tasks here, then run `ahk sync` to load them into SQLite.
+
+`ahk init` **never clobbers** this file: an existing backlog is merged into SQLite (deduplicated by slug) alongside any first task you add during init, then re-emitted — so a hand-written backlog is preserved. On a fresh project the file is created (empty `[]` if you skip the first-task prompt). If the file contains invalid JSON, init leaves it untouched and warns you to fix it and run `ahk sync`.
 
 ```json
 [

@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 
 import { detectPackageManager } from './detect-package-manager'
 import { mergeCodexConfigToml } from './mcp-merge'
-import { appendGitignore, slugify, writeAgentFiles, writeSkills } from './scaffold-utils'
+import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilderToml,
   agentConsultantToml,
@@ -12,7 +12,6 @@ import {
   agentLeadToml,
   agentReviewerToml,
   agentsMd,
-  featureListJson,
   HEALTH_SH,
 } from './templates'
 
@@ -49,18 +48,20 @@ export class CodexCliMaterializer implements Materializer {
       writeFileSync(abs, content, { encoding: 'utf8', mode })
     }
 
-    // AGENTS.md — always overwrite (generated from config)
-    write('AGENTS.md', agentsMd(config))
+    // AGENTS.md — fresh project, write unconditionally, but STAMP the provenance
+    // marker so the first `ahk build` recognizes it as our own output (a
+    // markerless file would look human-edited and freeze config propagation).
+    write('AGENTS.md', stampGenerated(agentsMd(config)))
 
     // health.sh — only create if it doesn't exist
     if (!existsSync(join(cwd, 'health.sh'))) {
       write('health.sh', HEALTH_SH, 0o755)
     }
 
-    const tasks = opts.firstTask
-      ? [{ slug: slugify(opts.firstTask.title), ...opts.firstTask }]
-      : []
-    write(join(config.storage.dir, 'feature_list.json'), featureListJson(tasks))
+    // .harness/feature_list.json is owned by `runInit`, not the scaffold — it
+    // is accumulable user data reconciled via the DB round-trip in init.ts, so
+    // the scaffold no longer writes it (which used to clobber a hand-written
+    // backlog).
 
     // scope='global' — current.md lives under ~/.harness/dbs/<projectId>/
     // (see resolveGlobalStorageDir in db.ts), not in the project tree, and
@@ -85,13 +86,14 @@ export class CodexCliMaterializer implements Materializer {
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
-    const write = (relPath: string, content: string) => {
-      const abs = join(cwd, relPath)
-      mkdirSync(resolve(abs, '..'), { recursive: true })
-      writeFileSync(abs, content, 'utf8')
-    }
-
-    write('AGENTS.md', agentsMd(config))
+    // AGENTS.md is DERIVED FROM CONFIG. Reconcile against the provenance marker:
+    // untouched files propagate config changes, hand-edited files are preserved
+    // (and reported), --force regenerates after backing up.
+    const derived = reconcileGeneratedFiles(
+      cwd,
+      [{ relPath: 'AGENTS.md', content: agentsMd(config) }],
+      { force: opts.force, backupRoot: join(cwd, config.storage.dir, 'backups') },
+    )
 
     const agents = writeAgentFiles(cwd, codexAgentFiles(config), {
       force: opts.force,
@@ -103,7 +105,7 @@ export class CodexCliMaterializer implements Materializer {
     mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
     writeSkills(cwd, '.agents/skills')
 
-    return { agents }
+    return { agents, derived }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

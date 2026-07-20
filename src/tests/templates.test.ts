@@ -6,7 +6,6 @@ import { describe, test } from 'node:test'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { getDoctorStatus } from '@/core/doctor'
 import { getMaterializer } from '@/core/materializer/index'
-import { pkg } from '@/core/package-data'
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
   __configObjectForTests,
@@ -24,6 +23,7 @@ import {
   translateFrontmatterForClaudeCode,
   translateFrontmatterForOpenCode,
 } from '@/core/materializer/templates'
+import { pkg } from '@/core/package-data'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
