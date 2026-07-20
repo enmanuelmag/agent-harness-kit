@@ -6,6 +6,7 @@ import { describe, test } from 'node:test'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { getDoctorStatus } from '@/core/doctor'
 import { getMaterializer } from '@/core/materializer/index'
+import { pkg } from '@/core/package-data'
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
   __configObjectForTests,
@@ -29,11 +30,24 @@ const TMP = join(import.meta.dirname, '../../.tmp-templates')
 function setup() { mkdirSync(TMP, { recursive: true }) }
 function teardown() { rmSync(TMP, { recursive: true, force: true }) }
 
+// The merger suites below assert the package-manager-mediated command shape,
+// which only applies when the package is installed locally in the project
+// being configured. TMP is the cwd passed to those mergers, so it must
+// genuinely look like such a project — otherwise getMcpCommandParts correctly
+// falls back to the bare global `ahk` binary. Making the fixture state that
+// intent explicitly is the point; see the dedicated global-install suite for
+// the other branch.
+function setupLocalInstall() {
+  setup()
+  const [scope, name] = pkg.name.split('/')
+  mkdirSync(join(TMP, 'node_modules', scope, name), { recursive: true })
+}
+
 describe('mergeClaudeMcpJson', () => {
   test('creates file when it does not exist (defaults to npm command)', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, '.mcp.json')
-    mergeClaudeMcpJson(path, 3456)
+    mergeClaudeMcpJson(path, 3456, TMP)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     const entry = parsed.mcpServers['agent-harness-kit']
     assert.ok(entry)
@@ -44,11 +58,11 @@ describe('mergeClaudeMcpJson', () => {
   })
 
   test('preserves existing mcpServers entries', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, '.mcp2.json')
     const initial = { mcpServers: { 'other-tool': { command: 'foo', args: [] } } }
     writeFileSync(path, JSON.stringify(initial))
-    mergeClaudeMcpJson(path, 3456)
+    mergeClaudeMcpJson(path, 3456, TMP)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.mcpServers['other-tool'])
     assert.ok(parsed.mcpServers['agent-harness-kit'])
@@ -56,9 +70,9 @@ describe('mergeClaudeMcpJson', () => {
   })
 
   test('generates pnpm command/args when pm is pnpm', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, '.mcp3.json')
-    mergeClaudeMcpJson(path, 3456, 'pnpm')
+    mergeClaudeMcpJson(path, 3456, TMP, 'pnpm')
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     const entry = parsed.mcpServers['agent-harness-kit']
     assert.equal(entry.command, 'pnpm')
@@ -67,10 +81,10 @@ describe('mergeClaudeMcpJson', () => {
   })
 
   test('generates yarn command/args for both yarn-classic and yarn-berry', () => {
-    setup()
+    setupLocalInstall()
     for (const pm of ['yarn-classic', 'yarn-berry'] as const) {
       const path = join(TMP, `.mcp-${pm}.json`)
-      mergeClaudeMcpJson(path, 3456, pm)
+      mergeClaudeMcpJson(path, 3456, TMP, pm)
       const parsed = JSON.parse(readFileSync(path, 'utf8'))
       const entry = parsed.mcpServers['agent-harness-kit']
       assert.equal(entry.command, 'yarn')
@@ -80,9 +94,9 @@ describe('mergeClaudeMcpJson', () => {
   })
 
   test('generates bun command/args when pm is bun', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, '.mcp-bun.json')
-    mergeClaudeMcpJson(path, 3456, 'bun')
+    mergeClaudeMcpJson(path, 3456, TMP, 'bun')
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     const entry = parsed.mcpServers['agent-harness-kit']
     assert.equal(entry.command, 'bunx')
@@ -93,9 +107,9 @@ describe('mergeClaudeMcpJson', () => {
 
 describe('mergeOpencodeJson', () => {
   test('creates file when it does not exist (defaults to npm command array)', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'opencode.json')
-    mergeOpencodeJson(path, 3456)
+    mergeOpencodeJson(path, 3456, TMP)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     const entry = parsed.mcp['agent-harness-kit']
     assert.ok(entry)
@@ -106,11 +120,11 @@ describe('mergeOpencodeJson', () => {
   })
 
   test('preserves existing mcp entries', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'opencode2.json')
     const initial = { mcp: { 'other': { type: 'local', command: ['bar'] } } }
     writeFileSync(path, JSON.stringify(initial))
-    mergeOpencodeJson(path, 3456)
+    mergeOpencodeJson(path, 3456, TMP)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.mcp['other'])
     assert.ok(parsed.mcp['agent-harness-kit'])
@@ -118,9 +132,9 @@ describe('mergeOpencodeJson', () => {
   })
 
   test('generates a single command array (not split command/args) per pm', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'opencode3.json')
-    mergeOpencodeJson(path, 3456, 'pnpm')
+    mergeOpencodeJson(path, 3456, TMP, 'pnpm')
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     const entry = parsed.mcp['agent-harness-kit']
     assert.deepEqual(entry.command, ['pnpm', 'exec', 'ahk', 'serve', '--port', '3456'])
@@ -130,9 +144,9 @@ describe('mergeOpencodeJson', () => {
 
 describe('mergeCodexConfigToml', () => {
   test('creates file when it does not exist (defaults to npm command)', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'config.toml')
-    mergeCodexConfigToml(path, 3456)
+    mergeCodexConfigToml(path, 3456, TMP)
     const content = readFileSync(path, 'utf8')
     assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
     assert.match(content, /command = "npx"/)
@@ -141,9 +155,9 @@ describe('mergeCodexConfigToml', () => {
   })
 
   test('generates pnpm command/args when pm is pnpm', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'config-pnpm.toml')
-    mergeCodexConfigToml(path, 3456, 'pnpm')
+    mergeCodexConfigToml(path, 3456, TMP, 'pnpm')
     const content = readFileSync(path, 'utf8')
     assert.match(content, /command = "pnpm"/)
     assert.match(content, /args = \["exec","ahk","serve","--port","3456"\]/)
@@ -151,9 +165,9 @@ describe('mergeCodexConfigToml', () => {
   })
 
   test('generates yarn command/args when pm is yarn-berry', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'config-yarn.toml')
-    mergeCodexConfigToml(path, 3456, 'yarn-berry')
+    mergeCodexConfigToml(path, 3456, TMP, 'yarn-berry')
     const content = readFileSync(path, 'utf8')
     assert.match(content, /command = "yarn"/)
     assert.match(content, /args = \["run","ahk","serve","--port","3456"\]/)
@@ -161,15 +175,60 @@ describe('mergeCodexConfigToml', () => {
   })
 
   test('preserves other existing TOML sections when merging', () => {
-    setup()
+    setupLocalInstall()
     const path = join(TMP, 'config-preserve.toml')
     writeFileSync(path, '[other_section]\nfoo = "bar"\n')
-    mergeCodexConfigToml(path, 3456)
+    mergeCodexConfigToml(path, 3456, TMP)
     const content = readFileSync(path, 'utf8')
     assert.match(content, /\[other_section\]/)
     assert.match(content, /foo = "bar"/)
     assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
     teardown()
+  })
+})
+
+describe('mergers — global install emits the bare ahk binary', () => {
+  // setup() leaves TMP bare: no package.json, no node_modules/@cardor/agent-harness-kit.
+  // That is exactly what a project configured against a globally installed
+  // ahk looks like, so no package manager can resolve the binary and the
+  // command must bypass the package manager entirely.
+
+  test('mergeClaudeMcpJson splits into bare command/args regardless of pm', () => {
+    for (const pm of ['npm', 'pnpm', 'yarn-classic', 'yarn-berry', 'bun'] as const) {
+      setup()
+      const path = join(TMP, `.mcp-global-${pm}.json`)
+      mergeClaudeMcpJson(path, 3456, TMP, pm)
+      const entry = JSON.parse(readFileSync(path, 'utf8')).mcpServers['agent-harness-kit']
+      assert.equal(entry.type, 'stdio')
+      assert.equal(entry.command, 'ahk')
+      assert.deepEqual(entry.args, ['serve', '--port', '3456'])
+      teardown()
+    }
+  })
+
+  test('mergeOpencodeJson emits a single bare command array regardless of pm', () => {
+    for (const pm of ['npm', 'pnpm', 'yarn-classic', 'yarn-berry', 'bun'] as const) {
+      setup()
+      const path = join(TMP, `opencode-global-${pm}.json`)
+      mergeOpencodeJson(path, 3456, TMP, pm)
+      const entry = JSON.parse(readFileSync(path, 'utf8')).mcp['agent-harness-kit']
+      assert.equal(entry.type, 'local')
+      assert.deepEqual(entry.command, ['ahk', 'serve', '--port', '3456'])
+      teardown()
+    }
+  })
+
+  test('mergeCodexConfigToml writes bare command/args regardless of pm', () => {
+    for (const pm of ['npm', 'pnpm', 'yarn-classic', 'yarn-berry', 'bun'] as const) {
+      setup()
+      const path = join(TMP, `config-global-${pm}.toml`)
+      mergeCodexConfigToml(path, 3456, TMP, pm)
+      const content = readFileSync(path, 'utf8')
+      assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
+      assert.match(content, /command = "ahk"/)
+      assert.match(content, /args = \["serve","--port","3456"\]/)
+      teardown()
+    }
   })
 })
 

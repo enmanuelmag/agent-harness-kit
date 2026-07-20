@@ -89,7 +89,9 @@ ahk init
 
 AI tool opens your project
   └── reads .claude/mcp.json, opencode.json, or .codex/config.toml
-  └── spawns: npx ahk serve (stdio MCP server)
+  └── spawns: ahk serve (stdio MCP server)
+      via your package manager (npx/pnpm exec/yarn run/bunx) when the
+      package is a local dependency, or the bare binary when it isn't
 
 Agent starts working
   └── tasks.get()         → picks a task from the backlog
@@ -171,8 +173,13 @@ npx ahk init
 | yarn classic (v1)          | `packageManager` field (major 1) or `yarn.lock` without `.yarnrc.yml`       | `yarn run ahk serve --port <port>`             |
 | yarn berry (v2+, PnP or node-modules) | `packageManager` field (major ≥ 2) or `yarn.lock` + `.yarnrc.yml` | `yarn run ahk serve --port <port>`             |
 | bun                        | `packageManager` field or `bun.lockb`/`bun.lock`                            | `bunx --no-install ahk serve --port <port>`    |
+| **any — no local install** | `@cardor/agent-harness-kit` is not a dependency of your project             | `ahk serve --port <port>`                      |
 
 Detection order: the `packageManager` field in your `package.json` (e.g. `"packageManager": "pnpm@8.15.0"`) takes priority when present; otherwise `ahk` falls back to lockfile heuristics; if nothing is detected, it defaults to npm.
+
+**Global installs bypass the package manager entirely.** Every command in the table above asks your package manager to resolve a *locally installed* `ahk` binary — `npx --no` deliberately refuses to download one, and `pnpm exec`/`yarn run`/`bunx --no-install` have nothing to point at. If you installed the CLI globally and never added it to the project, all five of those commands fail. So `ahk` checks for the local install first (the same check that decides your config file format, above) and, when there is none, generates the bare `ahk serve --port <port>` — resolved from your `PATH` like any other global binary. The package-manager-specific commands are used only when a local install actually exists.
+
+Working inside the `agent-harness-kit` repository itself counts as a local install: the package manager can resolve the workspace binary, so the `pnpm exec` form is generated rather than the bare one.
 
 **Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` (or `ahk build --sync`), including if you've since switched package managers.
 

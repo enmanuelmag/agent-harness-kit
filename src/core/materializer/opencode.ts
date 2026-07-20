@@ -61,7 +61,7 @@ export class OpenCodeMaterializer implements Materializer {
 
     // opencode.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
-    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, detectPackageManager(cwd))
+    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
 
     appendGitignore(cwd)
     writeSkills(cwd, '.opencode/skills')
@@ -83,7 +83,7 @@ export class OpenCodeMaterializer implements Materializer {
 
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
-    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, detectPackageManager(cwd))
+    mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
     writeSkills(cwd, '.opencode/skills')
 
     return { agents }

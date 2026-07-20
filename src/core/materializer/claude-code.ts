@@ -76,7 +76,7 @@ export class ClaudeCodeMaterializer implements Materializer {
 
     // .mcp.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, detectPackageManager(cwd))
+    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
     // .claude/settings.json — set `agent: "lead"` (the official Claude Code default-agent field)
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     // .claude/settings.local.json — merge MCP tool permissions
@@ -110,7 +110,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     // build means a stale/hardcoded command self-corrects the next time the
     // user runs `ahk build`, even if they switched package managers after
     // the initial `ahk init` — no separate migration flag needed.
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, detectPackageManager(cwd))
+    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
     writeSkills(cwd, '.claude/skills')

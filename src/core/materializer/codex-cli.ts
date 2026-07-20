@@ -78,7 +78,7 @@ export class CodexCliMaterializer implements Materializer {
 
     // .codex/config.toml — MERGE, never overwrite whole file. Detect the
     // project's package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
-    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, detectPackageManager(cwd))
+    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
 
     appendGitignore(cwd)
     writeSkills(cwd, '.agents/skills')
@@ -100,7 +100,7 @@ export class CodexCliMaterializer implements Materializer {
 
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
-    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, detectPackageManager(cwd))
+    mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
     writeSkills(cwd, '.agents/skills')
 
     return { agents }

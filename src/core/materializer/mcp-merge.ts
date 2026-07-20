@@ -7,7 +7,7 @@ import type { PackageManager } from './detect-package-manager'
 
 // ─── Claude Code ──────────────────────────────────────────────────────────────
 
-export function mergeClaudeMcpJson(filePath: string, port: number, pm: PackageManager = 'npm'): void {
+export function mergeClaudeMcpJson(filePath: string, port: number, cwd: string, pm: PackageManager = 'npm'): void {
   const folderPath = dirname(filePath)
   if (!existsSync(folderPath)) {
     mkdirSync(folderPath, { recursive: true })
@@ -22,7 +22,7 @@ export function mergeClaudeMcpJson(filePath: string, port: number, pm: PackageMa
     }
   }
 
-  const [command, ...args] = getMcpCommandParts(pm, port)
+  const [command, ...args] = getMcpCommandParts(pm, port, cwd)
 
   const merged = {
     ...existing,
@@ -195,7 +195,7 @@ export function mergeClaudeSettingsLocalJson(filePath: string): void {
 
 // ─── OpenCode ─────────────────────────────────────────────────────────────────
 
-export function mergeOpencodeJson(filePath: string, port: number, pm: PackageManager = 'npm'): void {
+export function mergeOpencodeJson(filePath: string, port: number, cwd: string, pm: PackageManager = 'npm'): void {
   const folderPath = dirname(filePath)
   if (!existsSync(folderPath)) {
     mkdirSync(folderPath, { recursive: true })
@@ -224,7 +224,7 @@ export function mergeOpencodeJson(filePath: string, port: number, pm: PackageMan
         type: 'local',
         // OpenCode's mcp.<name>.command field is a single array (unlike
         // Claude/Codex, which split command/args) — pass the full token list.
-        command: getMcpCommandParts(pm, port),
+        command: getMcpCommandParts(pm, port, cwd),
       },
     },
   }
@@ -265,7 +265,7 @@ function mergeTomlSection(content: string, sectionName: string, sectionBody: str
   return newLines.join('\n')
 }
 
-export function mergeCodexConfigToml(filePath: string, port: number, pm: PackageManager = 'npm'): void {
+export function mergeCodexConfigToml(filePath: string, port: number, cwd: string, pm: PackageManager = 'npm'): void {
   mkdirSync(dirname(filePath), { recursive: true })
 
   let content = ''
@@ -273,7 +273,7 @@ export function mergeCodexConfigToml(filePath: string, port: number, pm: Package
     content = readFileSync(filePath, 'utf8')
   }
 
-  const [command, ...args] = getMcpCommandParts(pm, port)
+  const [command, ...args] = getMcpCommandParts(pm, port, cwd)
 
   const sectionBody = [
     `command = ${JSON.stringify(command)}`,
