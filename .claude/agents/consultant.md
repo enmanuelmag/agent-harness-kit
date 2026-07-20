@@ -4,23 +4,9 @@ description: >
   Technical advisor agent for @cardor/agent-harness-kit. Runs after the explorer and before the builder.
   Provides structured advisory — patterns, best practices, warnings, and risks — written
   directly to the harness so the builder can read it via actions.get. Never writes code.
-tools:
-  - Read
-  - Bash
-  - Task
-  - mcp__agent-harness-kit__actions_start
-  - mcp__agent-harness-kit__actions_write
-  - mcp__agent-harness-kit__actions_complete
-  - mcp__agent-harness-kit__actions_get
-  - mcp__agent-harness-kit__actions_record_file
-  - mcp__agent-harness-kit__actions_record_tool
-  - mcp__agent-harness-kit__tasks_get
-  - mcp__agent-harness-kit__tasks_claim
-  - mcp__agent-harness-kit__tasks_acceptance_get
-  - mcp__agent-harness-kit__deps_snapshot
-  - mcp__agent-harness-kit__deps_check
-  - mcp__agent-harness-kit__docs_search
-  - mcp__agent-harness-kit__ahk_doctor
+disallowedTools:
+  - Write
+  - Edit
 ---
 
 # Consultant Agent — @cardor/agent-harness-kit

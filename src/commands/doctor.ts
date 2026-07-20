@@ -44,19 +44,16 @@ function printAgentsSection(agents: AgentStatus[]): void {
     return
   }
 
+  // Existence only — a customised agent file is a supported state, not drift.
   const missing = agents.filter((a) => a.status === 'missing')
-  const outdated = agents.filter((a) => a.status === 'outdated')
 
-  if (missing.length === 0 && outdated.length === 0) {
-    ok('agent files', 'all up to date')
+  if (missing.length === 0) {
+    ok('agent files', 'all present')
     return
   }
 
   for (const agent of missing) {
     warn('agent files', `${agent.name} missing`, 'run: ahk build')
-  }
-  for (const agent of outdated) {
-    warn('agent files', `${agent.name} outdated`, 'run: ahk build')
   }
 }
 

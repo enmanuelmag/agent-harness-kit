@@ -85,13 +85,6 @@ export default {
     docsPath: './docs',
   },
   provider: 'codex-cli',
-  agents: {
-    lead: { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'] },
-    builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
-    reviewer: { instructionsPath: null },
-    custom: [],
-  },
   database: { type: 'sqlite', path: '.harness/harness.db' },
   storage: {
     dir: '.harness',

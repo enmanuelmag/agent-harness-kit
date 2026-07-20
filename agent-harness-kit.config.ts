@@ -9,13 +9,9 @@ export default defineHarness({
 
   provider: 'claude-code',
 
-  agents: {
-    lead: { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src', 'README.md'] },
-    builder: { instructionsPath: null, writablePaths: ['./src', './tests', 'README.md'] },
-    reviewer: { instructionsPath: null },
-    custom: [],
-  },
+  // No `agents` key — per-agent settings live in .claude/agents/<role>.md,
+  // which is user-owned. `ahk build` creates those files when missing and never
+  // overwrites them; `ahk build --force` regenerates them.
 
   // SQLite (default). Switch to postgres/mysql by changing database.type.
   // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },

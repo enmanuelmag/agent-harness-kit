@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import pc from 'picocolors'
 
+import { isLocalInstallSatisfied } from '@/core/local-install-guard'
+
 import type { HarnessConfig, Provider } from '@/types'
 
 /**
@@ -23,7 +25,22 @@ export function readProjectNameFromPackageJson(cwd: string): string | null {
   }
 }
 
-export function detectConfigExtension(cwd: string): 'ts' | 'mjs' | 'cjs' {
+/**
+ * Chooses the config file format for `ahk init`.
+ *
+ * A local install of the package is the PRECONDITION, checked before anything
+ * else: without it, the project cannot resolve '@cardor/agent-harness-kit', so
+ * a .ts config's `import type` — and any editor autocompletion that depends on
+ * it — resolves to nothing and the user sees a red-underlined, apparently
+ * broken project. JSON has nothing to resolve, so it is correct by
+ * construction there.
+ *
+ * Only once the package IS installed locally do we fall through to the
+ * pre-existing project-type detection (tsconfig.json / package.json type),
+ * whose behavior is unchanged.
+ */
+export function detectConfigExtension(cwd: string): 'json' | 'ts' | 'mjs' | 'cjs' {
+  if (!isLocalInstallSatisfied(cwd)) return 'json'
   try {
     if (existsSync(join(cwd, 'tsconfig.json'))) return 'ts'
     const pkgPath = join(cwd, 'package.json')
@@ -40,14 +57,12 @@ export function applyConfigDefaults(params: {
   provider: Provider
   docsPath: string
   tasksAdapter: string
-  models?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>>
   /** Storage scope chosen during init. Defaults to 'local' for backward compat. */
   scope?: 'local' | 'global'
   /** Reuse an existing projectId (e.g. re-running init logic). If omitted, a
    *  fresh UUID is generated — NEVER derive it from the project path/hash. */
   projectId?: string
 }): HarnessConfig {
-  const models = params.models ?? {}
   const scope = params.scope ?? 'local'
   const projectId = params.projectId ?? randomUUID()
   const baseStorage = {
@@ -74,22 +89,10 @@ export function applyConfigDefaults(params: {
       docsPath: params.docsPath,
       agentsMd: './AGENTS.md',
     },
-    agents: {
-      lead: { instructionsPath: null, ...(models.lead && { model: models.lead }) },
-      explorer: {
-        instructionsPath: null,
-        allowedPaths: [params.docsPath, './src'],
-        ...(models.explorer && { model: models.explorer }),
-      },
-      builder: {
-        instructionsPath: null,
-        writablePaths: ['./src', './tests'],
-        ...(models.builder && { model: models.builder }),
-      },
-      reviewer: { instructionsPath: null, ...(models.reviewer && { model: models.reviewer }) },
-      ...(models.consultant && { consultant: { instructionsPath: null, model: models.consultant } }),
-      custom: [],
-    },
+    // No `agents` key: per-agent settings (model, role instructions) live in
+    // the generated agent file, which is user-owned. This object is the runtime
+    // twin of the config body emitted by configObjectBody() in templates.ts —
+    // drift between the two is the bug this pairing has to keep out.
     database: { type: 'sqlite' as const },
     storage,
     health: {

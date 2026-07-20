@@ -15,13 +15,6 @@ const SQLITE_PATH = '.harness/harness.db'
 const baseConfig: HarnessConfig = {
   project: { name: 'test', description: 'test project', docsPath: './docs' },
   provider: 'claude-code',
-  agents: {
-    lead: { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: [] },
-    builder: { instructionsPath: null, writablePaths: [] },
-    reviewer: { instructionsPath: null },
-    custom: [],
-  },
   database: { type: 'sqlite' },
   storage: {
     dir: '.harness',

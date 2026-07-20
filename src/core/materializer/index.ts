@@ -2,11 +2,24 @@ import { ClaudeCodeMaterializer } from './claude-code'
 import { CodexCliMaterializer } from './codex-cli'
 import { OpenCodeMaterializer } from './opencode'
 
+import type { WriteAgentFilesResult } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
+
+export interface BuildMaterializerOptions {
+  /** Regenerate agent files that already exist, DESTROYING any customization.
+   *  A backup of the previous content is written first; if the backup fails,
+   *  nothing is overwritten. */
+  force?: boolean
+}
+
+export interface BuildReport {
+  /** What happened to the provider's agent files during this build. */
+  agents: WriteAgentFilesResult
+}
 
 export interface Materializer {
   scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void>
-  build(config: HarnessConfig, cwd: string): Promise<void>
+  build(config: HarnessConfig, cwd: string, opts?: BuildMaterializerOptions): Promise<BuildReport>
   migrate(config: HarnessConfig, to: Provider, cwd: string): Promise<void>
   syncPermissions(cwd: string): Promise<void>
 }

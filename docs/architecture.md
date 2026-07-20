@@ -183,7 +183,14 @@ Agents interact through:
 
 The configuration system allows for flexible customization:
 
-### Main Configuration File (agent-harness-kit.config.ts)
+### Main Configuration File (agent-harness-kit.config.{json|ts|mjs|cjs})
+
+`ahk init` picks the format by checking `isLocalInstallSatisfied(cwd)` (`src/core/local-install-guard.ts`) **before** any project-type detection. Without a local install the project cannot resolve `@cardor/agent-harness-kit`, so a `.ts` config's `import type` fails to resolve in the editor and under `tsc --noEmit` — `detectConfigExtension()` returns `'json'`, which has no imports and no types. Only when the package IS installed locally does it fall through to the pre-existing `tsconfig.json` / `package.json` `type` detection that chooses between `.ts`, `.mjs` and `.cjs`.
+
+`findConfigFile()` resolves all five names in a fixed precedence order with `.json` last, so adding it cannot change which config an already-initialized project loads. A config's format is never converted because the install state changed.
+
+The example below is the TypeScript form:
+
 ```typescript
 import { defineHarness } from '@cardor/agent-harness-kit'
 
@@ -194,13 +201,8 @@ export default defineHarness({
     docsPath: './docs',
   },
   provider: 'claude-code', // or 'opencode'
-  agents: {
-    lead:     { instructionsPath: null },
-    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'] },
-    builder:  { instructionsPath: null, writablePaths: ['./src', './tests'] },
-    reviewer: { instructionsPath: null },
-    custom:   [], // Define additional agents here
-  },
+  // No `agents` key — per-agent settings (model, role instructions) live in
+  // the generated agent file, which is yours to edit.
   // `database` never carries a file path — physical location is a `storage`
   // concern (see `storage.sqlitePath` below), not a `database` one.
   database: { type: 'sqlite' },
@@ -252,6 +254,8 @@ storage: {
 `DatabaseConfig` (`SQLiteConfig | RemoteDBConfig`) stays engine-only and scope-agnostic — `RemoteDBConfig`'s `connectionString` is the same regardless of local/global scope, so it's untouched by this split.
 
 Because `loadConfig()` loads `agent-harness-kit.config.ts` via `jiti.import()` at runtime (types are stripped before the module is evaluated), an on-disk config that still has the old contradictory shape (`scope: 'global'` alongside `database.path`/`storage.markdownFallback.path`) gets no compile-time protection. `applyDefaults()` (`src/core/config.ts`) detects that shape at runtime, strips the offending fields, and emits a `console.warn` rather than crashing.
+
+This applies with full force to JSON configs, which have no compile-time protection at all — there is no type to check them against. A `.json` config is read and parsed directly rather than through `jiti` (pure data, no module semantics, and a parse error can name the file and the reason), then handed to the same `applyDefaults()`. Both normalizers — `normalizeLegacyStorageShape()` and `normalizeLegacyAgentsKey()`, the latter stripping the `agents` key removed in a prior version — run identically for every format.
 
 ## Implementation Details
 

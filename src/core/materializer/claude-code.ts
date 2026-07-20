@@ -1,20 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 
 import { write } from '@/utils/file'
 
 import { detectPackageManager } from './detect-package-manager'
 import {
-  MCP_CLAUDE_PERMISSIONS_BUILDER,
-  MCP_CLAUDE_PERMISSIONS_CONSULTANT,
-  MCP_CLAUDE_PERMISSIONS_EXPLORER,
-  MCP_CLAUDE_PERMISSIONS_LEAD,
-  MCP_CLAUDE_PERMISSIONS_REVIEWER,
   mergeClaudeMcpJson,
   mergeClaudeSettingsJson,
   mergeClaudeSettingsLocalJson,
 } from './mcp-merge'
-import { appendGitignore, slugify, writeAgentFile, writeSkills } from './scaffold-utils'
+import { appendGitignore, slugify, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilder,
   agentConsultant,
@@ -28,8 +23,24 @@ import {
   translateFrontmatterForClaudeCode,
 } from './templates'
 
-import type { Materializer } from './index'
+import type { BuildMaterializerOptions, BuildReport, Materializer } from './index'
+import type { AgentFileEntry } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
+
+/** The set of agent files this provider owns, with their generated content.
+ *  Single definition shared by `scaffold()` and `build()` — the two used to
+ *  duplicate this list, which is how `build()` kept overwriting user edits
+ *  long after `scaffold()` had been fixed to preserve them. */
+function claudeAgentFiles(config: HarnessConfig): AgentFileEntry[] {
+  const projectName = config.project.name
+  return [
+    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead') },
+    { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }), 'explorer') },
+    { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant') },
+    { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }), 'builder') },
+    { relPath: '.claude/agents/reviewer.md', content: translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer') },
+  ]
+}
 
 export class ClaudeCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
@@ -60,20 +71,8 @@ export class ClaudeCodeMaterializer implements Materializer {
       )
     }
 
-    // .claude/agents/ — skip files the dev may have customized
-    const projectName = config.project.name
-    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    const leadModel = config.agents.lead.model
-    const explorerModel = config.agents.explorer.model
-    const consultantModel = config.agents.consultant?.model
-    const builderModel = config.agents.builder.model
-    const reviewerModel = config.agents.reviewer.model
-    writeAgentFile(cwd, '.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead', leadModel))
-    writeAgentFile(cwd, '.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer', explorerModel))
-    writeAgentFile(cwd, '.claude/agents/consultant.md', translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant', consultantModel))
-    writeAgentFile(cwd, '.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder', builderModel))
-    writeAgentFile(cwd, '.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', reviewerModel))
+    // .claude/agents/ — user-owned: create when missing, never overwrite
+    writeAgentFiles(cwd, claudeAgentFiles(config))
 
     // .mcp.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
@@ -88,7 +87,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     writeSkills(cwd, '.claude/skills')
   }
 
-  async build(config: HarnessConfig, cwd: string): Promise<void> {
+  async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
     const write = (relPath: string, content: string) => {
       const abs = join(cwd, relPath)
       mkdirSync(resolve(abs, '..'), { recursive: true })
@@ -99,20 +98,13 @@ export class ClaudeCodeMaterializer implements Materializer {
     write('AGENTS.md', agentsMd(config))
     write('CLAUDE.md', claudeMd(config))
 
-    // Agent files: always regenerate (build must update existing files)
-    const projectName = config.project.name
-    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    const leadModel = config.agents.lead.model
-    const explorerModel = config.agents.explorer.model
-    const consultantModel = config.agents.consultant?.model
-    const builderModel = config.agents.builder.model
-    const reviewerModel = config.agents.reviewer.model
-    write('.claude/agents/lead.md', translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead', leadModel))
-    write('.claude/agents/explorer.md', translateFrontmatterForClaudeCode(agentExplorer({ projectName, allowedPaths }), 'explorer', explorerModel))
-    write('.claude/agents/consultant.md', translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant', consultantModel))
-    write('.claude/agents/builder.md', translateFrontmatterForClaudeCode(agentBuilder({ projectName, writablePaths }), 'builder', builderModel))
-    write('.claude/agents/reviewer.md', translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', reviewerModel))
+    // Agent files are USER-OWNED. Without --force they are created when
+    // missing and never touched again; --force regenerates them, backing up
+    // the previous content first.
+    const agents = writeAgentFiles(cwd, claudeAgentFiles(config), {
+      force: opts.force,
+      backupRoot: join(cwd, config.storage.dir, 'backups'),
+    })
 
     // MCP config: always merge. Re-detecting the package manager on every
     // build means a stale/hardcoded command self-corrects the next time the
@@ -122,6 +114,8 @@ export class ClaudeCodeMaterializer implements Materializer {
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
     writeSkills(cwd, '.claude/skills')
+
+    return { agents }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {
@@ -129,40 +123,23 @@ export class ClaudeCodeMaterializer implements Materializer {
     // Migration from claude-code is handled by the target materializer
   }
 
-  async syncPermissions(cwd: string): Promise<void> {
-    const AGENT_TOOLS: Record<string, string[]> = {
-      lead: [...MCP_CLAUDE_PERMISSIONS_LEAD],
-      explorer: [...MCP_CLAUDE_PERMISSIONS_EXPLORER],
-      consultant: [...MCP_CLAUDE_PERMISSIONS_CONSULTANT],
-      builder: [...MCP_CLAUDE_PERMISSIONS_BUILDER],
-      reviewer: [...MCP_CLAUDE_PERMISSIONS_REVIEWER],
-    }
-
-    for (const [agent, tools] of Object.entries(AGENT_TOOLS)) {
-      const filePath = join(cwd, '.claude', 'agents', `${agent}.md`)
-      if (!existsSync(filePath)) {
-        console.log(`  ${agent}.md not found — skipping`)
-        continue
-      }
-      const content = readFileSync(filePath, 'utf-8')
-      // Replace mcp__ lines in the tools: block while preserving native tools (Read/Write/Bash/Task)
-      const updated = content.replace(
-        /(tools:\n)((?:  - [^\n]+\n)*)/m,
-        (_match, header, toolsSection) => {
-          const nativeLines = toolsSection
-            .split('\n')
-            .filter((line: string) => line.trim() && !line.includes('mcp__'))
-          const nativeSection = nativeLines.length ? nativeLines.join('\n') + '\n' : ''
-          const mcpSection = tools.map((t) => `  - ${t}`).join('\n') + '\n'
-          return header + nativeSection + mcpSection
-        }
-      )
-      if (updated === content) {
-        console.log(`  ${agent}.md already in sync`)
-      } else {
-        writeFileSync(filePath, updated, 'utf-8')
-        console.log(`  ${agent}.md updated`)
-      }
-    }
+  /**
+   * No-op by design.
+   *
+   * This used to rewrite the `tools:` frontmatter block of every agent file,
+   * re-injecting the canonical `mcp__agent-harness-kit__*` allowlist. Agent
+   * files no longer declare `tools` at all: they inherit the full tool set
+   * (Task and every MCP tool included) and express restrictions as a
+   * `disallowedTools` denylist instead.
+   *
+   * Keeping the old rewrite alive would be actively harmful — on a project
+   * upgraded from an older version, whose agent files still carry a legacy
+   * `tools:` block, it would re-inject the allowlist and silently undo the
+   * migration on exactly the files that most need it. Run `ahk build` to
+   * regenerate agent files in the current shape.
+   */
+  async syncPermissions(_cwd: string): Promise<void> {
+    console.log('  Agent files inherit tools and declare a disallowedTools denylist —')
+    console.log('  there is no permission allowlist to sync. Run `ahk build` to regenerate them.')
   }
 }

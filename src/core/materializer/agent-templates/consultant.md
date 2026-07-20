@@ -4,9 +4,6 @@ description: >
   Technical advisor agent for {{projectName}}. Runs after the explorer and before the builder.
   Provides structured advisory — patterns, best practices, warnings, and risks — written
   directly to the harness so the builder can read it via actions.get. Never writes code.
-tools:
-  - Read
-  - Bash
 ---
 
 # Consultant Agent — {{projectName}}

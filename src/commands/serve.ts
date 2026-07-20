@@ -21,14 +21,9 @@ export async function runServe(cwd: string, opts: ServeOptions): Promise<void> {
   if (!syncResult.in_sync && syncResult.agents) {
     const affected = Object.entries(syncResult.agents)
       .filter(([, r]) => !r.ok)
-      .map(([name, r]) => {
-        const parts: string[] = []
-        if (r.missing.length) parts.push(`missing: ${r.missing.map(t => t.replace('mcp__agent-harness-kit__', '')).join(', ')}`)
-        if (r.extra.length) parts.push(`extra: ${r.extra.map(t => t.replace('mcp__agent-harness-kit__', '')).join(', ')}`)
-        return `${name} (${parts.join('; ')})`
-      })
-      .join('\n   ')
-    process.stderr.write(`[agent-harness-kit] Agent permissions out of sync. Run: ahk build --sync\n   ${affected}\n`)
+      .map(([name]) => name)
+      .join(', ')
+    process.stderr.write(`[agent-harness-kit] Agent definition files missing: ${affected}. Run: ahk build\n`)
   }
 
   await startMcpServer(config, cwd)

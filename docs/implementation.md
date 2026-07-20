@@ -93,19 +93,8 @@ export default defineHarness({
   
   provider: 'claude-code', // or 'opencode'
   
-  agents: {
-    lead: { instructionsPath: null },
-    explorer: { 
-      instructionsPath: null, 
-      allowedPaths: ['./docs', './src'] 
-    },
-    builder: { 
-      instructionsPath: null, 
-      writablePaths: ['./src', './tests'] 
-    },
-    reviewer: { instructionsPath: null },
-    custom: [], // Define additional agents here
-  },
+  // No `agents` key — per-agent settings (model, role instructions) live in
+  // the generated agent file, which is yours to edit.
 
   // `database` never carries a file path — physical location is a `storage`
   // concern (see `storage.sqlitePath` below), not a `database` one.
@@ -536,9 +525,11 @@ ls -la .harness/harness.db
 **Symptoms**: Builder/Explorer agents cannot access files
 **Solution**:
 ```bash
-# Verify file permissions and paths in config
-# Check that writablePaths are correctly defined
-# Ensure no path conflicts or typos
+# Write access is per-tool, not per-path: check the generated agent file
+# (.claude/agents/<role>.md, .opencode/agents/<role>.md, .codex/agents/<role>.toml).
+# Only the builder has write tools enabled; every other role has them denied
+# via disallowedTools / permission.edit / sandbox_mode.
+# If a non-builder agent needs to write, that is the plan being wrong, not the config.
 ```
 
 ### Performance Optimization Tips

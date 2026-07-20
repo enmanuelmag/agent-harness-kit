@@ -7,7 +7,7 @@ import { findConfigFile } from '@/core/config'
 import { openDB } from '@/core/db'
 import { getMaterializer } from '@/core/materializer/index'
 import { slugify } from '@/core/materializer/scaffold-utils'
-import { configCjs,configMjs, configTs } from '@/core/materializer/templates'
+import { configCjs, configJson, configMjs, configTs } from '@/core/materializer/templates'
 import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/init'
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
@@ -110,72 +110,11 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     provider = val satisfies Provider
   }
 
-  // ─── Per-agent model customization (provider-conditional) ────────────────
-  // OpenCode: no closed enum for models — skip entirely, no prompts at all.
-  const AGENT_LABELS: {
-    key: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'
-    label: string
-  }[] = [
-    { key: 'lead', label: 'Lead' },
-    { key: 'explorer', label: 'Explorer' },
-    { key: 'consultant', label: 'Consultant' },
-    { key: 'builder', label: 'Builder' },
-    { key: 'reviewer', label: 'Reviewer' },
-  ]
-  const modelOverrides: Partial<
-    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>
-  > = {}
-
-  if (provider === 'claude-code' || provider === 'codex-cli') {
-    const wantsModelCustomization = await p.confirm({
-      message: 'Customize the model per agent?',
-      initialValue: false,
-    })
-    if (p.isCancel(wantsModelCustomization)) {
-      p.cancel('Cancelled.')
-      process.exit(0)
-    }
-
-    if (wantsModelCustomization) {
-      if (provider === 'claude-code') {
-        for (const agent of AGENT_LABELS) {
-          const val = await p.select({
-            message: `Model for ${agent.label}`,
-            options: [
-              { value: 'inherit', label: 'inherit (default)' },
-              { value: 'haiku', label: 'haiku' },
-              { value: 'sonnet', label: 'sonnet' },
-              { value: 'opus', label: 'opus' },
-              { value: 'fable', label: 'fable' },
-            ],
-            initialValue: 'inherit',
-          })
-          if (p.isCancel(val)) {
-            p.cancel('Cancelled.')
-            process.exit(0)
-          }
-          modelOverrides[agent.key] = val as string
-        }
-      } else {
-        // codex-cli: free text. Codex does not validate this value client-side —
-        // leaving it blank or under 3 characters means no override will be written.
-        for (const agent of AGENT_LABELS) {
-          const val = await p.text({
-            message: `Model for ${agent.label} (Codex does not validate this value)`,
-            placeholder: 'e.g. gpt-5 (empty or <3 chars = no override)',
-          })
-          if (p.isCancel(val)) {
-            p.cancel('Cancelled.')
-            process.exit(0)
-          }
-          const trimmed = (val as string).trim()
-          if (trimmed.length >= 3) {
-            modelOverrides[agent.key] = trimmed
-          }
-        }
-      }
-    }
-  }
+  // NOTE: init no longer prompts for a per-agent model. The generated agent
+  // file is user-owned, so the model is set by editing its `model:` frontmatter
+  // line (or `model = "..."` for Codex) directly — that is also where the role
+  // prompt lives, so both per-agent settings are now in one place instead of
+  // being split between the config and the file.
 
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string
@@ -281,7 +220,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   }
 
   // ─── Scaffold ─────────────────────────────────────────────────────────────
-  let configExt: 'ts' | 'mjs' | 'cjs' = 'ts'
+  let configExt: 'json' | 'ts' | 'mjs' | 'cjs' = 'ts'
   const spinner = p.spinner()
   spinner.start('Scaffolding...')
 
@@ -292,7 +231,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       provider,
       docsPath,
       tasksAdapter,
-      models: modelOverrides,
       scope: storageScope,
     })
     const materializer = getMaterializer(provider)
@@ -301,7 +239,14 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
     configExt = detectConfigExtension(cwd)
     const configFileName = `agent-harness-kit.config.${configExt}`
-    const templateFn = configExt === 'ts' ? configTs : configExt === 'mjs' ? configMjs : configCjs
+    const templateFn =
+      configExt === 'json'
+        ? configJson
+        : configExt === 'ts'
+          ? configTs
+          : configExt === 'mjs'
+            ? configMjs
+            : configCjs
     const configContent = templateFn({
       name,
       description,
@@ -309,7 +254,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       docsPath,
       tasksAdapter,
       port: config.tools.mcp.port,
-      models: modelOverrides,
       scope: config.storage.scope,
       projectId: config.storage.projectId,
     })

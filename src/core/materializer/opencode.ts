@@ -3,11 +3,24 @@ import { join, resolve } from 'node:path'
 
 import { detectPackageManager } from './detect-package-manager'
 import { mergeOpencodeJson } from './mcp-merge'
-import { appendGitignore, slugify, writeAgentFile, writeSkills } from './scaffold-utils'
+import { appendGitignore, slugify, writeAgentFiles, writeSkills } from './scaffold-utils'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, featureListJson, HEALTH_SH, translateFrontmatterForOpenCode } from './templates'
 
-import type { Materializer } from './index'
+import type { BuildMaterializerOptions, BuildReport, Materializer } from './index'
+import type { AgentFileEntry } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
+
+/** Agent files this provider owns. Shared by `scaffold()` and `build()`. */
+function opencodeAgentFiles(config: HarnessConfig): AgentFileEntry[] {
+  const projectName = config.project.name
+  return [
+    { relPath: '.opencode/agents/lead.md', content: translateFrontmatterForOpenCode(agentLead({ projectName }), 'lead') },
+    { relPath: '.opencode/agents/explorer.md', content: translateFrontmatterForOpenCode(agentExplorer({ projectName }), 'explorer') },
+    { relPath: '.opencode/agents/consultant.md', content: translateFrontmatterForOpenCode(agentConsultant({ projectName }), 'consultant') },
+    { relPath: '.opencode/agents/builder.md', content: translateFrontmatterForOpenCode(agentBuilder({ projectName }), 'builder') },
+    { relPath: '.opencode/agents/reviewer.md', content: translateFrontmatterForOpenCode(agentReviewer({ projectName }), 'reviewer') },
+  ]
+}
 
 export class OpenCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
@@ -43,15 +56,8 @@ export class OpenCodeMaterializer implements Materializer {
       )
     }
 
-    // .opencode/agents/ — skip files the dev may have customized
-    const projectName = config.project.name
-    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    writeAgentFile(cwd, '.opencode/agents/lead.md', translateFrontmatterForOpenCode(agentLead({ projectName })))
-    writeAgentFile(cwd, '.opencode/agents/explorer.md', translateFrontmatterForOpenCode(agentExplorer({ projectName, allowedPaths })))
-    writeAgentFile(cwd, '.opencode/agents/consultant.md', translateFrontmatterForOpenCode(agentConsultant({ projectName })))
-    writeAgentFile(cwd, '.opencode/agents/builder.md', translateFrontmatterForOpenCode(agentBuilder({ projectName, writablePaths })))
-    writeAgentFile(cwd, '.opencode/agents/reviewer.md', translateFrontmatterForOpenCode(agentReviewer({ projectName })))
+    // .opencode/agents/ — user-owned: create when missing, never overwrite
+    writeAgentFiles(cwd, opencodeAgentFiles(config))
 
     // opencode.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
@@ -61,7 +67,7 @@ export class OpenCodeMaterializer implements Materializer {
     writeSkills(cwd, '.opencode/skills')
   }
 
-  async build(config: HarnessConfig, cwd: string): Promise<void> {
+  async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
     const write = (relPath: string, content: string) => {
       const abs = join(cwd, relPath)
       mkdirSync(resolve(abs, '..'), { recursive: true })
@@ -70,19 +76,17 @@ export class OpenCodeMaterializer implements Materializer {
 
     write('AGENTS.md', agentsMd(config))
 
-    const projectName = config.project.name
-    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    writeAgentFile(cwd, '.opencode/agents/lead.md', translateFrontmatterForOpenCode(agentLead({ projectName })))
-    writeAgentFile(cwd, '.opencode/agents/explorer.md', translateFrontmatterForOpenCode(agentExplorer({ projectName, allowedPaths })))
-    writeAgentFile(cwd, '.opencode/agents/consultant.md', translateFrontmatterForOpenCode(agentConsultant({ projectName })))
-    writeAgentFile(cwd, '.opencode/agents/builder.md', translateFrontmatterForOpenCode(agentBuilder({ projectName, writablePaths })))
-    writeAgentFile(cwd, '.opencode/agents/reviewer.md', translateFrontmatterForOpenCode(agentReviewer({ projectName })))
+    const agents = writeAgentFiles(cwd, opencodeAgentFiles(config), {
+      force: opts.force,
+      backupRoot: join(cwd, config.storage.dir, 'backups'),
+    })
 
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
     mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, detectPackageManager(cwd))
     writeSkills(cwd, '.opencode/skills')
+
+    return { agents }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

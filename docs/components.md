@@ -191,10 +191,23 @@ project: {
 ```
 
 **Agent Definitions**
-Each agent can have custom settings:
-- `instructionsPath`: Path to agent-specific instructions
-- `allowedPaths`: Files/areas explorer is allowed to examine  
-- `writablePaths`: Directories builder is allowed to write to
+
+Agents are not configured from `agent-harness-kit.config.ts` — there is no
+`agents` key. Every per-agent setting lives in the generated agent file itself
+(`.claude/agents/<role>.md`, `.opencode/agents/<role>.md`,
+`.codex/agents/<role>.toml`), which is user-owned:
+
+- **Model**: set the `model:` frontmatter line (`model = "..."` for Codex CLI).
+  Omit it to let the provider apply its default.
+- **Role instructions**: written in the body of the file.
+
+`ahk build` creates these files when missing and never overwrites them.
+`ahk build --force` regenerates them from the packaged templates, discarding
+customisations (a backup is written to `.harness/backups/agents-<timestamp>/`
+first).
+
+Path scoping is not configurable per agent. What a role may not do is enforced
+per-tool in the generated agent files — see `src/core/materializer/agent-restrictions.ts`.
 
 **Storage Settings**
 

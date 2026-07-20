@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 
 import { detectPackageManager } from './detect-package-manager'
 import { mergeCodexConfigToml } from './mcp-merge'
-import { appendGitignore, slugify, writeAgentFile, writeSkills } from './scaffold-utils'
+import { appendGitignore, slugify, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilderToml,
   agentConsultantToml,
@@ -16,8 +16,28 @@ import {
   HEALTH_SH,
 } from './templates'
 
-import type { Materializer } from './index'
+import type { BuildMaterializerOptions, BuildReport, Materializer } from './index'
+import type { AgentFileEntry } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
+
+/** Agent files this provider owns. Shared by `scaffold()` and `build()`.
+ *
+ *  `default.toml` is included deliberately. It is a shim that overrides Codex's
+ *  built-in `default` agent so `lead` runs when no agent is selected, but it is
+ *  still an agent file the user may edit, so it follows the same user-owned
+ *  policy as the five roles: created when missing, regenerated only with
+ *  --force. */
+function codexAgentFiles(config: HarnessConfig): AgentFileEntry[] {
+  const projectName = config.project.name
+  return [
+    { relPath: '.codex/agents/lead.toml', content: agentLeadToml({ projectName }) },
+    { relPath: '.codex/agents/explorer.toml', content: agentExplorerToml({ projectName }) },
+    { relPath: '.codex/agents/consultant.toml', content: agentConsultantToml({ projectName }) },
+    { relPath: '.codex/agents/builder.toml', content: agentBuilderToml({ projectName }) },
+    { relPath: '.codex/agents/reviewer.toml', content: agentReviewerToml({ projectName }) },
+    { relPath: '.codex/agents/default.toml', content: agentLeadAsDefaultToml({ projectName }) },
+  ]
+}
 
 export class CodexCliMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
@@ -53,23 +73,8 @@ export class CodexCliMaterializer implements Materializer {
       )
     }
 
-    // .codex/agents/ — skip files the dev may have customized
-    const projectName = config.project.name
-    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    const leadModel = config.agents.lead.model
-    const explorerModel = config.agents.explorer.model
-    const consultantModel = config.agents.consultant?.model
-    const builderModel = config.agents.builder.model
-    const reviewerModel = config.agents.reviewer.model
-
-    writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName, model: leadModel }))
-    writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths, model: explorerModel }))
-    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName, model: consultantModel }))
-    writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths, model: builderModel }))
-    writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName, model: reviewerModel }))
-    // Override Codex's built-in `default` agent so `lead` runs when no agent is selected
-    writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName, model: leadModel }))
+    // .codex/agents/ — user-owned: create when missing, never overwrite
+    writeAgentFiles(cwd, codexAgentFiles(config))
 
     // .codex/config.toml — MERGE, never overwrite whole file. Detect the
     // project's package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
@@ -79,7 +84,7 @@ export class CodexCliMaterializer implements Materializer {
     writeSkills(cwd, '.agents/skills')
   }
 
-  async build(config: HarnessConfig, cwd: string): Promise<void> {
+  async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
     const write = (relPath: string, content: string) => {
       const abs = join(cwd, relPath)
       mkdirSync(resolve(abs, '..'), { recursive: true })
@@ -88,26 +93,17 @@ export class CodexCliMaterializer implements Materializer {
 
     write('AGENTS.md', agentsMd(config))
 
-    const projectName = config.project.name
-    const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-    const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-    const leadModel = config.agents.lead.model
-    const explorerModel = config.agents.explorer.model
-    const consultantModel = config.agents.consultant?.model
-    const builderModel = config.agents.builder.model
-    const reviewerModel = config.agents.reviewer.model
-
-    writeAgentFile(cwd, '.codex/agents/lead.toml', agentLeadToml({ projectName, model: leadModel }))
-    writeAgentFile(cwd, '.codex/agents/explorer.toml', agentExplorerToml({ projectName, allowedPaths, model: explorerModel }))
-    writeAgentFile(cwd, '.codex/agents/consultant.toml', agentConsultantToml({ projectName, model: consultantModel }))
-    writeAgentFile(cwd, '.codex/agents/builder.toml', agentBuilderToml({ projectName, writablePaths, model: builderModel }))
-    writeAgentFile(cwd, '.codex/agents/reviewer.toml', agentReviewerToml({ projectName, model: reviewerModel }))
-    writeAgentFile(cwd, '.codex/agents/default.toml', agentLeadAsDefaultToml({ projectName, model: leadModel }))
+    const agents = writeAgentFiles(cwd, codexAgentFiles(config), {
+      force: opts.force,
+      backupRoot: join(cwd, config.storage.dir, 'backups'),
+    })
 
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
     mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, detectPackageManager(cwd))
     writeSkills(cwd, '.agents/skills')
+
+    return { agents }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

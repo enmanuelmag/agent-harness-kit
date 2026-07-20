@@ -1,13 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-
-import {
-  MCP_CLAUDE_PERMISSIONS_BUILDER,
-  MCP_CLAUDE_PERMISSIONS_CONSULTANT,
-  MCP_CLAUDE_PERMISSIONS_EXPLORER,
-  MCP_CLAUDE_PERMISSIONS_LEAD,
-  MCP_CLAUDE_PERMISSIONS_REVIEWER,
-} from './materializer/mcp-merge'
 
 import type { HarnessConfig } from '@/types'
 
@@ -15,8 +7,8 @@ export type AgentName = 'lead' | 'explorer' | 'consultant' | 'builder' | 'review
 
 export interface AgentSyncResult {
   ok: boolean
-  missing: string[]
-  extra: string[]
+  /** Only reason an agent can be out of sync now: its definition file is absent. */
+  reason?: 'missing_file'
 }
 
 export interface SyncCheckResult {
@@ -24,50 +16,34 @@ export interface SyncCheckResult {
   agents?: Record<AgentName, AgentSyncResult>
 }
 
-const CANONICAL: Record<AgentName, string[]> = {
-  lead: [...MCP_CLAUDE_PERMISSIONS_LEAD],
-  explorer: [...MCP_CLAUDE_PERMISSIONS_EXPLORER],
-  consultant: [...MCP_CLAUDE_PERMISSIONS_CONSULTANT],
-  builder: [...MCP_CLAUDE_PERMISSIONS_BUILDER],
-  reviewer: [...MCP_CLAUDE_PERMISSIONS_REVIEWER],
-}
+const AGENTS: AgentName[] = ['lead', 'explorer', 'consultant', 'builder', 'reviewer']
 
-function parseToolsFromFrontmatter(content: string): string[] {
-  const match = content.match(/^---\n([\s\S]*?)\n---/m)
-  if (!match) return []
-  const fm = match[1]
-  const toolsMatch = fm.match(/^tools:\n((?:  - [^\n]+\n?)*)/m)
-  if (!toolsMatch) return []
-  return toolsMatch[1]
-    .split('\n')
-    .map((l) => l.trim().replace(/^- /, ''))
-    .filter((l) => l.startsWith('mcp__'))
-}
-
+/**
+ * Verifies that each role's agent definition file exists.
+ *
+ * This used to parse the `tools:` frontmatter block and diff it against a
+ * canonical list of `mcp__agent-harness-kit__*` tools. That premise no longer
+ * holds: agent files intentionally omit `tools` so the agent inherits the full
+ * tool set (including every MCP tool) from the session, and restrictions are
+ * expressed as a `disallowedTools` denylist instead. With no allowlist in the
+ * file, there is nothing to diff — every agent would have reported as missing
+ * all of its tools.
+ *
+ * Agent file contents are user-customisable and are never inspected here.
+ */
 export function checkPermissionsSync(cwd: string, config: HarnessConfig): SyncCheckResult {
   if (config.provider !== 'claude-code') {
     return { in_sync: true }
   }
 
-  const agents: Record<AgentName, AgentSyncResult> = {} as Record<AgentName, AgentSyncResult>
+  const agents = {} as Record<AgentName, AgentSyncResult>
   let in_sync = true
 
-  for (const agent of ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as AgentName[]) {
+  for (const agent of AGENTS) {
     const filePath = join(cwd, '.claude', 'agents', `${agent}.md`)
-    if (!existsSync(filePath)) {
-      const missing = CANONICAL[agent]
-      agents[agent] = { ok: false, missing, extra: [] }
-      in_sync = false
-      continue
-    }
-    const content = readFileSync(filePath, 'utf-8')
-    const installed = parseToolsFromFrontmatter(content)
-    const canonical = CANONICAL[agent]
-    const missing = canonical.filter((t) => !installed.includes(t))
-    const extra = installed.filter((t) => !canonical.includes(t))
-    const ok = missing.length === 0 && extra.length === 0
-    if (!ok) in_sync = false
-    agents[agent] = { ok, missing, extra }
+    const exists = existsSync(filePath)
+    if (!exists) in_sync = false
+    agents[agent] = exists ? { ok: true } : { ok: false, reason: 'missing_file' }
   }
 
   return { in_sync, agents }

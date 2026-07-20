@@ -48,6 +48,11 @@ program
   .description('Regenerate AGENTS.md and provider files from agent-harness-kit.config.ts')
   .option('--watch', 'Rebuild on config changes')
   .option('--sync', 'Sync tools: frontmatter in existing .claude/agents/*.md to match current permission constants')
+  .option(
+    '--force',
+    'Regenerate agent files that already exist, DESTROYING your customizations (a backup is written first). ' +
+      'Without this flag, build only creates agent files that are missing and never modifies existing ones.',
+  )
   .action(async (opts) => {
     await runBuild(cwd, opts)
   })

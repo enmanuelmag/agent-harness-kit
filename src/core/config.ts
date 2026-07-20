@@ -1,15 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createJiti } from 'jiti'
 
 import type { HarnessConfig } from '@/types'
 
+/** Order is precedence: the first file that exists wins. `.json` is appended
+ *  last so adding it cannot change which config an existing project resolves
+ *  to — a project that already has a .ts/.mjs/.cjs config keeps loading it. */
 const CONFIG_NAMES = [
   'agent-harness-kit.config.ts',
   'agent-harness-kit.config',
   'agent-harness-kit.config.mjs',
   'agent-harness-kit.config.cjs',
+  'agent-harness-kit.config.json',
 ]
 
 export function findConfigFile(cwd: string): string | null {
@@ -26,14 +30,40 @@ export async function loadConfig(cwd: string): Promise<HarnessConfig> {
     throw new Error('No agent-harness-kit.config found. Run: ahk init')
   }
 
-  const jiti = createJiti(import.meta.url)
-  const mod = await jiti.import(configPath) as { default?: HarnessConfig } | HarnessConfig
-  const config = (mod as { default?: HarnessConfig }).default ?? (mod as HarnessConfig)
+  let config: HarnessConfig
 
-  if (!config || typeof config !== 'object') {
+  if (configPath.endsWith('.json')) {
+    // Read and parse directly rather than going through jiti: a JSON config is
+    // pure data with no module semantics to interpret, and parsing it here lets
+    // a syntax error name the file and the reason instead of surfacing as an
+    // opaque module-resolution failure.
+    let raw: string
+    try {
+      raw = readFileSync(configPath, 'utf8')
+    } catch (err) {
+      throw new Error(`Could not read ${configPath}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    try {
+      config = JSON.parse(raw) as HarnessConfig
+    } catch (err) {
+      throw new Error(
+        `${configPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  } else {
+    const jiti = createJiti(import.meta.url)
+    const mod = await jiti.import(configPath) as { default?: HarnessConfig } | HarnessConfig
+    config = (mod as { default?: HarnessConfig }).default ?? (mod as HarnessConfig)
+  }
+
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
     throw new Error(`agent-harness-kit.config must export a default HarnessConfig object.`)
   }
 
+  // applyDefaults() runs the same normalizers (normalizeLegacyStorageShape,
+  // normalizeLegacyAgentsKey) for every format — a JSON config carrying a
+  // legacy `agents` key or a contradictory global-scope path is normalized
+  // and warned about exactly like its .ts/.mjs/.cjs counterpart.
   return applyDefaults(config as HarnessConfig)
 }
 
@@ -91,8 +121,52 @@ function normalizeLegacyStorageShape(raw: Record<string, unknown>): Record<strin
   return { ...raw, storage: normalizedStorage, database: normalizedDatabase ?? database }
 }
 
+/** Detects and strips the removed `agents` config key entirely.
+ *
+ *  Supersedes the narrower normalizer that only stripped `allowedPaths` /
+ *  `writablePaths` from `agents.*`: with the whole key gone, per-field
+ *  stripping is subsumed — a config declaring `agents.explorer.allowedPaths`
+ *  loses it because it loses `agents` altogether.
+ *
+ *  Same rationale as `normalizeLegacyStorageShape` above: deleting the key from
+ *  `HarnessConfig` protects authors who type-check their config file, but
+ *  `loadConfig()` imports the config via `jiti.import()`, which strips types
+ *  before evaluation — so an existing config on disk that still declares
+ *  `agents` reaches us untouched. It must not crash; the key is simply dropped.
+ *
+ *  Operates on the RAW untyped input and returns a normalized plain object —
+ *  never crashes, only warns, exactly once, no matter how many roles or fields
+ *  the old config declared. */
+function normalizeLegacyAgentsKey(raw: Record<string, unknown>): Record<string, unknown> {
+  if (!('agents' in raw)) return raw
+
+  const agents = raw.agents
+  const roles =
+    agents && typeof agents === 'object' && !Array.isArray(agents)
+      ? Object.keys(agents as Record<string, unknown>)
+      : []
+
+  const normalized = Object.fromEntries(Object.entries(raw).filter(([k]) => k !== 'agents'))
+
+  console.warn(
+    `[agent-harness-kit] The 'agents' key is set in agent-harness-kit.config.ts` +
+      `${roles.length > 0 ? ` (${roles.map((r) => `agents.${r}`).join(', ')})` : ''} ` +
+      `but no longer has any effect — it has been removed and is ignored. ` +
+      `Per-agent settings now live in the generated agent file itself, which is yours to edit: ` +
+      `set the model on the 'model:' frontmatter line and write role instructions in the body of ` +
+      `.claude/agents/<role>.md (Claude Code), .opencode/agents/<role>.md (OpenCode) or ` +
+      `.codex/agents/<role>.toml (Codex CLI). 'ahk build' creates those files when missing and never ` +
+      `overwrites them; use 'ahk build --force' to regenerate them from the packaged templates. ` +
+      `Remove the 'agents' key from your config. See docs/architecture.md#agent-restrictions.`,
+  )
+
+  return normalized
+}
+
 function applyDefaults(config: HarnessConfig): HarnessConfig {
-  const normalized = normalizeLegacyStorageShape(config as unknown as Record<string, unknown>)
+  const normalized = normalizeLegacyAgentsKey(
+    normalizeLegacyStorageShape(config as unknown as Record<string, unknown>),
+  )
   const c = normalized as Partial<HarnessConfig>
 
   const scope: 'local' | 'global' = c.storage?.scope === 'global' ? 'global' : 'local'
@@ -136,14 +210,6 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
       agentsMd: './AGENTS.md',
       ...c.project,
     } as HarnessConfig['project'],
-    agents: {
-      lead: { instructionsPath: null },
-      explorer: { instructionsPath: null },
-      builder: { instructionsPath: null },
-      reviewer: { instructionsPath: null },
-      custom: [],
-      ...c.agents,
-    } as HarnessConfig['agents'],
     database: c.database ?? { type: 'sqlite' as const },
     storage,
     health: {

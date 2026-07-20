@@ -5,26 +5,9 @@ description: >
   delegate to explorer, builder, and reviewer in sequence, and close the session correctly.
   Invoke when starting a new work session, picking up a pending task, or when another agent
   reports a blocker that requires re-coordination.
-tools:
-  - Read
-  - Bash
-  - Task
-  - mcp__agent-harness-kit__actions_start
-  - mcp__agent-harness-kit__actions_write
-  - mcp__agent-harness-kit__actions_complete
-  - mcp__agent-harness-kit__actions_get
-  - mcp__agent-harness-kit__actions_record_file
-  - mcp__agent-harness-kit__actions_record_tool
-  - mcp__agent-harness-kit__tasks_get
-  - mcp__agent-harness-kit__tasks_claim
-  - mcp__agent-harness-kit__tasks_add
-  - mcp__agent-harness-kit__tasks_update
-  - mcp__agent-harness-kit__tasks_edit
-  - mcp__agent-harness-kit__tasks_archive
-  - mcp__agent-harness-kit__tasks_unarchive
-  - mcp__agent-harness-kit__tasks_acceptance_get
-  - mcp__agent-harness-kit__docs_search
-  - mcp__agent-harness-kit__ahk_doctor
+disallowedTools:
+  - Write
+  - Edit
 ---
 
 # Lead Agent — @cardor/agent-harness-kit
@@ -90,7 +73,10 @@ When in lightweight mode:
 
 ### File creation in lightweight mode
 
-You may only create files in lightweight mode if the user **explicitly** asks to save the output (e.g., "write the triage report to TRIAGE.md"). Even then, do not use the full harness pipeline — just write the file directly.
+Your Write and Edit tools are disabled, so you cannot save output yourself — not even in
+lightweight mode. If the user **explicitly** asks to persist the result (e.g., "write the
+triage report to TRIAGE.md"), delegate that single write to the builder. Do not spin up the
+full harness pipeline for it; hand the builder the exact content and target path.
 
 > **If in lightweight mode: skip Step 1 (Orient) entirely.** No health.sh, no MCP calls.
 

@@ -3,14 +3,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
-  MCP_CLAUDE_PERMISSIONS,
-  MCP_CLAUDE_PERMISSIONS_BUILDER,
-  MCP_CLAUDE_PERMISSIONS_CONSULTANT,
-  MCP_CLAUDE_PERMISSIONS_EXPLORER,
-  MCP_CLAUDE_PERMISSIONS_LEAD,
-  MCP_CLAUDE_PERMISSIONS_REVIEWER,
-} from './mcp-merge'
+  claudeDisallowedTools,
+  codexRestrictionNotice,
+  codexSandboxMode,
+  opencodePermissions,
+} from './agent-restrictions'
 
+import type { AgentName } from './agent-restrictions'
 import type { HarnessConfig } from '@/types'
 
 // ─── Agent template loader ────────────────────────────────────────────────────
@@ -232,18 +231,6 @@ If orchestrating: Agent definition files in .claude/agents/
 
 // ─── agent-harness-kit.config.ts template ───────────────────────────────────────────
 
-export interface AgentModelOverrides {
-  lead?: string
-  explorer?: string
-  consultant?: string
-  builder?: string
-  reviewer?: string
-}
-
-function modelField(model: string | undefined): string {
-  return model ? `, model: ${JSON.stringify(model)}` : ''
-}
-
 interface ConfigTemplateParams {
   name: string
   description: string
@@ -251,7 +238,6 @@ interface ConfigTemplateParams {
   docsPath: string
   tasksAdapter: string
   port: number
-  models?: AgentModelOverrides
   scope: 'local' | 'global'
   projectId: string
 }
@@ -262,7 +248,6 @@ interface ConfigTemplateParams {
  * each variant can control its own import/export shape around it.
  */
 function configObjectBody(params: ConfigTemplateParams): string {
-  const models = params.models ?? {}
   const isGlobal = params.scope === 'global'
 
   // scope='global' — the sqlite file and current.md fallback both live under
@@ -282,13 +267,13 @@ function configObjectBody(params: ConfigTemplateParams): string {
 
   provider: '${params.provider}',
 
-  agents: {
-    lead:     { instructionsPath: null${modelField(models.lead)} },
-    explorer: { instructionsPath: null, allowedPaths: ['${params.docsPath}', './src']${modelField(models.explorer)} },
-    builder:  { instructionsPath: null, writablePaths: ['./src', './tests']${modelField(models.builder)} },
-    reviewer: { instructionsPath: null${modelField(models.reviewer)} },
-    ${models.consultant ? `consultant: { instructionsPath: null${modelField(models.consultant)} },\n    ` : ''}custom:   [],
-  },
+  // There is no 'agents' key. Agent files are yours: edit the role prompt and
+  // the 'model:' frontmatter line directly in the generated file. 'ahk build'
+  // creates them when missing and never overwrites them — use
+  // 'ahk build --force' to regenerate them from the packaged templates.
+  // What each role may NOT do is enforced per-tool inside those files
+  // (disallowedTools / permission.edit / sandbox_mode); see
+  // src/core/materializer/agent-restrictions.ts.
 
   // SQLite (default). Switch to postgres/mysql by changing database.type.
   // database: { type: 'postgres', connectionString: process.env.DATABASE_URL },
@@ -323,6 +308,81 @@ function configObjectBody(params: ConfigTemplateParams): string {
   },
 `
 }
+
+/**
+ * Structural twin of `configObjectBody()` above, as a real object instead of a
+ * source string. `configObjectBody` has to stay a hand-formatted string because
+ * its explanatory comments are part of what makes the generated .ts/.mjs/.cjs
+ * config readable — JSON has no comments, so the JSON variant cannot reuse it.
+ *
+ * The two are therefore maintained in parallel, and the drift that invites is
+ * pinned by a test asserting that the parsed .ts body and this object are
+ * deep-equal. Any field added to one and not the other fails that test.
+ *
+ * Deliberately contains no `$schema` key: no JSON Schema for HarnessConfig is
+ * published or shipped with the package today, and pointing at a URL that does
+ * not resolve would trade a type error for a fetch error.
+ */
+function configObject(params: ConfigTemplateParams): Record<string, unknown> {
+  const isGlobal = params.scope === 'global'
+
+  return {
+    project: {
+      name: params.name,
+      description: params.description,
+      docsPath: params.docsPath,
+    },
+    provider: params.provider,
+    // There is no 'agents' key here either — it was removed from the config
+    // entirely, so the JSON variant must not reintroduce it.
+    database: { type: 'sqlite' },
+    storage: {
+      dir: '.harness',
+      tasks: { adapter: params.tasksAdapter },
+      sections: {
+        toolsUsed: true,
+        filesModified: true,
+        result: true,
+        blockers: true,
+        nextSteps: false,
+      },
+      // Same scope rule as configObjectBody(): 'global' has no local path to
+      // declare, so markdownFallback.path is omitted for it.
+      markdownFallback: isGlobal ? { enabled: true } : { enabled: true, path: '.harness/current.md' },
+      scope: params.scope,
+      projectId: params.projectId,
+    },
+    health: {
+      scriptPath: './health.sh',
+      required: true,
+    },
+    tools: {
+      mcp: { enabled: true, port: params.port },
+      scripts: { enabled: true, outputDir: './.harness/scripts' },
+    },
+  }
+}
+
+/**
+ * JSON config: emitted when the package is NOT installed locally in the project
+ * (see detectConfigExtension). Plain data — no import, no type annotation, no
+ * reference to '@cardor/agent-harness-kit' of any kind — so an editor and a
+ * `tsc --noEmit` have nothing to resolve and report zero errors. That is the
+ * whole point of this variant: the .ts template's `import type` is erased at
+ * runtime, but it still red-underlines in an editor that cannot resolve the
+ * package.
+ *
+ * Cost of the trade: no autocompletion. JSON.stringify handles all quoting and
+ * escaping, so descriptions containing quotes or apostrophes are safe by
+ * construction rather than by careful template authoring.
+ */
+export function configJson(params: ConfigTemplateParams): string {
+  return JSON.stringify(configObject(params), null, 2) + '\n'
+}
+
+/** Exported for the drift test that compares this shape against the parsed
+ *  .ts/.mjs/.cjs config body. Not part of the public API. */
+export const __configObjectForTests = configObject
 
 /**
  * TypeScript config: uses `import type` (type-only, erased at compile time)
@@ -375,11 +435,11 @@ export function agentLead(vars: { projectName: string }): string {
   return loadAgentTemplate('lead', vars)
 }
 
-export function agentExplorer(vars: { projectName: string; allowedPaths: string }): string {
+export function agentExplorer(vars: { projectName: string }): string {
   return loadAgentTemplate('explorer', vars)
 }
 
-export function agentBuilder(vars: { projectName: string; writablePaths: string }): string {
+export function agentBuilder(vars: { projectName: string }): string {
   return loadAgentTemplate('builder', vars)
 }
 
@@ -392,8 +452,13 @@ export function agentReviewer(vars: { projectName: string }): string {
 }
 
 // Note: agentLead/agentExplorer/agentConsultant/agentBuilder/agentReviewer above produce the
-// raw markdown template (frontmatter without `model:`). The `model:` line is injected downstream
-// by translateFrontmatterForClaudeCode() (Claude Code) — never injected for OpenCode.
+// raw markdown template (frontmatter without `model:` and without any permission fields).
+// No `model:` line is ever injected, by any provider: the per-agent `model` config was removed
+// along with the whole `agents` key, and the generated agent file is user-owned, so the model is
+// set by editing the file's frontmatter directly. Each provider applies its own default when no
+// model line is present. Permission/restriction fields ARE added downstream by each provider's
+// translator, driven by AGENT_RESTRICTIONS in ./agent-restrictions.ts, which is the single source
+// of truth for what a role may not do.
 
 // ─── feature_list.json initial seed ──────────────────────────────────────────
 
@@ -430,133 +495,153 @@ function stripFrontmatter(md: string): { description: string; body: string } {
 }
 
 /**
- * Codex CLI does not validate the `model` value client-side (free text, resolved
- * at invocation time). Per explicit product rule: if the value is null/undefined/
- * empty, or its trimmed length is < 3 chars, omit the `model` line entirely —
- * never emit a placeholder or an 'inherit'-like value.
+ * No `model` line is emitted. The generated file is user-owned, so the model is
+ * set by editing `model = "..."` directly in `.codex/agents/<role>.toml`;
+ * omitting it here lets Codex apply its own default, which is what the old
+ * 'inherit' option meant.
  */
 function toCodexToml(
-  name: string,
+  tomlName: string,
+  agentName: AgentName,
   description: string,
-  body: string,
-  sandboxMode: 'workspace-write' | 'read-only',
-  model?: string
+  body: string
 ): string {
   // TOML multiline basic strings end at `"""` — escape any that appear in content
   const safe = (s: string) => s.replace(/"""/g, '""\\u0022')
-  const trimmedModel = model?.trim() ?? ''
-  const modelLine = trimmedModel.length >= 3 ? `model = "${trimmedModel}"\n` : ''
-  return `name = "${name}"
+
+  // Codex has no per-agent tool denylist; sandbox_mode is the only real
+  // mechanism. Because write tools stay visible to the model regardless, the
+  // same restriction is restated in prose inside developer_instructions.
+  const sandboxMode = codexSandboxMode(agentName)
+  const notice = codexRestrictionNotice(agentName)
+  const instructions = notice ? `${body.trimEnd()}\n\n---\n\n${notice}` : body.trimEnd()
+
+  return `name = "${tomlName}"
 sandbox_mode = "${sandboxMode}"
-${modelLine}
+
 description = """
 ${safe(description)}
 """
 
 developer_instructions = """
-${safe(body.trimEnd())}
+${safe(instructions)}
 """
 `
 }
 
-export function agentLeadToml(vars: { projectName: string; model?: string }): string {
+export function agentLeadToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  return toCodexToml('lead', description, body, 'read-only', vars.model)
+  return toCodexToml('lead', 'lead', description, body)
 }
 
-export function agentLeadAsDefaultToml(vars: { projectName: string; model?: string }): string {
+export function agentLeadAsDefaultToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  return toCodexToml('default', description, body, 'read-only', vars.model)
+  return toCodexToml('default', 'lead', description, body)
 }
 
-export function agentExplorerToml(vars: { projectName: string; allowedPaths: string; model?: string }): string {
+export function agentExplorerToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('explorer', vars))
-  return toCodexToml('explorer', description, body, 'read-only', vars.model)
+  return toCodexToml('explorer', 'explorer', description, body)
 }
 
-export function agentBuilderToml(vars: { projectName: string; writablePaths: string; model?: string }): string {
+export function agentBuilderToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('builder', vars))
-  return toCodexToml('builder', description, body, 'workspace-write', vars.model)
+  return toCodexToml('builder', 'builder', description, body)
 }
 
-export function agentReviewerToml(vars: { projectName: string; model?: string }): string {
+export function agentReviewerToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('reviewer', vars))
-  return toCodexToml('reviewer', description, body, 'read-only', vars.model)
+  return toCodexToml('reviewer', 'reviewer', description, body)
 }
 
-export function agentConsultantToml(vars: { projectName: string; model?: string }): string {
+export function agentConsultantToml(vars: { projectName: string }): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('consultant', vars))
-  return toCodexToml('consultant', description, body, 'read-only', vars.model)
+  return toCodexToml('consultant', 'consultant', description, body)
 }
 
 // ─── Claude Code frontmatter translation ─────────────────────────────────────
 
 /**
- * Takes a template markdown string (with simple tools list) and injects
- * `Task` + the agent-specific `mcp__agent-harness-kit__*` tools into the
- * frontmatter `tools:` section for Claude Code.
- *
- * Inserts `Task` after the last non-mcp tool entry, then appends mcp tools.
+ * Removes a `tools:` (or `disallowedTools:`) YAML block sequence from the
+ * frontmatter, if present. Used to normalise a template before re-emitting the
+ * provider-native permission shape, so translation stays idempotent even when
+ * fed already-translated content.
  */
-export function translateFrontmatterForClaudeCode(
-  md: string,
-  agentName: 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer',
-  model?: string
-): string {
-  const permissionsMap: Record<string, string[]> = {
-    lead: [...MCP_CLAUDE_PERMISSIONS_LEAD],
-    explorer: [...MCP_CLAUDE_PERMISSIONS_EXPLORER],
-    consultant: [...MCP_CLAUDE_PERMISSIONS_CONSULTANT],
-    builder: [...MCP_CLAUDE_PERMISSIONS_BUILDER],
-    reviewer: [...MCP_CLAUDE_PERMISSIONS_REVIEWER],
-  }
-  const permissions = permissionsMap[agentName] ?? MCP_CLAUDE_PERMISSIONS
-  const mcpLines = permissions.map((t) => `  - ${t}`).join('\n')
-
-  // Find the tools: block in frontmatter and append Task + mcp tools after last tool entry
-  // We look for the pattern: a line with `  - SomeTool` followed by either `---` or a non-tool line
-  let result = md.replace(/(tools:\n(?:  - (?!mcp__)[^\n]+\n)+)/, (match) => {
-    const trimmed = match.trimEnd()
-    return `${trimmed}\n  - Task\n${mcpLines}\n`
-  })
-
-  // Inject a `model:` frontmatter line, independent of the tools: regex above.
-  // Placed right after `name: <agentName>` — matches the shape used when a model
-  // is manually configured today. No model configured → leave frontmatter untouched.
-  if (model) {
-    result = injectModelFrontmatterLine(result, model)
-  }
-
-  return result
+function stripFrontmatterBlockSequence(md: string, key: string): string {
+  const re = new RegExp(`^${key}:\\n(?:  - [^\\n]+\\n)+`, 'm')
+  return md.replace(re, '')
 }
 
 /**
- * Inserts (or replaces) a `model: <value>` line right after the `name:` line
- * in a template's YAML frontmatter. Never touches the `tools:` block.
+ * Appends a YAML block sequence (one `  - value` per line) to the end of the
+ * frontmatter, just before its closing `---`. Block sequence — not the inline
+ * comma form shown in some upstream docs — for consistency with the rest of the
+ * agent files in this repo.
  */
-function injectModelFrontmatterLine(md: string, model: string): string {
-  // Replace an existing `model:` line if present (idempotent re-generation)...
-  if (/^model:\s*.*$/m.test(md)) {
-    return md.replace(/^model:\s*.*$/m, `model: ${model}`)
-  }
-  // ...otherwise insert a new `model:` line right after `name:`.
-  return md.replace(/^(name:.*)$/m, `$1\nmodel: ${model}`)
+function appendFrontmatterBlockSequence(md: string, key: string, values: string[]): string {
+  if (values.length === 0) return md
+  const block = `${key}:\n${values.map((v) => `  - ${v}`).join('\n')}\n`
+  return md.replace(/^---\n([\s\S]*?)^---\n/m, (_m, body: string) => `---\n${body}${block}---\n`)
+}
+
+/**
+ * Appends a nested YAML mapping (e.g. `permission:\n  edit: deny`) to the end of
+ * the frontmatter, just before its closing `---`.
+ */
+function appendFrontmatterMapping(md: string, key: string, entries: Record<string, string>): string {
+  const keys = Object.keys(entries)
+  if (keys.length === 0) return md
+  const block = `${key}:\n${keys.map((k) => `  ${k}: ${entries[k]}`).join('\n')}\n`
+  return md.replace(/^---\n([\s\S]*?)^---\n/m, (_m, body: string) => `---\n${body}${block}---\n`)
+}
+
+/**
+ * Translates a template's frontmatter into the Claude Code agent shape.
+ *
+ * `tools` is deliberately OMITTED: a Claude Code sub-agent with no `tools` key
+ * inherits the full tool set, which includes `Task` and every `mcp__*` tool from
+ * the connected servers. That inheritance replaces the explicit Task + MCP tool
+ * injection this function used to perform — enumerating them was both redundant
+ * and the reason `ahk doctor` reported hand-edited agent files as "outdated".
+ *
+ * Restrictions are expressed as a denylist via `disallowedTools`, which Claude
+ * Code applies before `tools`.
+ *
+ * No `model:` line is emitted either. The generated file is user-owned, so the
+ * model is set by editing the frontmatter directly; with no line emitted,
+ * Claude Code applies its own default — the behaviour the old 'inherit' option
+ * described.
+ */
+export function translateFrontmatterForClaudeCode(
+  md: string,
+  agentName: AgentName
+): string {
+  let result = stripFrontmatterBlockSequence(md, 'tools')
+  result = stripFrontmatterBlockSequence(result, 'disallowedTools')
+  return appendFrontmatterBlockSequence(result, 'disallowedTools', claudeDisallowedTools(agentName))
 }
 
 // ─── OpenCode frontmatter translation ────────────────────────────────────────
 
 /**
- * Converts the `tools:` YAML list in a template's frontmatter to the
- * dictionary format expected by OpenCode (e.g. `read: true`, `bash: true`).
+ * Translates a template's frontmatter into the OpenCode agent shape.
  *
- * Only transforms the tools: block — all other frontmatter fields and
- * body content are left exactly as-is.
+ * The `tools: { read: true, ... }` dict this function used to emit is
+ * deprecated upstream in favour of `permission`, so no `tools` key is written
+ * at all — the agent inherits the default tool set. Restrictions are expressed
+ * as `permission` entries with `allow | ask | deny` values.
+ *
+ * Only ONE key is emitted for the no-write case: OpenCode has no separate
+ * `write` permission — `edit` already covers write/patch/edit.
+ *
+ * Note on MCP tools: under OpenCode they are named `<server>_<tool>` with no
+ * `mcp__` prefix, so Claude Code patterns must never be ported here verbatim.
+ * Nothing in the current restriction set targets MCP tools, so none are emitted.
  */
-export function translateFrontmatterForOpenCode(md: string): string {
-  return md.replace(/(tools:\n(?:  - [^\n]+\n)+)/, (match) => {
-    const tools = [...match.matchAll(/  - ([^\n]+)/g)].map((m) => m[1].trim())
-    return 'tools:\n' + tools.map((t) => `  ${t.toLocaleLowerCase()}: true`).join('\n') + '\n'
-  })
+export function translateFrontmatterForOpenCode(md: string, agentName: AgentName): string {
+  let result = stripFrontmatterBlockSequence(md, 'tools')
+  result = stripFrontmatterBlockSequence(result, 'disallowedTools')
+  return appendFrontmatterMapping(result, 'permission', opencodePermissions(agentName))
 }
 
 // ─── .gitignore additions ─────────────────────────────────────────────────────

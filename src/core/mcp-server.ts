@@ -276,7 +276,7 @@ const TOOLS = [
   {
     name: 'permissions.check',
     description:
-      'Check whether the .claude/agents/*.md tool permission lists are in sync with the current canonical permission constants. Returns per-agent diff with missing and extra tools. Call this at session start to detect outdated agent files after an ahk upgrade.',
+      'Check that a .claude/agents/*.md definition file exists for every role. Returns { in_sync, agents } where each agent is { ok } or { ok: false, reason: "missing_file" }. Agent file CONTENTS are never inspected — they are meant to be customised freely — so this never reports drift, only absence. Run `ahk build` to restore a missing file.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -580,9 +580,10 @@ async function dispatch(
       const status = await getDoctorStatus(cwd)
       const result = {
         lib: { current: status.lib.current, latest: status.lib.latest, outdated: status.lib.outdated },
+        // Agents are existence-checked only — there is no `outdated` bucket.
+        // Hand-edited agent definitions are supported and must not be flagged.
         agents: {
           missing: status.agents.filter((a) => a.status === 'missing').map((a) => a.name),
-          outdated: status.agents.filter((a) => a.status === 'outdated').map((a) => a.name),
           ok: status.agents.filter((a) => a.status === 'ok').map((a) => a.name),
         },
         skills: {

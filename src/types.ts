@@ -11,29 +11,30 @@ export interface ProjectConfig {
   agentsMd?: string | null
 }
 
-export interface AgentConfig {
-  instructionsPath: string | null
-  context?: string
-  allowedPaths?: string[]
-  writablePaths?: string[]
-  model?: string
-}
-
-export interface CustomAgentConfig {
-  name: string
-  instructionsPath: string
-}
-
-export interface AgentsConfig {
-  lead: AgentConfig
-  explorer: AgentConfig
-  builder: AgentConfig
-  reviewer: AgentConfig
-  /** Optional — the consultant agent has no dedicated config entry elsewhere;
-   *  this exists primarily to carry a per-agent `model` override. */
-  consultant?: AgentConfig
-  custom?: CustomAgentConfig[]
-}
+/* NOTE: the whole `agents` config key was removed, along with the
+ * `AgentConfig` / `AgentsConfig` / `CustomAgentConfig` types (which were also
+ * part of the public API — see src/index.ts). It configured four things and
+ * delivered none of them:
+ *
+ *   - `allowedPaths` / `writablePaths` — prompt text only, never enforced by
+ *     any provider (removed earlier; see git history).
+ *   - `instructionsPath` and `context`  — written by the config generator but
+ *     never read by anything.
+ *   - `custom`                          — emitted as `[]` and never consumed.
+ *   - `model`                           — the only field with an effect, and it
+ *     is redundant: the generated agent file is now user-owned, so the `model:`
+ *     line is edited directly in `.claude/agents/<role>.md` (or the provider's
+ *     equivalent), which is where every other per-agent setting already lives.
+ *
+ * What a role may NOT do is enforced per-tool by AGENT_RESTRICTIONS
+ * (src/core/materializer/agent-restrictions.ts), which each provider translates
+ * natively (Claude Code `disallowedTools`, OpenCode `permission.edit`, Codex
+ * `sandbox_mode`). Configs on disk that still declare `agents` are accepted,
+ * ignored, and warned about — see `normalizeLegacyAgentsKey()` in
+ * src/core/config.ts.
+ *
+ * Do NOT confuse this with the `AgentName` type below — that is the agent
+ * identifier used by the DB and MCP layers, and it is unaffected. */
 
 export type TasksAdapter = 'local' | 'jira' | 'linear' | 'mcp'
 
@@ -126,7 +127,6 @@ export interface ToolsConfig {
 export interface HarnessConfig {
   project: ProjectConfig
   provider: Provider
-  agents: AgentsConfig
   storage: StorageConfig
   database: DatabaseConfig
   health: HealthConfig

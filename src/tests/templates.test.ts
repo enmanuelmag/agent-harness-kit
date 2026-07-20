@@ -8,9 +8,15 @@ import { getDoctorStatus } from '@/core/doctor'
 import { getMaterializer } from '@/core/materializer/index'
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
+  __configObjectForTests,
   agentBuilderToml,
+  agentConsultantToml,
   agentExplorerToml,
+  agentLeadAsDefaultToml,
+  agentLeadToml,
+  agentReviewerToml,
   configCjs,
+  configJson,
   configMjs,
   configTs,
   featureListJson,
@@ -234,26 +240,42 @@ describe('featureListJson', () => {
   })
 })
 
-describe('translateFrontmatterForOpenCode', () => {
-  test('converts tools list to dict format', () => {
-    const input = `---\nname: lead\ntools:\n  - Read\n  - Bash\n---\n\n# Body\n`
-    const result = translateFrontmatterForOpenCode(input)
-    assert.ok(result.includes('tools:\n  read: true\n  bash: true\n'), `Expected dict format, got:\n${result}`)
-    assert.ok(!result.includes('- Read'), 'Should not contain list format')
+describe('translateFrontmatterForOpenCode — permission translation', () => {
+  test('restricted role emits permission: { edit: deny } and no tools key', () => {
+    const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body\n`
+    const result = translateFrontmatterForOpenCode(input, 'explorer')
+    assert.match(result, /^permission:\n  edit: deny$/m)
+    assert.doesNotMatch(result, /^tools:/m)
   })
 
-  test('converts all four builder tools', () => {
-    const input = `---\nname: builder\ntools:\n  - Read\n  - Write\n  - Edit\n  - Bash\n---\n\n# Body\n`
-    const result = translateFrontmatterForOpenCode(input)
-    assert.ok(result.includes('  read: true'))
-    assert.ok(result.includes('  write: true'))
-    assert.ok(result.includes('  edit: true'))
-    assert.ok(result.includes('  bash: true'))
+  test('emits ONLY edit — OpenCode has no separate write permission', () => {
+    const result = translateFrontmatterForOpenCode(`---\nname: lead\n---\n\n# Body\n`, 'lead')
+    assert.doesNotMatch(result, /^\s+write:/m)
+    assert.doesNotMatch(result, /^\s+patch:/m)
+    assert.equal(result.match(/^\s+\w+: deny$/gm)?.length, 1)
+  })
+
+  test('builder (unrestricted) emits no permission block at all', () => {
+    const result = translateFrontmatterForOpenCode(`---\nname: builder\n---\n\n# Body\n`, 'builder')
+    assert.doesNotMatch(result, /^permission:/m)
+    assert.doesNotMatch(result, /^tools:/m)
+  })
+
+  test('never emits the deprecated tools dict, even when input still carries a tools list', () => {
+    const input = `---\nname: explorer\ntools:\n  - Read\n  - Bash\n---\n\n# Body\n`
+    const result = translateFrontmatterForOpenCode(input, 'explorer')
+    assert.doesNotMatch(result, /^tools:/m)
+    assert.ok(!result.includes('read: true'), 'deprecated tools dict must not be emitted')
+  })
+
+  test('never emits Claude Code style mcp__ patterns (OpenCode uses <server>_<tool>)', () => {
+    const result = translateFrontmatterForOpenCode(`---\nname: reviewer\n---\n\n# Body\n`, 'reviewer')
+    assert.doesNotMatch(result, /mcp__/)
   })
 
   test('leaves other frontmatter fields and body unchanged', () => {
-    const input = `---\nname: explorer\ndescription: some desc\ntools:\n  - Read\n---\n\n# Body content\n`
-    const result = translateFrontmatterForOpenCode(input)
+    const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body content\n`
+    const result = translateFrontmatterForOpenCode(input, 'explorer')
     assert.ok(result.includes('name: explorer'))
     assert.ok(result.includes('description: some desc'))
     assert.ok(result.includes('# Body content'))
@@ -448,63 +470,393 @@ describe('configCjs', () => {
   })
 })
 
-// ─── agent-model-personalization (task 43) ────────────────────────────────────
+// ─── configJson (task #61) ───────────────────────────────────────────────────
+//
+// Emitted when the package is not installed locally. Coverage mirrors configTs
+// and configCjs — quote/apostrophe escaping, scope-conditional storage, no
+// database.path — plus what is specific to this variant: nothing referencing
+// the package, and a shape identical to its JS twins.
 
-describe('agent*Toml — model field emission', () => {
-  test('omits model line for undefined model', () => {
-    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src' })
-    assert.doesNotMatch(out, /model = /)
+describe('configJson', () => {
+  const base = {
+    name: 'my-app',
+    description: 'placeholder',
+    provider: 'claude-code',
+    docsPath: './docs',
+    tasksAdapter: 'local',
+    port: 3742,
+    scope: 'local' as const,
+    projectId: 'test-project-id',
+  }
+
+  const parse = (out: string): Record<string, Record<string, unknown>> =>
+    JSON.parse(out) as Record<string, Record<string, unknown>>
+
+  test('emits valid, parseable JSON', () => {
+    assert.doesNotThrow(() => parse(configJson(base)))
   })
 
-  test('omits model line for empty string model', () => {
-    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src', model: '' })
-    assert.doesNotMatch(out, /model = /)
+  test('description with apostrophe round-trips intact', () => {
+    const desc = "it's a playground"
+    assert.equal(parse(configJson({ ...base, description: desc })).project.description, desc)
   })
 
-  test('omits model line for whitespace-only model', () => {
-    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src', model: '   ' })
-    assert.doesNotMatch(out, /model = /)
+  test('description with double quotes round-trips intact', () => {
+    const desc = 'a "test" project'
+    assert.equal(parse(configJson({ ...base, description: desc })).project.description, desc)
   })
 
-  test('omits model line for a 2-char model (below the 3-char minimum)', () => {
-    const out = agentExplorerToml({ projectName: 'demo', allowedPaths: './src', model: 'ab' })
-    assert.doesNotMatch(out, /model = /)
+  test('description with both apostrophe and double quotes round-trips intact', () => {
+    const desc = `it's a "test" project`
+    assert.equal(parse(configJson({ ...base, description: desc })).project.description, desc)
   })
 
-  test('includes model line for a valid (>=3 char) model', () => {
-    const out = agentBuilderToml({ projectName: 'demo', writablePaths: './src', model: 'gpt-5' })
-    assert.match(out, /model = "gpt-5"/)
+  test('description with a backslash and a newline round-trips intact', () => {
+    // Free via JSON.stringify, but pinned because these are exactly the
+    // characters a hand-rolled string template gets wrong.
+    const desc = 'path C:\\tmp\nsecond line'
+    assert.equal(parse(configJson({ ...base, description: desc })).project.description, desc)
   })
 
-  test('trims the model value before emitting', () => {
-    const out = agentBuilderToml({ projectName: 'demo', writablePaths: './src', model: '  haiku  ' })
-    assert.match(out, /model = "haiku"/)
-    assert.doesNotMatch(out, /model = "  haiku  "/)
+  test('emits scope and projectId explicitly in the storage section', () => {
+    const cfg = parse(configJson({ ...base, scope: 'global', projectId: 'abc-123' }))
+    assert.equal(cfg.storage.scope, 'global')
+    assert.equal(cfg.storage.projectId, 'abc-123')
+  })
+
+  test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
+    const cfg = parse(configJson({ ...base, scope: 'local' }))
+    assert.deepEqual(cfg.storage.markdownFallback, { enabled: true, path: '.harness/current.md' })
+  })
+
+  test('scope=global omits markdownFallback.path (GlobalStorageConfig shape)', () => {
+    const cfg = parse(configJson({ ...base, scope: 'global' }))
+    assert.deepEqual(cfg.storage.markdownFallback, { enabled: true })
+    assert.ok(!('path' in (cfg.storage.markdownFallback as Record<string, unknown>)))
+  })
+
+  test('never emits database.path, regardless of scope', () => {
+    for (const scope of ['local', 'global'] as const) {
+      const cfg = parse(configJson({ ...base, scope }))
+      assert.deepEqual(cfg.database, { type: 'sqlite' })
+      assert.ok(!('path' in cfg.database))
+    }
+  })
+
+  test('never emits storage.sqlitePath, regardless of scope', () => {
+    for (const scope of ['local', 'global'] as const) {
+      assert.ok(!('sqlitePath' in parse(configJson({ ...base, scope })).storage))
+    }
+  })
+
+  test('has no agents key', () => {
+    // Task 60 removed the key; the newest generator must not reintroduce it,
+    // or every JSON-config user would immediately trip the legacy warning in
+    // normalizeLegacyAgentsKey().
+    assert.ok(!('agents' in parse(configJson(base))))
+  })
+
+  test('contains no import and no reference to the package — the point of the format', () => {
+    const out = configJson(base)
+    assert.doesNotMatch(out, /@cardor\/agent-harness-kit/)
+    assert.doesNotMatch(out, /\bimport\b/)
+    assert.doesNotMatch(out, /HarnessConfig/)
+    assert.doesNotMatch(out, /defineHarness/)
+  })
+
+  test('emits no $schema key (no schema is published or shipped today)', () => {
+    // A $schema pointing at a URL that does not resolve trades a type error
+    // for a fetch error. Flip this test when a schema is actually published.
+    assert.ok(!('$schema' in parse(configJson(base))))
+  })
+
+  test('produces the same shape as the .ts config for both scopes', () => {
+    // The anti-drift guard: configObjectBody() (a hand-formatted string, so it
+    // can carry comments) and configObject() (real data for JSON) are
+    // maintained in parallel. A field added to one and not the other fails here.
+    function evalTsConfig(out: string): Record<string, unknown> {
+      const src =
+        out
+          .replace(/^import .+$/gm, '//$&')
+          .replace(/^const config: HarnessConfig = /m, 'const config = ')
+          .replace(/^export default .+$/m, '') + '\nreturn config'
+      return new Function(src)() as Record<string, unknown>
+    }
+    for (const scope of ['local', 'global'] as const) {
+      const params = { ...base, scope }
+      assert.deepEqual(
+        JSON.parse(configJson(params)),
+        evalTsConfig(configTs(params)),
+        `JSON and TS config shapes diverged for scope=${scope}`,
+      )
+    }
+  })
+
+  test('configObject matches the emitted JSON exactly', () => {
+    assert.deepEqual(JSON.parse(configJson(base)), __configObjectForTests(base))
+  })
+
+  test('ends with a trailing newline', () => {
+    assert.ok(configJson(base).endsWith('\n'))
   })
 })
 
-describe('translateFrontmatterForClaudeCode — model injection', () => {
-  const input = `---\nname: explorer\ndescription: some desc\ntools:\n  - Read\n  - Bash\n---\n\n# Body content\n`
+describe('configJson — loaded by loadConfig()', () => {
+  test('loadConfig() reads a generated .json config with no node_modules present', async () => {
+    const dir = join(TMP, 'json-config-load')
+    mkdirSync(dir, { recursive: true })
+    try {
+      const out = configJson({
+        name: 'my-app',
+        description: "it's a \"quoted\" app",
+        provider: 'claude-code',
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        port: 3742,
+        scope: 'local',
+        projectId: 'test-project-id',
+      })
+      writeFileSync(join(dir, 'agent-harness-kit.config.json'), out, 'utf8')
+      const { loadConfig } = await import('@/core/config')
+      const config = await loadConfig(dir)
+      assert.equal(config.project.name, 'my-app')
+      assert.equal(config.project.description, 'it\'s a "quoted" app')
+      assert.equal(config.storage.scope, 'local')
+      assert.equal(config.storage.projectId, 'test-project-id')
+      // Defaults still applied for a JSON config, same as any other format.
+      assert.equal(config.project.agentsMd, './AGENTS.md')
+      assert.equal(config.tools.mcp.port, 3742)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
-  test('no model configured → no model: line, output unchanged aside from tools block', () => {
+  test('legacy normalizers apply to a JSON config exactly as to a .ts one', async () => {
+    const dir = join(TMP, 'json-config-legacy')
+    mkdirSync(dir, { recursive: true })
+    try {
+      // Hand-written JSON carrying both removed/contradictory shapes: the
+      // `agents` key (removed in task 60) and global scope alongside
+      // now-meaningless local-only paths. Must load, not crash, and be stripped.
+      writeFileSync(
+        join(dir, 'agent-harness-kit.config.json'),
+        JSON.stringify({
+          project: { name: 'legacy-json', description: 'legacy shape' },
+          agents: { explorer: { model: 'opus', allowedPaths: ['src/'] } },
+          database: { type: 'sqlite', path: '.harness/harness.db' },
+          storage: {
+            scope: 'global',
+            projectId: 'legacy-id',
+            sqlitePath: '.harness/harness.db',
+            markdownFallback: { enabled: true, path: '.harness/current.md' },
+          },
+        }),
+        'utf8',
+      )
+      const { loadConfig } = await import('@/core/config')
+      const config = await loadConfig(dir)
+      assert.equal(config.project.name, 'legacy-json')
+      assert.ok(!('agents' in config), 'the removed agents key must be stripped')
+      // Double cast: the typed unions (DatabaseConfig, StorageConfig) do not
+      // declare the legacy fields at all, which is exactly why they have to be
+      // asserted as absent at runtime on the untyped shape.
+      assert.ok(!('path' in (config.database as unknown as Record<string, unknown>)))
+      assert.ok(!('sqlitePath' in (config.storage as unknown as Record<string, unknown>)))
+      assert.ok(!('path' in (config.storage.markdownFallback as unknown as Record<string, unknown>)))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a malformed .json config fails with a message naming the file', async () => {
+    const dir = join(TMP, 'json-config-malformed')
+    mkdirSync(dir, { recursive: true })
+    try {
+      writeFileSync(join(dir, 'agent-harness-kit.config.json'), '{ "project": ', 'utf8')
+      const { loadConfig } = await import('@/core/config')
+      await assert.rejects(() => loadConfig(dir), /agent-harness-kit\.config\.json is not valid JSON/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('an existing config of another extension keeps precedence over a .json one', async () => {
+    // The format choice must never silently convert an initialized project
+    // just because its local-install state changed. `ahk init` bails out when
+    // any config exists, and findConfigFile keeps resolving the original.
+    const dir = join(TMP, 'json-config-precedence')
+    mkdirSync(dir, { recursive: true })
+    try {
+      writeFileSync(
+        join(dir, 'agent-harness-kit.config.mjs'),
+        configMjs({
+          name: 'the-mjs-one',
+          description: 'pre-existing',
+          provider: 'claude-code',
+          docsPath: './docs',
+          tasksAdapter: 'local',
+          port: 3742,
+          scope: 'local',
+          projectId: 'mjs-id',
+        }),
+        'utf8',
+      )
+      writeFileSync(
+        join(dir, 'agent-harness-kit.config.json'),
+        configJson({
+          name: 'the-json-one',
+          description: 'newcomer',
+          provider: 'claude-code',
+          docsPath: './docs',
+          tasksAdapter: 'local',
+          port: 3742,
+          scope: 'local',
+          projectId: 'json-id',
+        }),
+        'utf8',
+      )
+      const { findConfigFile, loadConfig } = await import('@/core/config')
+      assert.match(findConfigFile(dir) ?? '', /agent-harness-kit\.config\.mjs$/)
+      const config = await loadConfig(dir)
+      assert.equal(config.project.name, 'the-mjs-one')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ─── no generated model line (replaces the task-43 model-personalization suite)
+//
+// The per-agent `model` config was removed along with the whole `agents` key.
+// The generated agent file is user-owned, so the model is set by editing the
+// file. Emitting NO model line is what makes that work: each provider then
+// applies its own default, which is exactly what the old 'inherit' option meant.
+// These tests pin the absence, because a reintroduced model line would silently
+// override the user's own edit on every --force regeneration.
+
+describe('agent*Toml — never emits a model line', () => {
+  const generators: [string, () => string][] = [
+    ['lead', () => agentLeadToml({ projectName: 'demo' })],
+    ['explorer', () => agentExplorerToml({ projectName: 'demo' })],
+    ['consultant', () => agentConsultantToml({ projectName: 'demo' })],
+    ['builder', () => agentBuilderToml({ projectName: 'demo' })],
+    ['reviewer', () => agentReviewerToml({ projectName: 'demo' })],
+    ['default (lead shim)', () => agentLeadAsDefaultToml({ projectName: 'demo' })],
+  ]
+
+  for (const [role, generate] of generators) {
+    test(`${role}: no model = line`, () => {
+      assert.doesNotMatch(generate(), /model\s*=/)
+    })
+  }
+
+  test('sandbox_mode survives — removing model must not disturb the real restriction', () => {
+    assert.match(agentExplorerToml({ projectName: 'demo' }), /sandbox_mode = "read-only"/)
+    assert.match(agentBuilderToml({ projectName: 'demo' }), /sandbox_mode = "workspace-write"/)
+  })
+})
+
+describe('translateFrontmatterForClaudeCode — never emits a model line', () => {
+  const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body content\n`
+
+  test('no model: line is injected', () => {
+    assert.doesNotMatch(translateFrontmatterForClaudeCode(input, 'explorer'), /^model:/m)
+  })
+
+  test('a user-authored model: line is preserved, not stripped or rewritten', () => {
+    // The whole point of user ownership: --force regenerates from the template,
+    // but the translator itself must never touch a model line it finds.
+    const withModel = `---\nname: explorer\nmodel: opus\ndescription: some desc\n---\n\n# Body\n`
+    const result = translateFrontmatterForClaudeCode(withModel, 'explorer')
+    assert.match(result, /^model: opus$/m)
+  })
+
+  test('disallowedTools block is still emitted', () => {
     const result = translateFrontmatterForClaudeCode(input, 'explorer')
-    assert.doesNotMatch(result, /^model:/m)
-  })
-
-  test('model configured → model: line present right after name:', () => {
-    const result = translateFrontmatterForClaudeCode(input, 'explorer', 'haiku')
-    assert.match(result, /^model: haiku$/m)
-    assert.match(result, /name: explorer\nmodel: haiku/)
-  })
-
-  test('tools: block (Task + mcp injection) is unaffected by model injection', () => {
-    const result = translateFrontmatterForClaudeCode(input, 'explorer', 'haiku')
-    assert.ok(result.includes('  - Task'))
-    assert.ok(result.includes('mcp__agent-harness-kit__'))
+    assert.match(result, /^disallowedTools:\n  - Write\n  - Edit$/m)
   })
 })
 
-describe('doctor.ts — model-aware status (fixes false-positive outdated)', () => {
+describe('translateFrontmatterForClaudeCode — denylist translation', () => {
+  const fm = (name: string) => `---\nname: ${name}\ndescription: some desc\n---\n\n# Body content\n`
+
+  for (const role of ['lead', 'explorer', 'consultant', 'reviewer'] as const) {
+    test(`${role} (no-write) emits disallowedTools as a YAML block sequence`, () => {
+      const result = translateFrontmatterForClaudeCode(fm(role), role)
+      assert.match(result, /^disallowedTools:\n  - Write\n  - Edit$/m)
+      // Block sequence, not the inline comma form.
+      assert.doesNotMatch(result, /^disallowedTools:\s*Write/m)
+    })
+  }
+
+  test('builder (unrestricted) emits no disallowedTools at all', () => {
+    const result = translateFrontmatterForClaudeCode(fm('builder'), 'builder')
+    assert.doesNotMatch(result, /disallowedTools/)
+  })
+
+  test('tools is omitted entirely so the agent inherits Task and all mcp__ tools', () => {
+    for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const) {
+      const result = translateFrontmatterForClaudeCode(fm(role), role)
+      assert.doesNotMatch(result, /^tools:/m, `${role} must not pin an allowlist`)
+      assert.doesNotMatch(result, /mcp__agent-harness-kit__/, `${role} must not enumerate MCP tools`)
+      assert.doesNotMatch(result, /^\s+- Task$/m, `${role} must not enumerate Task`)
+    }
+  })
+
+  test('is idempotent — re-translating already-translated output is stable', () => {
+    const once = translateFrontmatterForClaudeCode(fm('explorer'), 'explorer')
+    const twice = translateFrontmatterForClaudeCode(once, 'explorer')
+    assert.equal(twice, once)
+  })
+
+  test('strips a legacy tools allowlist carried in the input', () => {
+    const legacy = `---\nname: explorer\ntools:\n  - Read\n  - Bash\n  - Task\n---\n\n# Body\n`
+    const result = translateFrontmatterForClaudeCode(legacy, 'explorer')
+    assert.doesNotMatch(result, /^tools:/m)
+    assert.match(result, /^disallowedTools:\n  - Write\n  - Edit$/m)
+  })
+
+  test('body content survives translation untouched', () => {
+    const result = translateFrontmatterForClaudeCode(fm('lead'), 'lead')
+    assert.ok(result.includes('# Body content'))
+    assert.ok(result.includes('description: some desc'))
+  })
+})
+
+describe('agent*Toml — sandbox_mode and restriction reinforcement (Codex CLI)', () => {
+  test('read-only roles get sandbox_mode = "read-only"', () => {
+    const out = agentExplorerToml({ projectName: 'demo' })
+    assert.match(out, /^sandbox_mode = "read-only"$/m)
+  })
+
+  test('builder gets sandbox_mode = "workspace-write"', () => {
+    const out = agentBuilderToml({ projectName: 'demo' })
+    assert.match(out, /^sandbox_mode = "workspace-write"$/m)
+  })
+
+  test('read-only roles restate the prohibition in developer_instructions', () => {
+    // Codex keeps write tools visible to the model, so config alone is not
+    // enough — the restriction must also appear in the instructions.
+    const out = agentExplorerToml({ projectName: 'demo' })
+    const instructions = out.split('developer_instructions = """')[1]
+    assert.ok(instructions, 'developer_instructions block missing')
+    assert.match(instructions, /sandbox_mode = .read-only/)
+    assert.match(instructions, /MUST NOT create, modify, or delete any file/)
+  })
+
+  test('builder instructions carry no read-only notice', () => {
+    const out = agentBuilderToml({ projectName: 'demo' })
+    assert.doesNotMatch(out, /MUST NOT create, modify, or delete any file/)
+  })
+
+  test('Codex emits no tool denylist — it has no such mechanism', () => {
+    const out = agentExplorerToml({ projectName: 'demo' })
+    assert.doesNotMatch(out, /^disallowed_tools/m)
+    assert.doesNotMatch(out, /^allowed_tools/m)
+  })
+})
+
+describe('doctor.ts — agent files are existence-checked only', () => {
   const TMP_DOCTOR = join(import.meta.dirname, '../../.tmp-doctor')
 
   function makeTmp(suffix: string): string {
@@ -517,82 +869,197 @@ describe('doctor.ts — model-aware status (fixes false-positive outdated)', () 
     rmSync(TMP_DOCTOR, { recursive: true, force: true })
   }
 
-  test('reports ok (not outdated) for an agent whose live file model matches configured model', async () => {
-    const dir = makeTmp('ok-case')
+  async function buildProject(dir: string): Promise<void> {
+    const config = applyConfigDefaults({
+      name: 'demo-app',
+      description: 'demo',
+      provider: 'claude-code',
+      docsPath: './docs',
+      tasksAdapter: 'local',
+    })
+    const configContent = configMjs({
+      name: 'demo-app',
+      description: 'demo',
+      provider: 'claude-code',
+      docsPath: './docs',
+      tasksAdapter: 'local',
+      port: config.tools.mcp.port,
+      scope: config.storage.scope,
+      projectId: config.storage.projectId,
+    })
+    writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
+    await getMaterializer('claude-code').build(config, dir)
+  }
+
+  test('a freshly built project reports every agent as ok', async () => {
+    const dir = makeTmp('fresh')
     try {
-      const config = applyConfigDefaults({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'claude-code',
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        models: { explorer: 'haiku', reviewer: 'haiku' },
-      })
-
-      const configContent = configMjs({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'claude-code',
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        port: config.tools.mcp.port,
-        models: { explorer: 'haiku', reviewer: 'haiku' },
-        scope: config.storage.scope,
-        projectId: config.storage.projectId,
-      })
-      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
-
-      const materializer = getMaterializer('claude-code')
-      await materializer.build(config, dir)
-
+      await buildProject(dir)
       const status = await getDoctorStatus(dir)
-      const explorerStatus = status.agents.find((a) => a.name === 'explorer')
-      const reviewerStatus = status.agents.find((a) => a.name === 'reviewer')
-      assert.equal(explorerStatus?.status, 'ok', 'explorer should be ok when live model matches config')
-      assert.equal(reviewerStatus?.status, 'ok', 'reviewer should be ok when live model matches config')
+      assert.equal(status.agents.length, 5)
+      for (const agent of status.agents) {
+        assert.equal(agent.status, 'ok', `${agent.name} should be ok`)
+      }
     } finally {
       cleanup()
     }
   })
 
-  test('reports outdated when the live file model diverges from the configured model', async () => {
-    const dir = makeTmp('outdated-case')
+  test('hand-editing an agent body does NOT report outdated', async () => {
+    const dir = makeTmp('edited-body')
     try {
-      const config = applyConfigDefaults({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'claude-code',
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        models: { explorer: 'haiku' },
-      })
+      await buildProject(dir)
+      const explorerPath = join(dir, '.claude/agents/explorer.md')
+      const live = readFileSync(explorerPath, 'utf8')
+      writeFileSync(explorerPath, live + '\n\n## My own custom section\n\nHand written.\n', 'utf8')
 
-      const configContent = configMjs({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'claude-code',
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        port: config.tools.mcp.port,
-        models: { explorer: 'haiku' },
-        scope: config.storage.scope,
-        projectId: config.storage.projectId,
-      })
-      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
+      const status = await getDoctorStatus(dir)
+      assert.equal(status.agents.find((a) => a.name === 'explorer')?.status, 'ok')
+    } finally {
+      cleanup()
+    }
+  })
 
-      const materializer = getMaterializer('claude-code')
-      await materializer.build(config, dir)
-
-      // Simulate drift: live file has a different model than what's configured
+  test('hand-editing agent frontmatter does NOT report outdated', async () => {
+    const dir = makeTmp('edited-frontmatter')
+    try {
+      await buildProject(dir)
       const explorerPath = join(dir, '.claude/agents/explorer.md')
       const live = readFileSync(explorerPath, 'utf8')
       writeFileSync(explorerPath, live.replace('model: haiku', 'model: opus'), 'utf8')
 
       const status = await getDoctorStatus(dir)
-      const explorerStatus = status.agents.find((a) => a.name === 'explorer')
-      assert.equal(explorerStatus?.status, 'outdated')
+      assert.equal(status.agents.find((a) => a.name === 'explorer')?.status, 'ok')
     } finally {
       cleanup()
     }
+  })
+
+  test('replacing an agent file with unrelated content does NOT report outdated', async () => {
+    const dir = makeTmp('clobbered')
+    try {
+      await buildProject(dir)
+      writeFileSync(join(dir, '.claude/agents/reviewer.md'), 'totally different content\n', 'utf8')
+
+      const status = await getDoctorStatus(dir)
+      assert.equal(status.agents.find((a) => a.name === 'reviewer')?.status, 'ok')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('deleting an agent file DOES report missing', async () => {
+    const dir = makeTmp('deleted')
+    try {
+      await buildProject(dir)
+      rmSync(join(dir, '.claude/agents/builder.md'))
+
+      const status = await getDoctorStatus(dir)
+      assert.equal(status.agents.find((a) => a.name === 'builder')?.status, 'missing')
+      // Unrelated agents stay ok.
+      assert.equal(status.agents.find((a) => a.name === 'lead')?.status, 'ok')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test("'outdated' is never reported for any agent, under any edit", async () => {
+    const dir = makeTmp('never-outdated')
+    try {
+      await buildProject(dir)
+      for (const name of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
+        writeFileSync(join(dir, `.claude/agents/${name}.md`), 'clobbered\n', 'utf8')
+      }
+      const status = await getDoctorStatus(dir)
+      assert.equal(status.agents.filter((a) => (a.status as string) === 'outdated').length, 0)
+    } finally {
+      cleanup()
+    }
+  })
+})
+
+// ─── The generated config has no `agents` key ────────────────────────────────
+//
+// Successor to `configTs — no per-agent path fields`. The path fields went
+// first (prompt text that described a restriction without imposing one); the
+// rest of the key followed, because everything left in it was either dead
+// (`instructionsPath`, `context`, `custom`) or better expressed in the agent
+// file itself (`model`). A freshly generated config must reintroduce none of it.
+
+describe('configTs — no `agents` key', () => {
+  const base = {
+    name: 'my-app',
+    description: 'placeholder',
+    provider: 'claude-code',
+    docsPath: './docs',
+    tasksAdapter: 'local',
+    port: 3742,
+    scope: 'local' as const,
+    projectId: 'test-project-id',
+  }
+
+  // Evaluate the generated config back into a real object so the assertions
+  // inspect structure rather than matching source text.
+  function evalConfig(out: string): Record<string, unknown> {
+    const src =
+      out
+        .replace(/^import .+$/gm, '//$&')
+        .replace(/^const config: HarnessConfig = /m, 'const config = ')
+        .replace(/^export default .+$/m, '') + '\nreturn config'
+    return new Function(src)() as Record<string, unknown>
+  }
+
+  test('the generated config object has no agents key', () => {
+    assert.ok(!('agents' in evalConfig(configTs(base))), 'generated config must not declare agents')
+  })
+
+  test('a config generated today loads without tripping the legacy warning', () => {
+    // Closes the loop with normalizeLegacyAgentsKey(): the generator must not
+    // emit the very shape the loader warns about, or every user would see a
+    // deprecation warning on a brand-new project.
+    const config = evalConfig(configTs(base))
+    assert.ok(!('agents' in config))
+  })
+
+  test('the removed field names appear nowhere in the generated file', () => {
+    const out = configTs(base)
+    for (const field of ['allowedPaths', 'writablePaths', 'instructionsPath', 'custom']) {
+      assert.doesNotMatch(out, new RegExp(`${field}\\s*:`), `${field} must not be declared`)
+    }
+    // `agents:` as a config key. The word may still appear inside comments and
+    // in paths like `.claude/agents/`, which is why this is anchored.
+    assert.doesNotMatch(out, /^\s*agents\s*:/m)
+  })
+
+  test('the old narrow ./src + ./tests defaults are not reintroduced', () => {
+    const out = configTs(base)
+    assert.doesNotMatch(out, /writablePaths:\s*\[\s*'\.\/src',\s*'\.\/tests'\s*\]/)
+    assert.doesNotMatch(out, /allowedPaths:\s*\[\s*'\.\/docs',\s*'\.\/src'\s*\]/)
+  })
+
+  test('the mjs and cjs generators are equally free of the key', () => {
+    for (const gen of [configMjs, configCjs]) {
+      const out = gen(base)
+      assert.doesNotMatch(out, /^\s*agents\s*:/m)
+      assert.doesNotMatch(out, /instructionsPath\s*:/)
+    }
+  })
+})
+
+describe('agent prompt text — no path placeholders (task #59)', () => {
+  test('the builder prompt states its scope without an uninterpolated placeholder', () => {
+    const builder = agentBuilderToml({ projectName: 'demo' })
+    assert.doesNotMatch(builder, /\{\{writablePaths\}\}/)
+    assert.doesNotMatch(builder, /\{\{allowedPaths\}\}/)
+    // The real restriction — the one that is actually enforced — must remain.
+    assert.match(builder, /sandbox_mode = "workspace-write"/)
+  })
+
+  test('the explorer prompt carries no path placeholder and stays read-only', () => {
+    const explorer = agentExplorerToml({ projectName: 'demo' })
+    assert.doesNotMatch(explorer, /\{\{allowedPaths\}\}/)
+    assert.doesNotMatch(explorer, /\{\{writablePaths\}\}/)
+    assert.match(explorer, /sandbox_mode = "read-only"/)
+    assert.doesNotMatch(explorer, /You may write anywhere/)
   })
 })

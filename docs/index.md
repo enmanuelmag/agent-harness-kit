@@ -114,18 +114,6 @@ export default defineHarness({
     docsPath: './docs',
   },
   provider: 'claude-code', // or 'opencode'
-  agents: {
-    lead: { instructionsPath: null },
-    explorer: { 
-      instructionsPath: null, 
-      allowedPaths: ['./docs', './src'] 
-    },
-    builder: { 
-      instructionsPath: null, 
-      writablePaths: ['./src', './tests'] 
-    },
-    reviewer: { instructionsPath: null },
-  },
   // `database` never carries a file path — physical location is a `storage`
   // concern (see `storage.sqlitePath` below), not a `database` one.
   database: { type: 'sqlite' },

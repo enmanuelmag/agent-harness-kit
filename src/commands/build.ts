@@ -8,10 +8,11 @@ import { getMaterializer } from '@/core/materializer/index'
 interface BuildOptions {
   watch?: boolean
   sync?: boolean
+  force?: boolean
 }
 
 export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
-  await buildOnce(cwd)
+  await buildOnce(cwd, opts.force)
 
   if (opts.sync) {
     p.log.step('Syncing agent permissions...')
@@ -25,7 +26,10 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
     watch(cwd, { recursive: false }, async (_, filename) => {
       if (filename?.startsWith('agent-harness-kit.config')) {
         p.log.step('Config changed — rebuilding...')
-        await buildOnce(cwd)
+        // Deliberately never forced: an automatic rebuild triggered by a file
+        // watcher must not destroy agent-file customizations behind the user's
+        // back. --force is a one-shot, explicitly requested operation.
+        await buildOnce(cwd, false)
       }
     })
     // Keep process alive
@@ -33,7 +37,7 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
   }
 }
 
-async function buildOnce(cwd: string): Promise<void> {
+async function buildOnce(cwd: string, force?: boolean): Promise<void> {
   const spinner = p.spinner()
   spinner.start('Loading config...')
 
@@ -41,11 +45,41 @@ async function buildOnce(cwd: string): Promise<void> {
     const config = await loadConfig(cwd)
     spinner.message('Rebuilding files...')
     const materializer = getMaterializer(config.provider)
-    await materializer.build(config, cwd)
+    const report = await materializer.build(config, cwd, { force })
     spinner.stop(pc.green('Build complete'))
     p.log.success('AGENTS.md')
     p.log.success(`Agent definitions (${config.provider})`)
     p.log.success('MCP config')
+
+    const { created, overwritten, preserved, backupDir } = report.agents
+
+    if (created.length > 0) {
+      p.log.info(`Created ${created.length} missing agent file(s):\n  ${created.join('\n  ')}`)
+    }
+
+    if (overwritten.length > 0) {
+      // Name every file that lost its customizations. A count alone would not
+      // let the user tell which of their edits are now only in the backup.
+      p.log.warn(
+        pc.yellow(
+          `--force REGENERATED ${overwritten.length} existing agent file(s), discarding any customizations:\n  ` +
+            overwritten.join('\n  '),
+        ),
+      )
+      if (backupDir) {
+        p.log.info(pc.yellow(`  Previous content backed up → ${backupDir}`))
+      }
+    }
+
+    if (preserved.length > 0) {
+      // Without this, a user who edited a template and expects `build` to pick
+      // up an upstream improvement gets silence and assumes it was applied.
+      p.log.info(
+        `Left ${preserved.length} existing agent file(s) untouched — agent files are yours to edit.\n  ` +
+          `Re-run with --force to regenerate them from the packaged templates (this DESTROYS your edits;\n  ` +
+          `a backup is written first).`,
+      )
+    }
   } catch (err) {
     spinner.stop(pc.red('Build failed'))
     p.log.error(err instanceof Error ? err.message : String(err))

@@ -50,7 +50,7 @@ npx ahk init
     - [What each file does](#what-each-file-does)
   - [Tasks schema](#tasks-schema)
   - [What you can customize](#what-you-can-customize)
-    - [`agent-harness-kit.config.ts`](#agent-harness-kitconfigts)
+    - [`agent-harness-kit.config.{json|ts|mjs|cjs}`](#agent-harness-kitconfigjsontsmjscjs)
     - [`health.sh`](#healthsh)
     - [Agent definition files](#agent-definition-files)
     - [`.harness/feature_list.json`](#harnessfeature_listjson)
@@ -117,7 +117,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Markdown fallback** — `current.md` is always regenerated so agents can understand the session state even without the MCP server.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
 - **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
-- **Incremental scaffold** — `ahk init` preserves files you've already customized (agent definitions you've edited are kept). `ahk build` always regenerates agent files from the latest templates so they stay up to date.
+- **Incremental scaffold** — `ahk init` preserves files you've already customized (agent definitions you've edited are kept). `ahk build` does too: it creates missing agent files and never touches existing ones. Use `ahk build --force` to regenerate them from the latest templates, discarding your edits (a backup is written first).
 - **Global installation** — `ahk init` can scaffold the harness into your home directory (`~/.claude` or `~/.config/opencode`) to share it across all projects.
 - **Input validation** — CLI prompts validate all inputs (name length, path format, task title, etc.) and retry with the error message instead of silently accepting bad values.
 
@@ -143,7 +143,18 @@ Then run the interactive setup inside your project:
 npx ahk init
 ```
 
-> **Local install recommended.** The generated `agent-harness-kit.config.ts` uses `import type`, which is erased at compile time, so `ahk` no longer needs to resolve the package from your project's `node_modules` at runtime. If it detects a **global-only** install (`npm install -g @cardor/agent-harness-kit`), it prints a non-blocking warning recommending `npm install --save-dev @cardor/agent-harness-kit` (or the `pnpm`/`yarn`/`bun` equivalent) — the command still runs and exits normally either way. This is only about keeping the CLI version pinned and reproducible across your team and CI, not a functional requirement.
+> **The config file format depends on whether the package is installed locally.** `ahk init` checks that first, before anything else:
+>
+> | Local install | Generated config | Why |
+> | --- | --- | --- |
+> | **Not installed** (global-only CLI) | `agent-harness-kit.config.json` | Your project cannot resolve `@cardor/agent-harness-kit`, so a TypeScript config's `import type` would red-underline in your editor and fail `tsc --noEmit` on a package that isn't there. JSON has no imports and no types — nothing to resolve, zero editor errors. |
+> | **Installed** (`npm install --save-dev @cardor/agent-harness-kit`) | `.ts`, `.mjs` or `.cjs` | The package resolves, so you get the full typed config with editor autocompletion. Which of the three is picked is unchanged: `.ts` when a `tsconfig.json` is present, otherwise `.mjs`/`.cjs` based on `package.json` `type`. |
+>
+> The trade-off is autocompletion: a JSON config has no type information behind it, so your editor cannot suggest fields. Installing the package locally and switching to a `.ts` config gets that back. There is no `$schema` key in the generated JSON — no JSON Schema for `HarnessConfig` is published yet, and pointing at a URL that doesn't resolve would only swap a type error for a fetch error.
+>
+> **Existing projects are never converted.** If a config of any extension already exists, it keeps working and keeps its format — installing or removing the package locally will not silently rewrite it. `loadConfig()` reads all five formats, and `ahk init` stops when it finds any of them.
+>
+> **A local install is still recommended** even though it is no longer required: it pins the CLI version so behavior stays reproducible across your team and CI instead of drifting with whatever is installed globally on each machine. On a global-only install `ahk` prints a non-blocking warning suggesting it — the command runs and exits normally either way.
 >
 > This check also works with **Yarn Berry (PnP)** projects, which never create a `node_modules` folder — `ahk` detects `.pnp.cjs`/`.pnp.loader.mjs` and falls back to checking that the package is declared in `package.json` instead of requiring a `node_modules` entry.
 
@@ -208,8 +219,33 @@ Regenerates `AGENTS.md` and provider-specific files from your `agent-harness-kit
 ```bash
 ahk build
 ahk build --watch    # watch mode: rebuilds automatically on config changes
-ahk build --sync     # sync tools: frontmatter in agent files to match current permission constants (claude-code only; no-op for opencode/codex-cli)
+ahk build --force    # DESTRUCTIVE: regenerate agent files, discarding your edits
+ahk build --sync     # kept for backwards compatibility — now a no-op on every provider
 ```
+
+### Agent files are yours
+
+`ahk build` **creates agent files that are missing and never modifies ones that already exist.** Edit `.claude/agents/<role>.md` (or `.opencode/agents/<role>.md`, or `.codex/agents/<role>.toml`) freely — change the role prompt, set a `model:` line, adjust the restriction fields. Rebuilding will not revert your work. `ahk doctor` does not report hand-edited files either; it checks existence only.
+
+Everything else `build` writes — `AGENTS.md`, `CLAUDE.md`, MCP config, skills — is derived from your config and **is** regenerated on every run.
+
+> **If you use OpenCode or Codex CLI, your agent files may be out of date right now.** Those two providers have always preserved existing agent files on build, which means they have never picked up template improvements shipped in newer versions of this package. Claude Code, by contrast, used to overwrite them on every build — that inconsistency was a bug, and it is now fixed in favour of preserving your edits. To pull in the current templates, run `ahk build --force` (read the warning below first).
+
+### `--force`
+
+Because `build` no longer overwrites agent files on any provider, `--force` is the **only** way to regenerate them from the packaged templates. It is destructive:
+
+```bash
+ahk build --force
+```
+
+- **It discards your customizations.** Every agent file is rewritten from the template. Prompt edits, `model:` lines, and restriction tweaks are all lost.
+- **It backs up first.** Before overwriting anything, the current content of every affected file is copied to `.harness/backups/agents-<timestamp>/`. If that backup cannot be written, the command aborts and **no file is modified** — the same fail-safe as [`ahk migrate storage --force`](#storage-migration).
+- **It names what it touched.** The command prints every file it overwrote and the backup location, so you can diff or restore.
+
+`--watch` never forces, even if you pass both flags: an automatic rebuild triggered by a file change must not destroy your edits in the background.
+
+`--sync` used to rewrite the `tools:` frontmatter of agent files so it matched a canonical allowlist. Agent files no longer declare an allowlist at all — they inherit every tool and declare only restrictions — so there is nothing left to synchronise. Use `ahk build --force` to regenerate agent files.
 
 ---
 
@@ -263,7 +299,7 @@ ahk health
 
 ### `ahk doctor`
 
-Checks that the installed lib version, agent files, and harness skills are all in sync.
+Checks the installed lib version, that every agent file is present, and that the harness skills are in sync.
 
 ```bash
 ahk doctor
@@ -272,7 +308,7 @@ ahk doctor
 Reports three categories:
 
 - **lib version** — compares installed version against the latest on npm. Shows `[✓]` if up to date, `[!]` if an update is available, or `[~]` if the registry could not be reached.
-- **agent files** — reads each agent file on disk and compares against what `ahk build` would generate. Reports `[!]` with the file name if outdated.
+- **agent files** — checks only that a definition file exists for every role. Reports `[!]` with the file name if one is missing. The contents are never read, so **editing an agent file by hand is a fully supported state and is never reported** — customise the body, the description, or the restrictions freely and `ahk doctor` stays green.
 - **harness skills** — checks that `ahk-ask`, `ahk-consultant`, `ahk-triage`, and `ahk-review` skills exist and match the bundled source. Reports `[!]` if missing or outdated.
 
 Run `ahk build` to fix any reported issues.
@@ -427,7 +463,7 @@ ahk export --sql --output dump.sql       # SQL dump to file
 
 ```
 your-project/
-├── agent-harness-kit.config.{ts|mjs|cjs}
+├── agent-harness-kit.config.{json|ts|mjs|cjs}
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── health.sh
@@ -450,7 +486,7 @@ your-project/
 
 ```
 your-project/
-├── agent-harness-kit.config.{ts|mjs|cjs}
+├── agent-harness-kit.config.{json|ts|mjs|cjs}
 ├── AGENTS.md
 ├── health.sh
 ├── opencode.json                  ← MCP server + default_agent + compaction config
@@ -467,7 +503,7 @@ your-project/
 
 ```
 your-project/
-├── agent-harness-kit.config.{ts|mjs|cjs}
+├── agent-harness-kit.config.{json|ts|mjs|cjs}
 ├── AGENTS.md
 ├── health.sh
 ├── .harness/
@@ -485,19 +521,19 @@ your-project/
 
 | File                          | Purpose                                                                               | Edit it?                                                    |
 | ----------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `agent-harness-kit.config.ts` | Defines project metadata, provider, storage paths, MCP port                           | Yes — it's yours                                            |
+| `agent-harness-kit.config.{json\|ts\|mjs\|cjs}` | Defines project metadata, provider, storage paths, MCP port. JSON when the package isn't installed locally, otherwise `.ts`/`.mjs`/`.cjs` | Yes — it's yours                                            |
 | `AGENTS.md`                   | Navigation map agents read first. Regenerated by `ahk build`                          | No — changes will be overwritten                            |
 | `health.sh`                   | Shell script agents run before starting work. Must exit 0                             | **Yes — implement your checks here**                        |
 | `.harness/feature_list.json`  | Task backlog in JSON. Humans edit this, `ahk sync` loads it into SQLite               | Yes — add tasks here                                        |
 | `.harness/harness.db`         | SQLite database (local scope only). Source of truth for tasks, actions, sections      | No — managed by the harness                                 |
 | `.harness/current.md`         | Auto-generated session snapshot for agents without MCP access (local scope only)      | No — regenerated automatically                              |
 | `.harness/storage-state.json` | Always project-local. Records the REAL current storage state (`scope`, `projectId`, `dbType`, `migratedAt`) — used by migration tooling | No — managed by the harness |
-| `.claude/agents/*.md`         | Agent role definitions (Claude Code). Created once, never overwritten                 | **Yes — customize agent behavior**                          |
+| `.claude/agents/*.md`         | Agent role definitions (Claude Code). Created once, never overwritten (`ahk build --force` regenerates)                 | **Yes — customize agent behavior**                          |
 | `.claude/mcp.json`            | MCP server registration for Claude Code. Merged by `ahk build`                        | Yes, carefully — don't remove the `agent-harness-kit` entry |
 | `.claude/settings.json`       | Sets `agent: "lead"` so lead runs as the default session agent. Merged by `ahk build` | Yes, carefully                                              |
-| `.opencode/agents/*.md`       | Agent role definitions (OpenCode). Created once, never overwritten                    | **Yes — customize agent behavior**                          |
+| `.opencode/agents/*.md`       | Agent role definitions (OpenCode). Created once, never overwritten (`ahk build --force` regenerates)                    | **Yes — customize agent behavior**                          |
 | `opencode.json`               | MCP server + `default_agent` + compaction config for OpenCode. Merged by `ahk build`  | Yes, carefully                                              |
-| `.codex/agents/*.toml`        | Agent role definitions (Codex CLI). Created once, never overwritten                   | **Yes — customize agent behavior**                          |
+| `.codex/agents/*.toml`        | Agent role definitions (Codex CLI). Created once, never overwritten (`ahk build --force` regenerates)                   | **Yes — customize agent behavior**                          |
 | `.codex/config.toml`          | MCP server registration for Codex CLI. Merged by `ahk build`                          | Yes, carefully                                              |
 
 ---
@@ -510,9 +546,9 @@ The `tasks` table includes an `updated_at` timestamp column, set on creation and
 
 ## What you can customize
 
-### `agent-harness-kit.config.ts`
+### `agent-harness-kit.config.{json|ts|mjs|cjs}`
 
-Everything in the config file is yours to change:
+Everything in the config file is yours to change. The example below is the TypeScript form, generated when the package is installed locally in your project:
 
 ```ts
 import type { HarnessConfig } from '@cardor/agent-harness-kit'
@@ -526,14 +562,8 @@ const config: HarnessConfig = {
 
   provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli'
 
-  agents: {
-    lead: { instructionsPath: null, model: 'sonnet' }, // optional per-agent model override
-    explorer: { instructionsPath: null, allowedPaths: ['./docs', './src'], model: 'haiku' },
-    builder: { instructionsPath: null, writablePaths: ['./src', './tests'] },
-    reviewer: { instructionsPath: null },
-    consultant: { instructionsPath: null, model: 'haiku' },
-    custom: [], // define extra agents here
-  },
+  // There is no `agents` key. Per-agent settings live in the generated agent
+  // file itself, which is yours to edit — see "Agent files are yours" below.
 
   // ── Database ──────────────────────────────────────────────────────────────
   // SQLite (default — zero native deps, Node 22+ or Bun). Note: `database`
@@ -581,6 +611,41 @@ const config: HarnessConfig = {
 export default config
 ```
 
+**The JSON form** (`agent-harness-kit.config.json`, generated when the package is *not* installed locally) holds exactly the same values, minus the comments and the type annotation:
+
+```json
+{
+  "project": {
+    "name": "My App",
+    "description": "What this project does",
+    "docsPath": "./docs"
+  },
+  "provider": "claude-code",
+  "database": { "type": "sqlite" },
+  "storage": {
+    "dir": ".harness",
+    "tasks": { "adapter": "local" },
+    "sections": {
+      "toolsUsed": true,
+      "filesModified": true,
+      "result": true,
+      "blockers": true,
+      "nextSteps": false
+    },
+    "markdownFallback": { "enabled": true, "path": ".harness/current.md" },
+    "scope": "local",
+    "projectId": "5f2c..."
+  },
+  "health": { "scriptPath": "./health.sh", "required": true },
+  "tools": {
+    "mcp": { "enabled": true, "port": 3742 },
+    "scripts": { "enabled": true, "outputDir": "./.harness/scripts" }
+  }
+}
+```
+
+Every option documented below applies to both forms — the same keys, the same defaults, the same runtime normalization. The only difference is that the JSON form has no type checking or autocompletion behind it, since there is no package to resolve them from. To switch a JSON config to TypeScript, install the package locally (`npm install --save-dev @cardor/agent-harness-kit`) and rename the file to `agent-harness-kit.config.ts`, wrapping the object as shown above. `ahk` will not convert it for you — an existing config always keeps its format.
+
 **`scope: 'global'`** — DB and current.md live under `~/.harness/dbs/<projectId>/`, outside the project tree. Under this scope, `sqlitePath` and `markdownFallback.path` don't exist on the type at all (a type error, not just a no-op) — there's nothing local to declare a path for:
 
 ```ts
@@ -620,31 +685,55 @@ echo "All checks passed."
 
 ### Agent definition files
 
-Created by `ahk init` (which preserves existing files) and **regenerated by `ahk build`** from the latest templates. If you customise an agent file, re-running `ahk build` will overwrite your edits — keep customisations in source control.
+**These files belong to you.** `ahk init` and `ahk build` both create them when missing and **never modify them once they exist**. Customise them freely: rewrite the role prompt, add a `model:` line, adjust the restriction fields. Nothing in the normal workflow will revert your edits, and `ahk doctor` never reports a hand-edited file as drift — it checks existence only.
 
-**Claude Code** (`.claude/agents/*.md`) and **OpenCode** (`.opencode/agents/*.md`) use Markdown with YAML frontmatter:
+The trade-off is that you do not automatically receive template improvements from new versions of this package. `ahk build --force` is the only way to pull them in, and it **discards your customisations** (writing a backup to `.harness/backups/agents-<timestamp>/` first). Keep customisations in source control so you can diff against a forced regeneration.
+
+There is no `agents` key in `agent-harness-kit.config.ts`. Per-agent settings live here, in the file itself — set the model on the `model:` frontmatter line (`model = "..."` for Codex CLI) and write role instructions in the body. When no model line is present, the provider applies its own default.
+
+Agent files do not declare a tool allowlist. Each agent inherits the full tool set of the session — including `Task` and every MCP tool — and the file declares only what the role is *not* allowed to do. Each provider expresses that restriction in its own syntax.
+
+**Claude Code** (`.claude/agents/*.md`) uses a `disallowedTools` YAML block sequence:
 
 ```markdown
 ---
-name: builder
-description: Builder agent — implements the plan produced by explorer and lead
-tools:
-  read: true
-  write: true
-  edit: true
-  bash: true
-permissionMode: acceptEdits
+name: explorer
+description: Explorer agent — reads and maps the codebase, never writes
+disallowedTools:
+  - Write
+  - Edit
 ---
 
-# Builder Agent
+# Explorer Agent
 
-You are the builder agent for MyApp. Follow these rules:
+You are the explorer agent for MyApp. Follow these rules:
 
-- All API endpoints must be defined in `src/routes/`
-- Never modify `src/core/` without lead approval
-- Run `npm test` after every change and fix failures before completing
-- Use the existing error handling pattern from `src/lib/errors.ts`
+- Map the modules relevant to the task and report where each concern lives
+- Never modify files — record every file you read
+- Prefer the existing patterns in `src/lib/` when describing conventions
 ```
+
+**OpenCode** (`.opencode/agents/*.md`) uses a `permission` mapping instead. OpenCode has no separate `write` permission — its `edit` key is defined as "file modifications including write/patch", so a single `edit: deny` covers Write, Edit, and patch:
+
+```markdown
+---
+name: explorer
+description: Explorer agent — reads and maps the codebase, never writes
+permission:
+  edit: deny
+---
+
+# Explorer Agent
+
+You are the explorer agent for MyApp. Follow these rules:
+
+- Map the modules relevant to the task and report where each concern lives
+- Never modify files — record every file you read
+```
+
+> The legacy OpenCode `tools: { write: false }` dict is deprecated upstream in favour of `permission` and is no longer emitted.
+
+For the **builder**, which has no restrictions, the key is omitted entirely — no `disallowedTools` under Claude Code, no `permission` under OpenCode.
 
 **Codex CLI** (`.codex/agents/*.toml`) uses TOML format:
 
@@ -667,7 +756,9 @@ You are the builder agent for MyApp. Follow these rules:
 """
 ```
 
-The `sandbox_mode` field controls Codex's filesystem permissions per agent: `"read-only"` for lead, explorer, and reviewer; `"workspace-write"` for builder. The `permissionMode` field in Claude Code agent files enforces the same constraints at the session level (`plan` for read-only roles, `acceptEdits` for builder).
+Codex CLI has no per-agent tool denylist, so `sandbox_mode` is the only real mechanism: `"read-only"` for lead, explorer, consultant, and reviewer; `"workspace-write"` for builder. Because Codex keeps the write tools *visible* to the model even under a read-only sandbox, the restriction is additionally restated in prose inside `developer_instructions` — without it the model burns turns on calls the sandbox will reject.
+
+The equivalent constraint under Claude Code is expressed as `disallowedTools: [Write, Edit]`, and under OpenCode as `permission: { edit: deny }`.
 
 ### `.harness/feature_list.json`
 
@@ -714,7 +805,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `tasks.acceptance_get`    | `taskId`                                        | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update`              |
 | `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                                                           |
 | `deps.check`              | _(none)_                                        | Compare current `package.json` against `.harness/deps-lock.json`. Returns `{ significant, added, removed, majorBumps, advisory }`                                                   |
-| `ahk.doctor`              | _(none)_                                        | Check lib version, agent files, and harness skills sync status. Returns `{ lib: { current, latest, outdated }, agents: { missing, outdated, ok }, skills: { missing, outdated, ok } }`. The `lib` version lookup (npm registry check) is cached in-memory with a 5-minute TTL — repeated calls within that window do not hit the network again. |
+| `ahk.doctor`              | _(none)_                                        | Check lib version, agent file presence, and harness skills sync status. Returns `{ lib: { current, latest, outdated }, agents: { missing, ok }, skills: { missing, outdated, ok } }`. Agents are existence-checked only, so there is no `outdated` bucket for them; `skills` still has all three. The `lib` version lookup (npm registry check) is cached in-memory with a 5-minute TTL — repeated calls within that window do not hit the network again. |
 
 ---
 
@@ -725,12 +816,18 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | **lead**       | Decomposes the task into a plan, assigns sub-agents. Does not write code or read source files.                                              |
 | **explorer**   | Reads and maps the codebase. Never writes files. Records every file read.                                                                   |
 | **consultant** | Provides structured technical advisory after explorer. Runs conditionally. Never writes code. Writes advisory to harness via actions.write. |
-| **builder**    | Implements the plan. Only writes to `writablePaths`. Records every file modified.                                                           |
+| **builder**    | Implements the plan. The only role that writes — its write tools are enabled where every other role's are disabled. Records every file modified. |
 | **reviewer**   | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving.                                           |
+
+> **Scope note.** What a role may not do is enforced **per tool, not per path**. There is no per-agent path scoping and it is not configurable: the `allowedPaths` / `writablePaths` fields were removed because they were only interpolated into prompt text and no provider ever enforced them — they looked like a security control without being one. The real restriction lives in `src/core/materializer/agent-restrictions.ts`, which each provider translates natively: `disallowedTools` in Claude Code, `permission.edit` in OpenCode, `sandbox_mode` in Codex CLI. If a config still declares the removed fields they are stripped at load time with a warning.
+>
+> **The entire `agents` config key has since been removed too**, for the same underlying reason: everything left in it was either dead or better expressed elsewhere. `instructionsPath`, `context` and `custom` were written by the generator and never read by anything; `model` was the only field with an effect, and it now belongs in the agent file's frontmatter alongside the role prompt, since that file is user-owned. A config that still declares `agents` loads normally — the key is ignored, with one aggregated warning pointing at the agent file.
+>
+> **Breaking change for library consumers (compile time).** The `AgentConfig`, `AgentsConfig` and `CustomAgentConfig` types are no longer exported from the package, and `HarnessConfig` no longer has an `agents` property. If you import those types, remove the import; if you construct a `HarnessConfig` in TypeScript, drop the `agents` property. This is separate from the runtime tolerance above: existing config *files* keep loading, but code that references the removed types will not compile. The `AgentName` type is unrelated and unaffected.
 
 ### MCP tool permissions by role
 
-Each agent role has a scoped set of MCP tools enforced through the agent definition files.
+> **Scope note.** This table describes the *intended* division of labour between roles, not a restriction enforced by the agent files. Agent definitions no longer declare a tool allowlist, so every role inherits **all** MCP tools. The per-role `MCP_CLAUDE_PERMISSIONS_*` arrays still exist, but they are only unioned together to populate the allow list in `.claude/settings.local.json` — they are not applied per agent. Treat the table as the convention each role's prompt asks it to follow.
 
 | Tool                          | lead | explorer | consultant | builder | reviewer |
 | ----------------------------- | :--: | :------: | :--------: | :-----: | :------: |
@@ -754,7 +851,7 @@ Each agent role has a scoped set of MCP tools enforced through the agent definit
 **lead** and **builder** have identical access, both excluding `tasks.acceptance.update`.  
 **consultant** is advisory-only — reads code, writes to harness, and can call deps tools. Never modifies the codebase.
 
-`permissions.check` compares each `.claude/agents/*.md` tool list against the canonical constants in the package. Returns `{ in_sync: bool, agents: { lead, explorer, consultant, builder, reviewer } }` with per-agent `missing` and `extra` arrays. Run `ahk build --sync` to fix any drift.
+`permissions.check` verifies only that a `.claude/agents/*.md` definition file **exists** for every role. Returns `{ in_sync: bool, agents: { lead, explorer, consultant, builder, reviewer } }` where each agent is `{ ok: true }` or `{ ok: false, reason: 'missing_file' }`. Agent file contents are never inspected — they are meant to be customised freely — so this never reports drift, only absence. Run `ahk build` to restore a missing file.
 
 ---
 
@@ -762,7 +859,7 @@ Each agent role has a scoped set of MCP tools enforced through the agent definit
 
 | File                          | Commit?             |
 | ----------------------------- | ------------------- |
-| `agent-harness-kit.config.ts` | Yes                 |
+| `agent-harness-kit.config.{json\|ts\|mjs\|cjs}` | Yes                 |
 | `AGENTS.md`                   | Yes                 |
 | `CLAUDE.md`                   | Yes                 |
 | `health.sh`                   | Yes                 |

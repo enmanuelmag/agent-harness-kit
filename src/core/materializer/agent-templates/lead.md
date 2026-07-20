@@ -5,9 +5,6 @@ description: >
   delegate to explorer, builder, and reviewer in sequence, and close the session correctly.
   Invoke when starting a new work session, picking up a pending task, or when another agent
   reports a blocker that requires re-coordination.
-tools:
-  - Read
-  - Bash
 ---
 
 # Lead Agent — {{projectName}}
@@ -73,7 +70,10 @@ When in lightweight mode:
 
 ### File creation in lightweight mode
 
-You may only create files in lightweight mode if the user **explicitly** asks to save the output (e.g., "write the triage report to TRIAGE.md"). Even then, do not use the full harness pipeline — just write the file directly.
+Your Write and Edit tools are disabled, so you cannot save output yourself — not even in
+lightweight mode. If the user **explicitly** asks to persist the result (e.g., "write the
+triage report to TRIAGE.md"), delegate that single write to the builder. Do not spin up the
+full harness pipeline for it; hand the builder the exact content and target path.
 
 > **If in lightweight mode: skip Step 1 (Orient) entirely.** No health.sh, no MCP calls.
 

@@ -3,20 +3,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { loadConfig } from '@/core/config'
-import {
-  agentBuilder,
-  agentBuilderToml,
-  agentConsultant,
-  agentConsultantToml,
-  agentExplorer,
-  agentExplorerToml,
-  agentLead,
-  agentLeadToml,
-  agentReviewer,
-  agentReviewerToml,
-  translateFrontmatterForClaudeCode,
-  translateFrontmatterForOpenCode,
-} from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -27,9 +13,16 @@ export interface LibStatus {
   outdated: boolean
 }
 
+/**
+ * Agent files are checked for EXISTENCE ONLY — there is deliberately no
+ * 'outdated' state. Agent definitions are meant to be customised freely (body
+ * and frontmatter alike), so comparing them against the packaged template would
+ * flag every intentional edit as drift. Skills keep their content comparison;
+ * they are not a customisation surface.
+ */
 export interface AgentStatus {
   name: string
-  status: 'ok' | 'missing' | 'outdated'
+  status: 'ok' | 'missing'
 }
 
 export interface SkillStatus {
@@ -126,100 +119,22 @@ function getProviderAgentInfo(provider: string): {
   }
 }
 
-export function generateExpectedAgentContent(
-  agentName: AgentName,
-  provider: string,
-  vars: { projectName: string; allowedPaths: string; writablePaths: string; model?: string }
-): string {
-  const { projectName, allowedPaths, writablePaths, model } = vars
-
-  if (provider === 'claude-code') {
-    const templateFns = {
-      lead: () => agentLead({ projectName }),
-      explorer: () => agentExplorer({ projectName, allowedPaths }),
-      consultant: () => agentConsultant({ projectName }),
-      builder: () => agentBuilder({ projectName, writablePaths }),
-      reviewer: () => agentReviewer({ projectName }),
-    }
-    return translateFrontmatterForClaudeCode(templateFns[agentName](), agentName, model)
-  }
-
-  if (provider === 'opencode') {
-    const templateFns = {
-      lead: () => agentLead({ projectName }),
-      explorer: () => agentExplorer({ projectName, allowedPaths }),
-      consultant: () => agentConsultant({ projectName }),
-      builder: () => agentBuilder({ projectName, writablePaths }),
-      reviewer: () => agentReviewer({ projectName }),
-    }
-    // OpenCode never receives a model override — no injection for this provider.
-    return translateFrontmatterForOpenCode(templateFns[agentName]())
-  }
-
-  // codex-cli: TOML format
-  const tomlFns = {
-    lead: () => agentLeadToml({ projectName, model }),
-    explorer: () => agentExplorerToml({ projectName, allowedPaths, model }),
-    consultant: () => agentConsultantToml({ projectName, model }),
-    builder: () => agentBuilderToml({ projectName, writablePaths, model }),
-    reviewer: () => agentReviewerToml({ projectName, model }),
-  }
-  return tomlFns[agentName]()
-}
-
-// Root-based comparison — shared by both the project-local (cwd) and global
-// (homeDir) checks. Callers resolve `agentsRoot` to an absolute directory;
-// this function never derives paths on its own, so there is exactly ONE
-// place that compares live vs. expected agent content.
-function checkAgentFilesAtRoot(
-  agentsRoot: string,
-  ext: string,
-  provider: string,
-  projectName: string,
-  allowedPaths: string,
-  writablePaths: string,
-  models: Partial<Record<AgentName, string | undefined>>
-): AgentStatus[] {
+// Root-based existence check — shared by both the project-local (cwd) and
+// global (homeDir) checks. Callers resolve `agentsRoot` to an absolute
+// directory; this function never derives paths on its own.
+//
+// Existence is the ONLY signal. The file's contents are never read, so any
+// hand-editing of an agent definition is invisible here by design.
+function checkAgentFilesAtRoot(agentsRoot: string, ext: string): AgentStatus[] {
   return AGENT_NAMES.map((name) => {
     const filePath = join(agentsRoot, `${name}${ext}`)
-
-    if (!existsSync(filePath)) {
-      return { name, status: 'missing' as const }
-    }
-
-    try {
-      const live = readFileSync(filePath, 'utf8')
-      const expected = generateExpectedAgentContent(name, provider, {
-        projectName,
-        allowedPaths,
-        writablePaths,
-        model: models[name],
-      })
-      return { name, status: live === expected ? ('ok' as const) : ('outdated' as const) }
-    } catch {
-      return { name, status: 'outdated' as const }
-    }
+    return { name, status: existsSync(filePath) ? ('ok' as const) : ('missing' as const) }
   })
 }
 
-function checkAgentFiles(
-  cwd: string,
-  provider: string,
-  projectName: string,
-  allowedPaths: string,
-  writablePaths: string,
-  models: Partial<Record<AgentName, string | undefined>>
-): AgentStatus[] {
+function checkAgentFiles(cwd: string, provider: string): AgentStatus[] {
   const { agentsDir, ext } = getProviderAgentInfo(provider)
-  return checkAgentFilesAtRoot(
-    join(cwd, agentsDir),
-    ext,
-    provider,
-    projectName,
-    allowedPaths,
-    writablePaths,
-    models
-  )
+  return checkAgentFilesAtRoot(join(cwd, agentsDir), ext)
 }
 
 // ─── Skill check ─────────────────────────────────────────────────────────────
@@ -285,18 +200,8 @@ export async function getDoctorStatus(cwd: string): Promise<DoctorStatus> {
   }
 
   const provider = config.provider
-  const projectName = config.project.name
-  const allowedPaths = (config.agents.explorer.allowedPaths ?? []).join(', ')
-  const writablePaths = (config.agents.builder.writablePaths ?? []).join(', ')
-  const models: Partial<Record<AgentName, string | undefined>> = {
-    lead: config.agents.lead.model,
-    explorer: config.agents.explorer.model,
-    consultant: config.agents.consultant?.model,
-    builder: config.agents.builder.model,
-    reviewer: config.agents.reviewer.model,
-  }
 
-  const agents = checkAgentFiles(cwd, provider, projectName, allowedPaths, writablePaths, models)
+  const agents = checkAgentFiles(cwd, provider)
   const skills = checkSkills(cwd, provider)
 
   return { lib, agents, skills }

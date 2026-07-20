@@ -3,10 +3,10 @@ export type {
   ActionRow,
   ActionSections,
   ActionStatus,
-  AgentConfig,
+  // BREAKING (removed): `AgentConfig`, `AgentsConfig` and `CustomAgentConfig`
+  // were removed along with the `agents` config key. `AgentName` is unrelated
+  // and stays. See the note in src/types.ts.
   AgentName,
-  AgentsConfig,
-  CustomAgentConfig,
   HarnessConfig,
   HealthConfig,
   ProjectConfig,
