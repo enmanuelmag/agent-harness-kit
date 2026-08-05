@@ -152,7 +152,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
   // ─── Provider ─────────────────────────────────────────────────────────────
   let provider: Provider
-  if (flags.provider && ['claude-code', 'opencode'].includes(flags.provider)) {
+  if (flags.provider && ['claude-code', 'opencode', 'codex-cli', 'grok-cli'].includes(flags.provider)) {
     provider = flags.provider as Provider
   } else {
     const val = await p.select({
@@ -161,6 +161,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         { value: 'opencode', label: 'OpenCode' },
         { value: 'claude-code', label: 'Claude Code' },
         { value: 'codex-cli', label: 'Codex CLI' },
+        { value: 'grok-cli', label: 'Grok CLI' },
       ],
     })
     if (p.isCancel(val)) {
@@ -397,8 +398,13 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.green('✓ Scaffolded harness in current directory'))
 
   // ─── Summary ─────────────────────────────────────────────────────────────-
-  const agentsDir = provider === 'claude-code' ? '.claude/agents/' : '.opencode/agents/'
-  const mcpFile = provider === 'claude-code' ? '.claude/mcp.json' : './opencode.json'
+  const PROVIDER_SUMMARY_INFO: Record<Provider, { agentsDir: string; mcpFile: string }> = {
+    'claude-code': { agentsDir: '.claude/agents/', mcpFile: '.mcp.json' },
+    opencode: { agentsDir: '.opencode/agents/', mcpFile: './opencode.json' },
+    'codex-cli': { agentsDir: '.codex/agents/', mcpFile: '.codex/config.toml' },
+    'grok-cli': { agentsDir: '.grok/agents/', mcpFile: '.grok/config.toml' },
+  }
+  const { agentsDir, mcpFile } = PROVIDER_SUMMARY_INFO[provider]
 
   console.log('')
   console.log(pc.green(`✓ agent-harness-kit.config.${configExt}`))

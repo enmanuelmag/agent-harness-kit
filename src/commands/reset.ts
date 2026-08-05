@@ -7,29 +7,48 @@ import pc from 'picocolors'
 import { loadConfig } from '@/core/config'
 import { resolveSqlitePath } from '@/core/db'
 
+import type { Provider } from '@/types'
+
 interface ResetOptions {
   force?: boolean
-  provider?: 'claude-code' | 'opencode'
+  provider?: Provider
 }
 
-// Map of agent names to their .md filenames
+// Map of agent role names to their generated filenames (extension varies by provider)
 const AGENT_MD_FILES = ['lead', 'explorer', 'consultant', 'builder', 'reviewer']
 
-async function resetAgentMds(cwd: string, provider: 'claude-code' | 'opencode'): Promise<void> {
-  const agentDir = provider === 'claude-code' ? '.claude/agents' : '.opencode/agents'
+const PROVIDER_AGENT_DIRS: Record<Provider, string> = {
+  'claude-code': '.claude/agents',
+  opencode: '.opencode/agents',
+  'codex-cli': '.codex/agents',
+  'grok-cli': '.grok/agents',
+}
+
+// codex-cli agent files are TOML (see codex-cli.ts materializer); every other
+// provider generates markdown + YAML frontmatter.
+const PROVIDER_AGENT_EXT: Record<Provider, string> = {
+  'claude-code': '.md',
+  opencode: '.md',
+  'codex-cli': '.toml',
+  'grok-cli': '.md',
+}
+
+async function resetAgentMds(cwd: string, provider: Provider): Promise<void> {
+  const agentDir = PROVIDER_AGENT_DIRS[provider]
   const agentDirPath = resolve(cwd, agentDir)
+  const agentExt = PROVIDER_AGENT_EXT[provider]
 
   if (!existsSync(agentDirPath)) {
     console.log(pc.yellow(`  Skipping agent files — directory not found: ${agentDirPath}`))
     return
   }
 
-  // Collect existing agent MD files
+  // Collect existing agent files for this provider's extension
   const existingFiles: string[] = []
   try {
     const files = readdirSync(agentDirPath)
     for (const f of files) {
-      if (f.endsWith('.md') && AGENT_MD_FILES.includes(f.replace('.md', ''))) {
+      if (f.endsWith(agentExt) && AGENT_MD_FILES.includes(f.replace(agentExt, ''))) {
         existingFiles.push(f)
       }
     }

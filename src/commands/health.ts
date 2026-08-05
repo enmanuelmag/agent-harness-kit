@@ -114,6 +114,8 @@ function getProviderHealthFiles(provider: HarnessConfig['provider']): {
       return { agentsDir: '.opencode/agents', agentExtension: '.md', mcpFile: 'opencode.json' }
     case 'codex-cli':
       return { agentsDir: '.codex/agents', agentExtension: '.toml', mcpFile: '.codex/config.toml' }
+    case 'grok-cli':
+      return { agentsDir: '.grok/agents', agentExtension: '.md', mcpFile: '.grok/config.toml' }
     default:
       throw new Error(`Unknown provider: ${provider as string}`)
   }
