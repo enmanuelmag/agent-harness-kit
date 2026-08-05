@@ -585,6 +585,17 @@ function appendFrontmatterBlockSequence(md: string, key: string, values: string[
 }
 
 /**
+ * Appends a single scalar key (e.g. `model: opus`) to the end of the
+ * frontmatter, just before its closing `---`. Only used where the caller has
+ * already guarded that the frontmatter does not carry a hand-authored value
+ * for this key — this function does not check for an existing line itself.
+ */
+function appendFrontmatterScalar(md: string, key: string, value: string): string {
+  const block = `${key}: ${value}\n`
+  return md.replace(/^---\n([\s\S]*?)^---\n/m, (_m, body: string) => `---\n${body}${block}---\n`)
+}
+
+/**
  * Appends a nested YAML mapping (e.g. `permission:\n  edit: deny`) to the end of
  * the frontmatter, just before its closing `---`.
  */
@@ -607,17 +618,29 @@ function appendFrontmatterMapping(md: string, key: string, entries: Record<strin
  * Restrictions are expressed as a denylist via `disallowedTools`, which Claude
  * Code applies before `tools`.
  *
- * No `model:` line is emitted either. The generated file is user-owned, so the
- * model is set by editing the frontmatter directly; with no line emitted,
- * Claude Code applies its own default — the behaviour the old 'inherit' option
- * described.
+ * No `model:` line is emitted by default. Those generated files are
+ * user-owned, so their model is normally set by editing the frontmatter
+ * directly; with no line emitted, Claude Code applies its own default — the
+ * behaviour the old 'inherit' option described.
+ *
+ * `opts.model` is the one caller-controlled exception: when the value is
+ * provided and is not 'inherit', a `model: <value>` line is injected for
+ * whichever `agentName` is passed in. This is how `ahk init`'s per-role model
+ * prompt (Claude Code only) applies a user's choice to a role's generated
+ * `.claude/agents/<role>.md` at scaffold time — it writes straight into this
+ * function's output, never into config. Omitting `opts` (or passing 'inherit')
+ * keeps the contract byte-identical to the no-model-line default.
  */
 export function translateFrontmatterForClaudeCode(
   md: string,
-  agentName: AgentName
+  agentName: AgentName,
+  opts?: { model?: string }
 ): string {
   let result = stripFrontmatterBlockSequence(md, 'tools')
   result = stripFrontmatterBlockSequence(result, 'disallowedTools')
+  if (opts?.model && opts.model !== 'inherit') {
+    result = appendFrontmatterScalar(result, 'model', opts.model)
+  }
   return appendFrontmatterBlockSequence(result, 'disallowedTools', claudeDisallowedTools(agentName))
 }
 

@@ -227,4 +227,14 @@ export interface ScaffoldOptions {
     description: string
     acceptance: string[]
   }
+  /** Claude Code only: per-role model choice collected by `ahk init`'s
+   *  provider-conditional prompt, keyed by the materializer's `AgentName`
+   *  (lead/explorer/consultant/builder/reviewer). Consumed exclusively by
+   *  `ClaudeCodeMaterializer.scaffold()` to inject a `model:` frontmatter line
+   *  into each role's generated `.claude/agents/<role>.md` at scaffold time —
+   *  never persisted to config. Optional and provider-specific-in-practice,
+   *  but declared on the shared `ScaffoldOptions` type since `Materializer`
+   *  exposes one `scaffold(config, opts)` signature across all providers;
+   *  OpenCode's and Codex CLI's materializers simply never read this field. */
+  claudeAgentModels?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>>
 }

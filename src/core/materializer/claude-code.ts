@@ -29,21 +29,29 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 /** The set of agent files this provider owns, with their generated content.
  *  Single definition shared by `scaffold()` and `build()` — the two used to
  *  duplicate this list, which is how `build()` kept overwriting user edits
- *  long after `scaffold()` had been fixed to preserve them. */
-function claudeAgentFiles(config: HarnessConfig): AgentFileEntry[] {
+ *  long after `scaffold()` had been fixed to preserve them.
+ *
+ *  `modelsByRole` is optional and only ever populated by `scaffold()` (from
+ *  `ahk init`'s per-role model prompt, Claude Code only) — `build()` always
+ *  calls this with no second argument, so regenerating an existing project's
+ *  agent files never injects a model line. */
+function claudeAgentFiles(
+  config: HarnessConfig,
+  modelsByRole?: ScaffoldOptions['claudeAgentModels']
+): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead') },
-    { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }), 'explorer') },
-    { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant') },
-    { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }), 'builder') },
-    { relPath: '.claude/agents/reviewer.md', content: translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer') },
+    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead', { model: modelsByRole?.lead }) },
+    { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }), 'explorer', { model: modelsByRole?.explorer }) },
+    { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant', { model: modelsByRole?.consultant }) },
+    { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }), 'builder', { model: modelsByRole?.builder }) },
+    { relPath: '.claude/agents/reviewer.md', content: translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', { model: modelsByRole?.reviewer }) },
   ]
 }
 
 export class ClaudeCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
-    const { cwd } = opts
+    const { cwd, claudeAgentModels } = opts
 
     // AGENTS.md and CLAUDE.md — fresh project, write unconditionally, but STAMP
     // the provenance marker so the first `ahk build` recognizes these as our own
@@ -77,7 +85,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     }
 
     // .claude/agents/ — user-owned: create when missing, never overwrite
-    writeAgentFiles(cwd, claudeAgentFiles(config))
+    writeAgentFiles(cwd, claudeAgentFiles(config, claudeAgentModels))
 
     // .mcp.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.

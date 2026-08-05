@@ -182,6 +182,61 @@ describe('build — no generated agent file carries a model line', () => {
   }
 })
 
+describe('scaffold — claudeAgentModels injects a model line per role, no cross-contamination', () => {
+  // ahk init's per-role model prompt (Claude Code only) flows into
+  // scaffold(config, { claudeAgentModels }) → claudeAgentFiles() →
+  // translateFrontmatterForClaudeCode(). This is the end-to-end threading
+  // path, as opposed to templates.test.ts's unit-level coverage of the
+  // translator function alone.
+  test('each role gets its own model line; roles left unset get none', async () => {
+    const cwd = makeTmp('claude-code-scaffold-models')
+    const materializer = getMaterializer('claude-code')
+    const config = configFor('claude-code')
+
+    await materializer.scaffold(config, {
+      cwd,
+      claudeAgentModels: { lead: 'opus', builder: 'haiku' },
+    })
+
+    const lead = readFileSync(join(cwd, '.claude/agents/lead.md'), 'utf8')
+    const builder = readFileSync(join(cwd, '.claude/agents/builder.md'), 'utf8')
+    const explorer = readFileSync(join(cwd, '.claude/agents/explorer.md'), 'utf8')
+    const consultant = readFileSync(join(cwd, '.claude/agents/consultant.md'), 'utf8')
+    const reviewer = readFileSync(join(cwd, '.claude/agents/reviewer.md'), 'utf8')
+
+    assert.match(lead, /^model: opus$/m, 'lead should get its chosen model')
+    assert.match(builder, /^model: haiku$/m, 'builder should get its chosen model')
+    assert.doesNotMatch(explorer, /^model:/m, 'explorer was left unset — no model line')
+    assert.doesNotMatch(consultant, /^model:/m, 'consultant was left unset — no model line')
+    assert.doesNotMatch(reviewer, /^model:/m, 'reviewer was left unset — no model line')
+  })
+
+  test('a plain scaffold with no claudeAgentModels emits no model line for any role', async () => {
+    const cwd = makeTmp('claude-code-scaffold-nomodels')
+    const materializer = getMaterializer('claude-code')
+    const config = configFor('claude-code')
+
+    await materializer.scaffold(config, { cwd })
+
+    for (const file of ['lead.md', 'explorer.md', 'consultant.md', 'builder.md', 'reviewer.md']) {
+      const content = readFileSync(join(cwd, '.claude/agents', file), 'utf8')
+      assert.doesNotMatch(content, /^model:/m, `${file} must not declare a model: line`)
+    }
+  })
+
+  test('build() (re-scaffold) never threads a model map, even after scaffold set one', async () => {
+    const cwd = makeTmp('claude-code-build-ignores-models')
+    const materializer = getMaterializer('claude-code')
+    const config = configFor('claude-code')
+
+    // A fresh build (no prior scaffold) must not carry any model line, since
+    // build() never accepts/threads claudeAgentModels — only scaffold() does.
+    await materializer.build(config, cwd)
+    const lead = readFileSync(join(cwd, '.claude/agents/lead.md'), 'utf8')
+    assert.doesNotMatch(lead, /^model:/m)
+  })
+})
+
 describe('writeAgentFiles — backup is fail-safe', () => {
   test('a backup failure aborts without modifying a single file', () => {
     const cwd = makeTmp('backup-failure')

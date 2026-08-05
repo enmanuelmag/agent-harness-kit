@@ -815,11 +815,15 @@ describe('agent*Toml — never emits a model line', () => {
   })
 })
 
-describe('translateFrontmatterForClaudeCode — never emits a model line', () => {
+describe('translateFrontmatterForClaudeCode — no model line by default', () => {
   const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body content\n`
 
-  test('no model: line is injected', () => {
+  test('no opts → no model: line is injected', () => {
     assert.doesNotMatch(translateFrontmatterForClaudeCode(input, 'explorer'), /^model:/m)
+  })
+
+  test("opts.model 'inherit' → no model: line is injected", () => {
+    assert.doesNotMatch(translateFrontmatterForClaudeCode(input, 'explorer', { model: 'inherit' }), /^model:/m)
   })
 
   test('a user-authored model: line is preserved, not stripped or rewritten', () => {
@@ -832,6 +836,49 @@ describe('translateFrontmatterForClaudeCode — never emits a model line', () =>
 
   test('disallowedTools block is still emitted', () => {
     const result = translateFrontmatterForClaudeCode(input, 'explorer')
+    assert.match(result, /^disallowedTools:\n  - Write\n  - Edit$/m)
+  })
+})
+
+// ahk init's per-role model prompt (Claude Code only) writes straight into each
+// role's generated frontmatter via this opts.model param — never into config.
+// These tests cover every real role (lead/explorer/consultant/builder/reviewer)
+// getting its own correct model: line with no cross-role leakage.
+describe('translateFrontmatterForClaudeCode — per-role model injection', () => {
+  const roles = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
+  const fm = (name: string) => `---\nname: ${name}\ndescription: some desc\n---\n\n# Body content\n`
+
+  for (const role of roles) {
+    for (const model of ['haiku', 'sonnet', 'opus', 'fable']) {
+      test(`${role} with opts.model '${model}' → emits model: ${model}`, () => {
+        const result = translateFrontmatterForClaudeCode(fm(role), role, { model })
+        assert.match(result, new RegExp(`^model: ${model}$`, 'm'))
+      })
+    }
+
+    test(`${role} with opts.model 'inherit' → no model: line`, () => {
+      assert.doesNotMatch(translateFrontmatterForClaudeCode(fm(role), role, { model: 'inherit' }), /^model:/m)
+    })
+  }
+
+  test('no cross-role contamination — choosing opus for builder must not affect explorer', () => {
+    const builderResult = translateFrontmatterForClaudeCode(fm('builder'), 'builder', { model: 'opus' })
+    const explorerResult = translateFrontmatterForClaudeCode(fm('explorer'), 'explorer', { model: 'opus' })
+    assert.match(builderResult, /^model: opus$/m)
+    assert.match(explorerResult, /^model: opus$/m)
+    // Calling for one role with a model set must never inject into another
+    // role's output when that role's own call passes no model.
+    const reviewerNoModel = translateFrontmatterForClaudeCode(fm('reviewer'), 'reviewer')
+    assert.doesNotMatch(reviewerNoModel, /^model:/m)
+  })
+
+  test('disallowedTools is unaffected by model injection — builder (unrestricted) still emits none', () => {
+    const result = translateFrontmatterForClaudeCode(fm('builder'), 'builder', { model: 'opus' })
+    assert.doesNotMatch(result, /disallowedTools/)
+  })
+
+  test('disallowedTools is unaffected by model injection — reviewer (no-write) still emits its denylist', () => {
+    const result = translateFrontmatterForClaudeCode(fm('reviewer'), 'reviewer', { model: 'haiku' })
     assert.match(result, /^disallowedTools:\n  - Write\n  - Edit$/m)
   })
 })

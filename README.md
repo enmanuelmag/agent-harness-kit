@@ -191,10 +191,9 @@ Working inside the `agent-harness-kit` repository itself counts as a local insta
 
 Interactive scaffold. Asks for your project name, description, AI provider, docs path, storage scope, task adapter, and an optional first task. Creates all harness files in the current directory.
 
-For Claude Code and Codex CLI (not OpenCode), you'll also be asked whether to personalize the model per agent (lead/explorer/consultant/builder/reviewer):
+Claude Code only, init asks you to pick a model for each of the 5 core roles (lead, explorer, consultant, builder, reviewer) one at a time: `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable`. Each choice is written straight into that role's generated `.claude/agents/<role>.md` frontmatter as a `model:` line at scaffold time — it is never persisted to the config file. Picking `inherit` (the default) emits no `model:` line at all, leaving Claude Code to apply its own default. This prompt only runs during `ahk init`'s one-time scaffold, not on `ahk build` — agent files are user-owned once generated (see [Agent files are yours](#agent-files-are-yours) below), so after init the model is changed the same way as any other edit: hand-editing the `model:` frontmatter line directly.
 
-- Claude Code: pick from `inherit` (default), `haiku`, `sonnet`, `opus`, `fable` per agent.
-- Codex CLI: free-text model name per agent — Codex does not validate this value; leaving it blank or under 3 characters means no override is written to that agent's TOML file.
+OpenCode and Codex CLI are unaffected by this prompt — it never appears for those providers. OpenCode has no closed model enum to prompt against, and Codex's model is still set by hand-editing `model = "..."` in its TOML.
 
 **Storage scope** — where the harness DB (and its `current.md` fallback) physically lives:
 
