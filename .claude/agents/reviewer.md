@@ -30,15 +30,19 @@ These calls are **not optional**. The dashboard cannot display what you do not r
 
 ### 1. Log every tool call you make
 
-After **each** tool invocation (Read, Bash), call:
+`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. Accumulate each tool invocation (Read, Bash) as you go, and flush periodically — every few calls, or at a natural checkpoint — via:
 
 ```
-actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
+actions.record_tool(actionId, calls: [
+  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why>' },
+  ...
+])
 ```
 
-Examples:
-- `actions.record_tool(actionId, 'Read', 'src/auth/middleware.ts', 'verify refresh token logic matches criterion 2')`
-- `actions.record_tool(actionId, 'Bash', 'npm test --testPathPattern=auth', 'confirm all auth tests pass')`
+Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
+
+Example flush after a few calls:
+- `actions.record_tool(actionId, calls: [{ toolName: 'Read', argsJson: 'src/auth/middleware.ts', resultSummary: 'verify refresh token logic matches criterion 2' }, { toolName: 'Bash', argsJson: 'npm test --testPathPattern=auth', resultSummary: 'confirm all auth tests pass' }])`
 
 ### 2. Mark every acceptance criterion as you verify it
 

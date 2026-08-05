@@ -98,18 +98,21 @@ These calls are **not optional**. The dashboard cannot display what you do not r
 
 ### Log every tool call you make
 
-After **each** tool invocation (Bash, tasks.get, tasks.claim, actions.get), call:
+`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. As you work, accumulate the tool invocations you make (Bash, tasks.get, tasks.claim, actions.get) and flush them periodically — every few calls, or at a natural checkpoint — via:
 
 ```
-actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
+actions.record_tool(actionId, calls: [
+  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why/result>' },
+  ...
+])
 ```
 
-Examples:
-- `actions.record_tool(actionId, 'Bash', 'bash health.sh', 'verify codebase health before making changes')`
-- `actions.record_tool(actionId, 'tasks.get', 'pending', 'find next task to claim')`
-- `actions.record_tool(actionId, 'actions.get', 'taskId=abc123', 'read action history to resume in-progress task')`
+Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
 
-**Log every call.** This applies from the moment you have an `actionId` (after step 3 below).
+Example flush after a few calls:
+- `actions.record_tool(actionId, calls: [{ toolName: 'Bash', argsJson: 'bash health.sh', resultSummary: 'verify codebase health before making changes' }, { toolName: 'tasks.get', argsJson: 'pending', resultSummary: 'find next task to claim' }, { toolName: 'actions.get', argsJson: 'taskId=123', resultSummary: 'read action history to resume in-progress task' }])`
+
+**Log every call, batched.** This applies from the moment you have an `actionId` (after step 3 below) — flush at each phase boundary rather than round-tripping once per individual tool use, and never let calls go unrecorded by the time you complete the action.
 
 ---
 

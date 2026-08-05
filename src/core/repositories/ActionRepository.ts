@@ -1,5 +1,5 @@
 import type { DBDriver } from '../drivers/types'
-import type { ActionFileRow, ActionRow, ActionSectionRow, AgentName } from '@/types'
+import type { ActionFileRow, ActionRow, ActionSectionRow, ActionToolRow, AgentName } from '@/types'
 
 export interface ActionWithDetails extends ActionRow {
   sections: ActionSectionRow[]
@@ -7,26 +7,20 @@ export interface ActionWithDetails extends ActionRow {
   tools: ActionToolRow[]
 }
 
-export interface ActionToolRow {
-  id: number
-  action_id: string
-  tool_name: string
-  args_json: string | null
-  result_summary: string | null
-  called_at: string
-}
-
 export class ActionRepository {
   constructor(private driver: DBDriver) {}
 
-  async create(id: string, taskId: number, agent: AgentName, now: string): Promise<void> {
-    await this.driver.exec(
-      `INSERT INTO actions (id, task_id, agent, status, created_at) VALUES (?, ?, ?, 'in_progress', ?)`,
-      [id, taskId, agent, now],
+  /** Returns the new autoincrement id — mirrors TaskRepository.add(). Since
+   *  task #73, `actions.id` is a driver-generated INTEGER, not an
+   *  application-generated UUID, so callers no longer pass an id in. */
+  async create(taskId: number, agent: AgentName, now: string): Promise<number> {
+    return this.driver.insert(
+      `INSERT INTO actions (task_id, agent, status, created_at) VALUES (?, ?, 'in_progress', ?)`,
+      [taskId, agent, now],
     )
   }
 
-  async complete(actionId: string, summary: string, now: string): Promise<void> {
+  async complete(actionId: number, summary: string, now: string): Promise<void> {
     await this.driver.exec(
       `UPDATE actions SET status = 'completed', completed_at = ?, summary = ? WHERE id = ?`,
       [now, summary, actionId],
@@ -40,7 +34,7 @@ export class ActionRepository {
     )
   }
 
-  async getById(actionId: string): Promise<ActionRow | null> {
+  async getById(actionId: number): Promise<ActionRow | null> {
     return this.driver.queryOne<ActionRow>(`SELECT * FROM actions WHERE id = ?`, [actionId])
   }
 
@@ -69,14 +63,14 @@ export class ActionRepository {
 
   // ─── Sections ─────────────────────────────────────────────────────────────
 
-  async addSection(actionId: string, sectionType: string, content: string, now: string): Promise<void> {
+  async addSection(actionId: number, sectionType: string, content: string, now: string): Promise<void> {
     await this.driver.exec(
       `INSERT INTO action_sections (action_id, section_type, content, created_at) VALUES (?, ?, ?, ?)`,
       [actionId, sectionType, content, now],
     )
   }
 
-  async getSections(actionId: string): Promise<ActionSectionRow[]> {
+  async getSections(actionId: number): Promise<ActionSectionRow[]> {
     return this.driver.query<ActionSectionRow>(
       `SELECT * FROM action_sections WHERE action_id = ? ORDER BY created_at`,
       [actionId],
@@ -90,7 +84,7 @@ export class ActionRepository {
   // ─── Files ────────────────────────────────────────────────────────────────
 
   async addFile(
-    actionId: string,
+    actionId: number,
     filePath: string,
     operation: ActionFileRow['operation'],
     notes: string | null,
@@ -101,7 +95,7 @@ export class ActionRepository {
     )
   }
 
-  async getFiles(actionId: string): Promise<ActionFileRow[]> {
+  async getFiles(actionId: number): Promise<ActionFileRow[]> {
     return this.driver.query<ActionFileRow>(
       `SELECT * FROM action_files WHERE action_id = ?`,
       [actionId],
@@ -124,7 +118,7 @@ export class ActionRepository {
   // ─── Tools ────────────────────────────────────────────────────────────────
 
   async addTool(
-    actionId: string,
+    actionId: number,
     toolName: string,
     argsJson: string | null,
     resultSummary: string | null,
@@ -136,7 +130,7 @@ export class ActionRepository {
     )
   }
 
-  async getTools(actionId: string): Promise<ActionToolRow[]> {
+  async getTools(actionId: number): Promise<ActionToolRow[]> {
     return this.driver.query<ActionToolRow>(
       `SELECT * FROM action_tools WHERE action_id = ? ORDER BY called_at`,
       [actionId],

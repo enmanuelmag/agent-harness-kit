@@ -1,5 +1,7 @@
 import postgres from 'postgres'
 
+import { migrateActionsToIntegerIds } from './migrate-actions'
+
 import type { DBDriver } from './types'
 import type { RemoteDBConfig } from '@/types'
 
@@ -27,7 +29,7 @@ CREATE TABLE IF NOT EXISTS task_acceptance (
 );
 
 CREATE TABLE IF NOT EXISTS actions (
-  id           TEXT    PRIMARY KEY,
+  id           SERIAL  PRIMARY KEY,
   task_id      INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   agent        TEXT    NOT NULL
                CHECK(agent IN ('lead','explorer','builder','reviewer') OR agent LIKE 'custom:%'),
@@ -40,7 +42,7 @@ CREATE TABLE IF NOT EXISTS actions (
 
 CREATE TABLE IF NOT EXISTS action_sections (
   id           SERIAL  PRIMARY KEY,
-  action_id    TEXT    NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+  action_id    INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
   section_type TEXT    NOT NULL,
   content      TEXT    NOT NULL,
   created_at   TEXT    NOT NULL
@@ -48,7 +50,7 @@ CREATE TABLE IF NOT EXISTS action_sections (
 
 CREATE TABLE IF NOT EXISTS action_files (
   id          SERIAL  PRIMARY KEY,
-  action_id   TEXT    NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+  action_id   INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
   file_path   TEXT    NOT NULL,
   operation   TEXT    NOT NULL
               CHECK(operation IN ('read','created','modified','deleted')),
@@ -57,7 +59,7 @@ CREATE TABLE IF NOT EXISTS action_files (
 
 CREATE TABLE IF NOT EXISTS action_tools (
   id             SERIAL  PRIMARY KEY,
-  action_id      TEXT    NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+  action_id      INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
   tool_name      TEXT    NOT NULL,
   args_json      TEXT,
   result_summary TEXT,
@@ -100,6 +102,9 @@ export class PostgresDriver implements DBDriver {
     } catch {
       // Column already exists — ignore
     }
+    // Migration (task #73): actions.id TEXT/UUID -> INTEGER autoincrement,
+    // preserving all existing rows. Idempotent — no-op once already migrated.
+    await migrateActionsToIntegerIds(this, 'postgres', SCHEMA)
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {

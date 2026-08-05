@@ -13,6 +13,7 @@ import {
   resolveGlobalStorageDir,
 } from '@/core/db'
 import { SQLiteDriver } from '@/core/drivers/sqlite'
+import { ActionRepository } from '@/core/repositories/ActionRepository'
 import { TaskRepository } from '@/core/repositories/TaskRepository'
 import { MockRemoteDriver } from '@/tests/helpers/mock-remote-driver'
 
@@ -103,8 +104,8 @@ async function seedData(db: HarnessDB): Promise<{ taskId: number }> {
   const slug = `seed-task-${++seedCounter}`
   const task = await db.addTask({ slug, title: 'Seed Task', acceptance: ['must pass'] })
   const action = await db.startAction(task.id, 'lead')
-  await db.recordFile(action.id, 'src/index.ts', 'modified', 'note')
-  await db.recordTool(action.id, 'Bash', '{"cmd":"ls"}', 'summary')
+  await db.recordFiles(action.id, [{ filePath: 'src/index.ts', operation: 'modified', notes: 'note' }])
+  await db.recordTools(action.id, [{ toolName: 'Bash', argsJson: '{"cmd":"ls"}', resultSummary: 'summary' }])
   await db.writeSection(action.id, 'result', 'done')
   await db.completeAction(action.id, 'done')
   return { taskId: task.id }
@@ -256,6 +257,95 @@ describe('importFullExport — id preservation, transactional rollback, sequence
       newId > maxImportedId,
       `new id ${newId} must be greater than max imported id ${maxImportedId} (sequence reset must have run)`
     )
+  })
+
+  test('sqlite: after import, a subsequent ActionRepository.create() (no explicit id) does not collide with imported action ids (task #73)', async () => {
+    mkdirSync(dir, { recursive: true })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src5.db') }) })
+    const srcDb = await openDB(srcConfig, dir)
+    let data
+    try {
+      await seedData(srcDb)
+      await seedData(srcDb)
+      await seedData(srcDb)
+      data = await srcDb.exportJson()
+    } finally {
+      await srcDb.close()
+    }
+
+    const maxImportedActionId = Math.max(...data.actions.map((a) => a.id))
+
+    const destDriver = new SQLiteDriver(join(dir, 'dest5.db'))
+    await destDriver.ensureSchema()
+    try {
+      await importFullExport(destDriver, data, 'sqlite', { truncateFirst: false })
+      const repo = new ActionRepository(destDriver)
+      const newId = await repo.create(1, 'reviewer', new Date().toISOString())
+      assert.ok(
+        newId > maxImportedActionId,
+        `new action id ${newId} must be greater than max imported action id ${maxImportedActionId}`,
+      )
+    } finally {
+      await destDriver.close()
+    }
+  })
+
+  test('mocked remote (postgres-dialect) destination: actions sequence reset prevents id collision on next ActionRepository.create() (task #73)', async () => {
+    mkdirSync(dir, { recursive: true })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src6.db') }) })
+    const srcDb = await openDB(srcConfig, dir)
+    let data
+    try {
+      await seedData(srcDb)
+      await seedData(srcDb)
+      data = await srcDb.exportJson()
+    } finally {
+      await srcDb.close()
+    }
+
+    const maxImportedActionId = Math.max(...data.actions.map((a) => a.id))
+
+    const mockRemote = new MockRemoteDriver()
+    await importFullExport(mockRemote, data, 'postgres', { truncateFirst: false })
+
+    const repo = new ActionRepository(mockRemote)
+    const newId = await repo.create(1, 'reviewer', new Date().toISOString())
+    assert.ok(
+      newId > maxImportedActionId,
+      `new action id ${newId} must be greater than max imported action id ${maxImportedActionId} (sequence reset must have run)`,
+    )
+  })
+
+  test('importFullExport rejects a legacy (pre-2.0) export with string/UUID action ids instead of a raw driver error (task #73)', async () => {
+    mkdirSync(dir, { recursive: true })
+    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src7.db') }) })
+    const srcDb = await openDB(srcConfig, dir)
+    let data
+    try {
+      await seedData(srcDb)
+      data = await srcDb.exportJson()
+    } finally {
+      await srcDb.close()
+    }
+
+    // Simulate a pre-#73 export: actions still carrying UUID/text ids.
+    const legacyData = {
+      ...data,
+      actions: data.actions.map((a) => ({ ...a, id: 'legacy-uuid-0001' as unknown as number })),
+    }
+
+    const destDriver = new SQLiteDriver(join(dir, 'dest7.db'))
+    await destDriver.ensureSchema()
+    try {
+      await assert.rejects(
+        () => importFullExport(destDriver, legacyData, 'sqlite', { truncateFirst: false }),
+        /older version|pre-2\.0|integer-id/i,
+      )
+      const counts = await getRowCounts(destDriver)
+      assert.equal(counts.actions, 0, 'nothing should have been imported once the legacy-id check rejected the export')
+    } finally {
+      await destDriver.close()
+    }
   })
 
   test('without the sequence reset, the mocked remote driver WOULD collide (sanity check the mock itself)', async () => {

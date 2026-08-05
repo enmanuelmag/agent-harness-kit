@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -35,9 +34,12 @@ export interface FullExport {
 }
 
 /** Tables with an integer autoincrement/serial primary key, in FK-safe
- *  insertion order (parents before children). `actions` is excluded — its id
- *  is an application-generated UUID (TEXT), never autoincrement. */
-const AUTOINCREMENT_TABLES = ['tasks', 'task_acceptance', 'action_sections', 'action_files', 'action_tools'] as const
+ *  insertion order (parents before children). Since task #73, `actions.id`
+ *  is a driver-generated autoincrement INTEGER (previously an
+ *  application-generated UUID/TEXT id, which is why it used to be excluded
+ *  from this list) — see src/core/drivers/migrate-actions.ts for the
+ *  one-time migration that upgrades a pre-existing DB in place. */
+const AUTOINCREMENT_TABLES = ['tasks', 'task_acceptance', 'actions', 'action_sections', 'action_files', 'action_tools'] as const
 
 /** Full insertion order across all 6 tables, respecting FK constraints
  *  (parent before child): tasks -> task_acceptance -> actions ->
@@ -200,20 +202,19 @@ export class HarnessDB {
   // ─── Actions (public facade — delegates to ActionRepository) ──────────────
 
   async startAction(taskId: number, agent: AgentName): Promise<ActionRow> {
-    const id = randomUUID()
     const now = new Date().toISOString()
-    await this.actions.create(id, taskId, agent, now)
+    const id = await this.actions.create(taskId, agent, now)
     await this.regenerateCurrentMd()
     return (await this.actions.getById(id))!
   }
 
-  async writeSection(actionId: string, sectionType: string, content: string): Promise<void> {
+  async writeSection(actionId: number, sectionType: string, content: string): Promise<void> {
     const now = new Date().toISOString()
     await this.actions.addSection(actionId, sectionType, content, now)
     await this.regenerateCurrentMd()
   }
 
-  async completeAction(actionId: string, summary: string): Promise<ActionRow> {
+  async completeAction(actionId: number, summary: string): Promise<ActionRow> {
     const now = new Date().toISOString()
     await this.actions.complete(actionId, summary, now)
     await this.regenerateCurrentMd()
@@ -225,7 +226,7 @@ export class HarnessDB {
     return this.actions.closeOrphaned(taskId, now)
   }
 
-  async getAction(actionId: string): Promise<ActionRow | null> {
+  async getAction(actionId: number): Promise<ActionRow | null> {
     return this.actions.getById(actionId)
   }
 
@@ -233,27 +234,45 @@ export class HarnessDB {
     return this.actions.getForTask(taskId)
   }
 
-  async getActionSections(actionId: string): Promise<ActionSectionRow[]> {
+  async getActionSections(actionId: number): Promise<ActionSectionRow[]> {
     return this.actions.getSections(actionId)
   }
 
-  async recordFile(
-    actionId: string,
-    filePath: string,
-    operation: ActionFileRow['operation'],
-    notes?: string,
-  ): Promise<void> {
-    return this.actions.addFile(actionId, filePath, operation, notes ?? null)
+  /** Batch-only (task #74) — records N files in one atomic transaction. There
+   *  is no single-entry variant; callers pass a one-element array to log a
+   *  single file. Mirrors the driver.transaction() pattern from claimTask()
+   *  above: a fresh ActionRepository is bound to the tx driver so every
+   *  insert in the loop participates in the same transaction and any failure
+   *  rolls back the whole batch. Returns the number of files recorded. */
+  async recordFiles(
+    actionId: number,
+    files: Array<{ filePath: string; operation: ActionFileRow['operation']; notes?: string }>,
+  ): Promise<number> {
+    return this.driver.transaction(async (tx) => {
+      const txActions = new ActionRepository(tx)
+      for (const f of files) {
+        await txActions.addFile(actionId, f.filePath, f.operation, f.notes ?? null)
+      }
+      return files.length
+    })
   }
 
-  async recordTool(
-    actionId: string,
-    toolName: string,
-    argsJson?: string,
-    resultSummary?: string,
-  ): Promise<void> {
+  /** Batch-only (task #74) — records N tool calls in one atomic transaction.
+   *  See recordFiles() above for the pattern; a one-element array is the
+   *  only way to log a single tool call. Returns the number of calls
+   *  recorded. */
+  async recordTools(
+    actionId: number,
+    calls: Array<{ toolName: string; argsJson?: string; resultSummary?: string }>,
+  ): Promise<number> {
     const now = new Date().toISOString()
-    return this.actions.addTool(actionId, toolName, argsJson ?? null, resultSummary ?? null, now)
+    return this.driver.transaction(async (tx) => {
+      const txActions = new ActionRepository(tx)
+      for (const c of calls) {
+        await txActions.addTool(actionId, c.toolName, c.argsJson ?? null, c.resultSummary ?? null, now)
+      }
+      return calls.length
+    })
   }
 
   async getFilesForTask(taskId: number): Promise<(ActionFileRow & { agent: AgentName })[]> {
@@ -461,7 +480,7 @@ async function truncateAllTables(tx: DBDriver): Promise<void> {
  *  `tasksRepository.add()`) would collide with an imported id.
  *  MySQL AUTO_INCREMENT advances automatically on explicit-id inserts
  *  greater than the current counter — no action needed there. */
-async function resetAutoincrementSequences(
+export async function resetAutoincrementSequences(
   tx: DBDriver,
   dbType: 'sqlite' | 'postgres' | 'mysql',
 ): Promise<void> {
@@ -501,6 +520,20 @@ export async function importFullExport(
   destDbType: 'sqlite' | 'postgres' | 'mysql',
   opts: { truncateFirst: boolean } = { truncateFirst: false },
 ): Promise<void> {
+  // Task #73: actions.id moved from a UUID/TEXT id to an autoincrement
+  // INTEGER. An export produced by a pre-2.0 build still carries string
+  // action ids, which would otherwise fail deep inside the transaction below
+  // with a raw, confusing driver error (a datatype mismatch on sqlite's
+  // INTEGER PRIMARY KEY rowid alias, or a hard insert error on postgres/
+  // mysql). Fail fast with a clear, actionable message instead.
+  if (data.actions.some((a) => typeof (a as { id: unknown }).id !== 'number')) {
+    throw new Error(
+      'This export was produced by an older version of agent-harness-kit (actions used text/UUID ids, pre-2.0) and ' +
+        'cannot be imported into a database using the current integer-id actions schema. Re-exporting from the old build ' +
+        'is the only way to fix this — importing this file as-is is not supported.',
+    )
+  }
+
   await destDriver.transaction(async (tx) => {
     if (opts.truncateFirst) {
       await truncateAllTables(tx)

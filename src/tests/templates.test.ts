@@ -9,12 +9,18 @@ import { getMaterializer } from '@/core/materializer/index'
 import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
   __configObjectForTests,
+  agentBuilder,
   agentBuilderToml,
   agentConsultantToml,
+  agentExplorer,
   agentExplorerToml,
+  agentLead,
   agentLeadAsDefaultToml,
   agentLeadToml,
+  agentReviewer,
   agentReviewerToml,
+  agentsMd,
+  claudeMd,
   configCjs,
   configJson,
   configMjs,
@@ -1167,5 +1173,70 @@ describe('agent prompt text — no path placeholders (task #59)', () => {
     assert.doesNotMatch(explorer, /\{\{writablePaths\}\}/)
     assert.match(explorer, /sandbox_mode = "read-only"/)
     assert.doesNotMatch(explorer, /You may write anywhere/)
+  })
+})
+
+describe('record_tool/record_file tracking guidance — batch-only, no per-call phrasing (task #75)', () => {
+  const config = applyConfigDefaults({
+    name: 'demo-app',
+    description: 'demo',
+    provider: 'claude-code',
+    docsPath: './docs',
+    tasksAdapter: 'local',
+  })
+
+  // Text that described the old, retired single-entry call shape. None of it
+  // should survive anywhere agents are told how to call record_tool/record_file.
+  const staleNeedles = [
+    /After EVERY tool call/,
+    /After EVERY file change/,
+    /toolName>', '<args-summary>', '<why>'\)/,
+    /actions\.record_file\(actionId, '<file-path>'/,
+  ]
+
+  // Text that must be present wherever the tools are documented — proof the
+  // batch array shape (and the "even one entry is a one-element array" rule)
+  // is actually described, not just that the old text is gone.
+  function assertDescribesBatching(text: string, label: string): void {
+    for (const needle of staleNeedles) {
+      assert.doesNotMatch(text, needle, `${label} still contains stale per-call phrasing: ${needle}`)
+    }
+    assert.match(text, /calls:\s*\[/, `${label} should show the calls[] array shape`)
+    assert.match(text, /batch/i, `${label} should describe batching`)
+  }
+
+  test('agentsMd() documents batch-only record_tool/record_file', () => {
+    assertDescribesBatching(agentsMd(config), 'agentsMd()')
+  })
+
+  test('claudeMd() documents batch-only record_tool/record_file', () => {
+    assertDescribesBatching(claudeMd(config), 'claudeMd()')
+  })
+
+  test('lead agent template documents batch-only record_tool', () => {
+    assertDescribesBatching(agentLead({ projectName: 'demo' }), 'agentLead()')
+  })
+
+  test('explorer agent template documents batch-only record_tool', () => {
+    assertDescribesBatching(agentExplorer({ projectName: 'demo' }), 'agentExplorer()')
+  })
+
+  test('builder agent template documents batch-only record_tool and record_file, and drops the 1:1 call-count framing', () => {
+    const builder = agentBuilder({ projectName: 'demo' })
+    assertDescribesBatching(builder, 'agentBuilder()')
+    assert.match(builder, /files:\s*\[/, 'agentBuilder() should show the files[] array shape')
+    assert.doesNotMatch(
+      builder,
+      /there must be 5 `actions\.record_file` calls and 12 `actions\.record_tool` calls/,
+      'agentBuilder() should not hard-code a 1:1 call-per-event mapping'
+    )
+  })
+
+  test('reviewer agent template documents batch-only record_tool (acceptance-criteria guidance untouched)', () => {
+    const reviewer = agentReviewer({ projectName: 'demo' })
+    assertDescribesBatching(reviewer, 'agentReviewer()')
+    // The unrelated tasks.acceptance.update guidance is per-criterion by design — must survive as-is.
+    assert.match(reviewer, /tasks\.acceptance\.update\(criterionId\)/)
+    assert.match(reviewer, /one per criterion/)
   })
 })

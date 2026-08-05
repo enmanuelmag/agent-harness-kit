@@ -61,7 +61,7 @@ export interface AgentStatRow {
 }
 
 export interface TimelineRow {
-  id: string
+  id: number
   agent: string
   status: string
   summary: string | null

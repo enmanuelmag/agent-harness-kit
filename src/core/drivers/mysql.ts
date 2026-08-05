@@ -1,5 +1,7 @@
 import mysql, { type ExecuteValues } from 'mysql2/promise'
 
+import { migrateActionsToIntegerIds } from './migrate-actions'
+
 import type { DBDriver } from './types'
 import type { RemoteDBConfig } from '@/types'
 
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS task_acceptance (
 );
 
 CREATE TABLE IF NOT EXISTS actions (
-  id           VARCHAR(36)  PRIMARY KEY,
+  id           INT AUTO_INCREMENT PRIMARY KEY,
   task_id      INT          NOT NULL,
   agent        VARCHAR(100) NOT NULL,
   status       VARCHAR(20)  NOT NULL DEFAULT 'in_progress'
@@ -41,7 +43,7 @@ CREATE TABLE IF NOT EXISTS actions (
 
 CREATE TABLE IF NOT EXISTS action_sections (
   id           INT AUTO_INCREMENT PRIMARY KEY,
-  action_id    VARCHAR(36) NOT NULL,
+  action_id    INT NOT NULL,
   section_type VARCHAR(100) NOT NULL,
   content      TEXT         NOT NULL,
   created_at   VARCHAR(30)  NOT NULL,
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS action_sections (
 
 CREATE TABLE IF NOT EXISTS action_files (
   id          INT AUTO_INCREMENT PRIMARY KEY,
-  action_id   VARCHAR(36)  NOT NULL,
+  action_id   INT  NOT NULL,
   file_path   VARCHAR(1000) NOT NULL,
   operation   VARCHAR(20)  NOT NULL
               CHECK(operation IN ('read','created','modified','deleted')),
@@ -60,7 +62,7 @@ CREATE TABLE IF NOT EXISTS action_files (
 
 CREATE TABLE IF NOT EXISTS action_tools (
   id             INT AUTO_INCREMENT PRIMARY KEY,
-  action_id      VARCHAR(36)  NOT NULL,
+  action_id      INT NOT NULL,
   tool_name      VARCHAR(255) NOT NULL,
   args_json      TEXT,
   result_summary TEXT,
@@ -112,6 +114,11 @@ export class MySQLDriver implements DBDriver {
     } finally {
       conn.release()
     }
+    // Migration (task #73): actions.id VARCHAR/UUID -> INT AUTO_INCREMENT,
+    // preserving all existing rows. Idempotent — no-op once already migrated.
+    // Run outside the connection above (own execRaw/query calls via the pool)
+    // since MySQL's DDL isn't transactional either way.
+    await migrateActionsToIntegerIds(this, 'mysql', SCHEMA)
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {

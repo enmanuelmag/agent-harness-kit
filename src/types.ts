@@ -163,7 +163,7 @@ export type AgentName = 'lead' | 'explorer' | 'consultant' | 'builder' | 'review
 export type ActionStatus = 'in_progress' | 'completed' | 'blocked'
 
 export interface ActionRow {
-  id: string
+  id: number
   task_id: number
   agent: AgentName
   status: ActionStatus
@@ -174,7 +174,7 @@ export interface ActionRow {
 
 export interface ActionSectionRow {
   id: number
-  action_id: string
+  action_id: number
   section_type: string
   content: string
   created_at: string
@@ -182,7 +182,7 @@ export interface ActionSectionRow {
 
 export interface ActionFileRow {
   id: number
-  action_id: string
+  action_id: number
   file_path: string
   operation: 'read' | 'created' | 'modified' | 'deleted'
   notes: string | null
@@ -190,7 +190,7 @@ export interface ActionFileRow {
 
 export interface ActionToolRow {
   id: number
-  action_id: string
+  action_id: number
   tool_name: string
   args_json: string | null
   result_summary: string | null

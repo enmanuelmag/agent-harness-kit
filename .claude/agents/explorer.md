@@ -37,18 +37,21 @@ These calls are **not optional**. The dashboard cannot display what you do not r
 
 ### Log every tool call you make
 
-After **each** tool invocation (Read, Bash, grep, docs.search), call:
+`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. Accumulate the tool invocations you make (Read, Bash, grep, docs.search) as you go, and flush them periodically — every few calls, or at a natural checkpoint like finishing a file or a research thread — via:
 
 ```
-actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
+actions.record_tool(actionId, calls: [
+  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why>' },
+  ...
+])
 ```
 
-Examples:
-- `actions.record_tool(actionId, 'Read', 'src/auth/middleware.ts', 'find existing JWT pattern')`
-- `actions.record_tool(actionId, 'Bash', 'grep -r "refreshToken" src/', 'locate all refresh token usages')`
-- `actions.record_tool(actionId, 'docs.search', 'authentication middleware', 'check project docs for auth guidance')`
+Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
 
-**Every single tool call must be logged.** No silent reads. The Tools dashboard is built entirely from these `actions.record_tool` calls.
+Example flush after a few calls:
+- `actions.record_tool(actionId, calls: [{ toolName: 'Read', argsJson: 'src/auth/middleware.ts', resultSummary: 'find existing JWT pattern' }, { toolName: 'Bash', argsJson: 'grep -r "refreshToken" src/', resultSummary: 'locate all refresh token usages' }, { toolName: 'docs.search', argsJson: 'authentication middleware', resultSummary: 'check project docs for auth guidance' }])`
+
+**Every tool call must be logged, eventually, in a batch.** No silent reads. The Tools dashboard is built entirely from these `actions.record_tool` calls — accumulate as you work and flush before completing, don't let entries pile up unflushed.
 
 ---
 
@@ -84,7 +87,7 @@ Do NOT read the entire codebase. Be targeted.
 
 ### 5. Log every tool call as you make it
 
-Log each invocation as described in the **MANDATORY TRACKING** section above — do it immediately after each tool call, not at the end.
+Accumulate each invocation as described in the **MANDATORY TRACKING** section above and flush periodically in batches — don't wait until the very end to record everything at once.
 
 ### 6. Produce a structured analysis
 

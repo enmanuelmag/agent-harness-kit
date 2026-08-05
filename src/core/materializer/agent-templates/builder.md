@@ -32,36 +32,42 @@ a blocker and stop.
 
 ## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
 
-These three calls are **not optional**. The dashboard cannot display what you do not report. Missing any of them is a failure of your role.
+These calls are **not optional**. The dashboard cannot display what you do not report. Missing them is a failure of your role.
+
+Both `actions.record_tool` and `actions.record_file` are **batch-only** — each takes an array of entries, never a single bespoke call. Accumulate as you work and flush periodically (every few tool calls, or at a natural checkpoint/phase boundary) rather than round-tripping once per individual tool use. Even a single entry must still go through the array shape — a one-element array, never a bespoke single-call form, since that form no longer exists.
 
 ### 1. Log every tool call you make
 
-After **each** tool invocation (Read, Edit, Write, Bash), call **both**:
+Accumulate each tool invocation (Read, Edit, Write, Bash) as you go, then flush with:
 
 ```
-actions.record_tool(actionId, '<ToolName>', '<args-summary>', '<why>')
+actions.record_tool(actionId, calls: [
+  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why>' },
+  ...
+])
 ```
 
-Examples:
-- `actions.record_tool(actionId, 'Read', 'src/auth/middleware.ts', 'understand existing JWT pattern')`
-- `actions.record_tool(actionId, 'Bash', 'npm test --testPathPattern=auth', 'verify auth tests pass')`
-- `actions.record_tool(actionId, 'Edit', 'src/auth/middleware.ts:45-78', 'add refresh token validation')`
+Example flush after a few calls:
+- `actions.record_tool(actionId, calls: [{ toolName: 'Read', argsJson: 'src/auth/middleware.ts', resultSummary: 'understand existing JWT pattern' }, { toolName: 'Edit', argsJson: 'src/auth/middleware.ts:45-78', resultSummary: 'add refresh token validation' }, { toolName: 'Bash', argsJson: 'npm test --testPathPattern=auth', resultSummary: 'verify auth tests pass' }])`
 
 ### 2. Log every file you touch
 
-After **each** file modification (Edit, Write), call:
+Accumulate each file modification (Edit, Write) as you go, then flush with:
 
 ```
-actions.record_file(actionId, '<file-path>', '<operation>', '<what changed and why>')
+actions.record_file(actionId, files: [
+  { filePath: '<file-path>', operation: '<operation>', notes: '<what changed and why>' },
+  ...
+])
 ```
 
 Operations: `created` | `modified` | `deleted`
 
-Example: `actions.record_file(actionId, 'src/auth/middleware.ts', 'modified', 'added refresh token expiry check in validateToken()')`
+Example: `actions.record_file(actionId, files: [{ filePath: 'src/auth/middleware.ts', operation: 'modified', notes: 'added refresh token expiry check in validateToken()' }])`
 
 ### 3. Do not complete your action without both logs being up to date
 
-If you touched 5 files and made 12 tool calls, there must be 5 `actions.record_file` calls and 12 `actions.record_tool` calls before you call `actions.complete`.
+If you touched 5 files and made 12 tool calls across the session, every one of those must appear as an entry inside some `actions.record_file`/`actions.record_tool` batch call before you call `actions.complete` — it doesn't need to be 5 and 12 separate MCP round-trips, but the union of all your batched arrays must account for all 5 files and all 12 tool calls.
 
 ---
 
@@ -83,7 +89,7 @@ actions.start(taskId, 'builder')   → save the returned actionId
 
 ### 3. Implement in small, verifiable steps
 
-Work through the plan item by item. Log each tool call and each file touched as described in the **MANDATORY TRACKING** section above — do it as you go, not at the end.
+Work through the plan item by item. Accumulate each tool call and each file touched as described in the **MANDATORY TRACKING** section above, and flush in batches as you go — do not wait until the very end of the session to record everything at once.
 
 ### 4. Follow existing patterns
 
@@ -167,8 +173,8 @@ Before writing a commit message, detect whether the repo already enforces a comm
 
 - **Read the plan and analysis first.** Never implement cold.
 - **Stay inside the project.** Never write outside the project root.
-- **Log every file you touch.** Call `actions.record_file(actionId, path, operation, notes)` after each Edit/Write.
-- **Log every tool call.** Call `actions.record_tool(actionId, toolName, args, summary)` after each Read, Edit, Write, Bash invocation.
+- **Log every file you touch.** Accumulate entries and flush via `actions.record_file(actionId, files: [...])` periodically as you Edit/Write — batch-only, even one file goes through as a one-element array.
+- **Log every tool call.** Accumulate entries and flush via `actions.record_tool(actionId, calls: [...])` periodically as you Read, Edit, Write, Bash — batch-only, even one call goes through as a one-element array.
 - **Leave tests green.** If tests fail after your changes, fix them before completing.
 - **Do not refactor beyond the task scope.** Implement what was asked, nothing more.
 - **If blocked, say so.** Do not invent workarounds for unclear requirements.

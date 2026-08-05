@@ -22,7 +22,7 @@ const VERSION = '0.1.0'
 const TOOLS = [
   {
     name: 'actions.start',
-    description: 'Start a new action for a task. Returns an actionId (UUID).',
+    description: 'Start a new action for a task. Returns an actionId.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -38,11 +38,11 @@ const TOOLS = [
   {
     name: 'actions.write',
     description:
-      'Record a section in an action. Standard sections: result, tools_used, blockers, next_steps. Note: files_modified is a plain-text note only — it does NOT populate the files dashboard. Use actions.record_file to register files in the dashboard.',
+      'Record a section in an action. Standard sections: result, tools_used, blockers, next_steps.',
     inputSchema: {
       type: 'object',
       properties: {
-        actionId: { type: 'string', description: 'UUID returned by actions.start' },
+        actionId: { type: 'number', description: 'The actionId returned by actions.start' },
         sectionType: {
           type: 'string',
           description:
@@ -51,7 +51,7 @@ const TOOLS = [
         content: {
           type: 'string',
           description:
-            "Content for this section. No length limit — include all information that's relevant and necessary, but avoid unnecessary padding to prevent context bottlenecks between agents.",
+            "Content for this section. No length limit; avoid padding — it costs shared context for other agents.",
         },
       },
       required: ['actionId', 'sectionType', 'content'],
@@ -63,7 +63,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        actionId: { type: 'string', description: 'UUID of the action to close' },
+        actionId: { type: 'number', description: 'The actionId of the action to close' },
         summary: { type: 'string', description: 'One-line summary of what was done' },
       },
       required: ['actionId', 'summary'],
@@ -140,20 +140,31 @@ const TOOLS = [
   {
     name: 'actions.record_file',
     description:
-      'Record a file touched during an action. This is the only way to populate the files-touched count shown in the dashboard. Call once per file.',
+      'Record one or more files touched during an action, atomically (all-or-nothing). This is the only way to populate the files-touched count shown in the dashboard. Batch every file from a step of work into a single call — a single-element array is correct when only one file was touched.',
     inputSchema: {
       type: 'object',
       properties: {
-        actionId: { type: 'string', description: 'UUID returned by actions.start' },
-        filePath: { type: 'string', description: 'Absolute or repo-relative path of the file' },
-        operation: {
-          type: 'string',
-          enum: ['read', 'created', 'modified', 'deleted'],
-          description: 'What was done to the file',
+        actionId: { type: 'number', description: 'The actionId returned by actions.start' },
+        files: {
+          type: 'array',
+          minItems: 1,
+          description: 'Files touched, recorded atomically in one transaction.',
+          items: {
+            type: 'object',
+            properties: {
+              filePath: { type: 'string', description: 'Absolute or repo-relative path of the file' },
+              operation: {
+                type: 'string',
+                enum: ['read', 'created', 'modified', 'deleted'],
+                description: 'What was done to the file',
+              },
+              notes: { type: 'string', description: 'Optional short note about the change' },
+            },
+            required: ['filePath', 'operation'],
+          },
         },
-        notes: { type: 'string', description: 'Optional short note about the change' },
       },
-      required: ['actionId', 'filePath', 'operation'],
+      required: ['actionId', 'files'],
     },
   },
   {
@@ -198,13 +209,13 @@ const TOOLS = [
         description: {
           type: 'string',
           description:
-            "Longer description of the task goal. No length limit — include all information that's relevant and necessary, but avoid unnecessary padding to prevent context bottlenecks between agents.",
+            'Longer description of the task goal. No length limit; avoid padding — it costs shared context for other agents.',
         },
         acceptance: {
           type: 'array',
           items: { type: 'string' },
           description:
-            "List of acceptance criteria (plain sentences). No length limit — include all information that's relevant and necessary, but avoid unnecessary padding to prevent context bottlenecks between agents.",
+            'List of acceptance criteria (plain sentences). No length limit; avoid padding — it costs shared context for other agents.',
         },
       },
       required: ['title'],
@@ -213,22 +224,36 @@ const TOOLS = [
   {
     name: 'actions.record_tool',
     description:
-      'Record a tool call made during an action. This is the only way to populate the Tools dashboard. Call once per tool invocation.',
+      'Record one or more tool calls made during an action, atomically (all-or-nothing). This is the only way to populate the Tools dashboard. Batch every tool call from a step of work into a single call — a single-element array is correct when only one call was made.',
     inputSchema: {
       type: 'object',
       properties: {
-        actionId: { type: 'string', description: 'UUID returned by actions.start' },
-        toolName: {
-          type: 'string',
-          description: 'Name of the tool that was called (e.g. Read, Bash, Edit)',
+        actionId: { type: 'number', description: 'The actionId returned by actions.start' },
+        calls: {
+          type: 'array',
+          minItems: 1,
+          description: 'Tool calls made, recorded atomically in one transaction.',
+          items: {
+            type: 'object',
+            properties: {
+              toolName: {
+                type: 'string',
+                description: 'Name of the tool that was called (e.g. Read, Bash, Edit)',
+              },
+              argsJson: {
+                type: 'string',
+                description: 'Optional JSON string of the arguments passed to the tool',
+              },
+              resultSummary: {
+                type: 'string',
+                description: 'Optional short summary of the tool result',
+              },
+            },
+            required: ['toolName'],
+          },
         },
-        argsJson: {
-          type: 'string',
-          description: 'Optional JSON string of the arguments passed to the tool',
-        },
-        resultSummary: { type: 'string', description: 'Optional short summary of the tool result' },
       },
-      required: ['actionId', 'toolName'],
+      required: ['actionId', 'calls'],
     },
   },
   {
@@ -341,36 +366,47 @@ async function dispatch(
       const taskId = num(args, 'taskId')
       const agent = str(args, 'agent') as AgentName
       const action = await db.startAction(taskId, agent)
-      return ok(JSON.stringify({ actionId: action.id, taskId, agent, status: 'in_progress' }))
+      return ok(JSON.stringify({ actionId: action.id }))
     }
 
     case 'actions.write': {
-      const actionId = str(args, 'actionId')
+      const actionId = num(args, 'actionId')
       const sectionType = str(args, 'sectionType')
       const content = str(args, 'content')
       await db.writeSection(actionId, sectionType, content)
-      return ok(JSON.stringify({ actionId, sectionType, recorded: true }))
+      return ok(JSON.stringify({ recorded: true }))
     }
 
     case 'actions.complete': {
-      const actionId = str(args, 'actionId')
+      const actionId = num(args, 'actionId')
       const summary = str(args, 'summary')
       const action = await db.completeAction(actionId, summary)
-      return ok(
-        JSON.stringify({ actionId, status: action.status, completedAt: action.completed_at })
-      )
+      return ok(JSON.stringify({ status: action.status, completedAt: action.completed_at }))
     }
 
     case 'actions.get': {
       const taskId = num(args, 'taskId')
       const actions = await db.getActionsForTask(taskId)
       const full = await Promise.all(
-        actions.map(async (a) => ({
-          ...a,
-          sections: await db.getActionSections(a.id),
-        }))
+        actions.map(async (a) => {
+          const sections = await db.getActionSections(a.id)
+          return {
+            id: a.id,
+            agent: a.agent,
+            status: a.status,
+            created_at: a.created_at,
+            completed_at: a.completed_at,
+            summary: a.summary,
+            sections: sections.map((s) => ({
+              id: s.id,
+              section_type: s.section_type,
+              content: s.content,
+              created_at: s.created_at,
+            })),
+          }
+        })
       )
-      return ok(JSON.stringify(full, null, 2))
+      return ok(JSON.stringify(full))
     }
 
     case 'tasks.get': {
@@ -379,7 +415,7 @@ async function dispatch(
       const tasks = status
         ? await db.getTasks(status as TaskStatus, includeArchived ?? false)
         : await db.getTasks(undefined, includeArchived ?? false)
-      return ok(JSON.stringify(tasks, null, 2))
+      return ok(JSON.stringify(tasks))
     }
 
     case 'tasks.claim': {
@@ -414,16 +450,18 @@ async function dispatch(
     case 'docs.search': {
       const query = str(args, 'query')
       const results = searchDocs(docsPath, query)
-      return ok(JSON.stringify(results, null, 2))
+      return ok(JSON.stringify(results))
     }
 
     case 'actions.record_file': {
-      const actionId = str(args, 'actionId')
-      const filePath = str(args, 'filePath')
-      const operation = str(args, 'operation') as ActionFileRow['operation']
-      const notes = args['notes'] as string | undefined
-      await db.recordFile(actionId, filePath, operation, notes)
-      return ok(JSON.stringify({ actionId, filePath, operation, recorded: true }))
+      const actionId = num(args, 'actionId')
+      const files = nonEmptyArray(args, 'files').map((f) => ({
+        filePath: str(f, 'filePath'),
+        operation: str(f, 'operation') as ActionFileRow['operation'],
+        notes: f['notes'] as string | undefined,
+      }))
+      const recorded = await db.recordFiles(actionId, files)
+      return ok(JSON.stringify({ recorded }))
     }
 
     case 'tasks.acceptance.update': {
@@ -435,16 +473,18 @@ async function dispatch(
     case 'tasks.acceptance.get': {
       const taskId = num(args, 'taskId')
       const criteria = await db.getTaskAcceptance(taskId)
-      return ok(JSON.stringify(criteria, null, 2))
+      return ok(JSON.stringify(criteria))
     }
 
     case 'actions.record_tool': {
-      const actionId = str(args, 'actionId')
-      const toolName = str(args, 'toolName')
-      const argsJson = args['argsJson'] as string | undefined
-      const resultSummary = args['resultSummary'] as string | undefined
-      await db.recordTool(actionId, toolName, argsJson, resultSummary)
-      return ok(JSON.stringify({ actionId, toolName, recorded: true }))
+      const actionId = num(args, 'actionId')
+      const calls = nonEmptyArray(args, 'calls').map((c) => ({
+        toolName: str(c, 'toolName'),
+        argsJson: c['argsJson'] as string | undefined,
+        resultSummary: c['resultSummary'] as string | undefined,
+      }))
+      const recorded = await db.recordTools(actionId, calls)
+      return ok(JSON.stringify({ recorded }))
     }
 
     case 'tasks.edit': {
@@ -481,7 +521,7 @@ async function dispatch(
 
     case 'permissions.check': {
       const result = checkPermissionsSync(cwd, config)
-      return ok(JSON.stringify(result, null, 2))
+      return ok(JSON.stringify(result))
     }
 
     case 'deps.snapshot': {
@@ -592,7 +632,7 @@ async function dispatch(
           ok: status.skills.filter((s) => s.status === 'ok').map((s) => s.name),
         },
       }
-      return ok(JSON.stringify(result, null, 2))
+      return ok(JSON.stringify(result))
     }
 
     default:
@@ -675,4 +715,21 @@ function num(args: Record<string, unknown>, key: string): number {
   const v = args[key]
   if (typeof v !== 'number') throw new Error(`${key} must be a number`)
   return v
+}
+
+/** Validates that `args[key]` is a non-empty array of plain objects, as
+ *  required by the batch-only shapes of actions.record_file/record_tool
+ *  (task #74) — the single-entry top-level shape is no longer accepted, so
+ *  every entry must be pulled from this array via str()/num() on each item. */
+function nonEmptyArray(args: Record<string, unknown>, key: string): Record<string, unknown>[] {
+  const v = args[key]
+  if (!Array.isArray(v) || v.length === 0) {
+    throw new Error(`${key} must be a non-empty array`)
+  }
+  for (const item of v) {
+    if (typeof item !== 'object' || item === null) {
+      throw new Error(`${key} entries must be objects`)
+    }
+  }
+  return v as Record<string, unknown>[]
 }
