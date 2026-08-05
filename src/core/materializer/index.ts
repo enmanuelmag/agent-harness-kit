@@ -11,6 +11,16 @@ export interface BuildMaterializerOptions {
    *  A backup of the previous content is written first; if the backup fails,
    *  nothing is overwritten. */
   force?: boolean
+  /** Claude Code only: per-role model choice collected via
+   *  `promptClaudeAgentModels`, keyed by `AgentName`. Threaded into
+   *  `ClaudeCodeMaterializer.build()` to inject a `model:` frontmatter line
+   *  when regenerating agent files (currently only reachable via
+   *  `ahk build --force`, which re-runs the prompt). Same shape as
+   *  `ScaffoldOptions['claudeAgentModels']` — reused verbatim rather than
+   *  redeclared. Purely additive and optional: `opencode.ts`, `codex-cli.ts`,
+   *  and `grok.ts` share the identical `build()` signature and simply never
+   *  read this field. */
+  claudeAgentModels?: ScaffoldOptions['claudeAgentModels']
 }
 
 export interface BuildReport {

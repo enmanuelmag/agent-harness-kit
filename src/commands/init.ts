@@ -12,6 +12,7 @@ import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
 
+import { promptClaudeAgentModels } from './claude-model-prompt'
 import {
   applyConfigDefaults,
   detectConfigExtension,
@@ -20,7 +21,6 @@ import {
   readProjectNameFromPackageJson,
 } from './init-helpers'
 
-import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { Provider } from '@/types'
 
 interface InitOptions {
@@ -176,40 +176,14 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // 'inherit' (no override). The choice is written straight into that role's
   // generated `.claude/agents/<role>.md` frontmatter at scaffold time — never
   // into config (the old `config.agents.<role>.model` mechanism stays
-  // removed). Agent files are user-owned once generated, so this prompt only
-  // runs during `ahk init`'s one-time scaffold; `ahk build` regenerates
-  // agent files (when missing, or with --force) with no model line, same as
-  // before. Other providers (OpenCode, Codex CLI) are unaffected — Codex's
+  // removed). Other providers (OpenCode, Codex CLI) are unaffected — Codex's
   // model is still hand-edited via `model = "..."` in its TOML, and OpenCode
   // has no closed model enum to prompt against.
-  const AGENT_LABELS: { key: AgentName; label: string }[] = [
-    { key: 'lead', label: 'Lead' },
-    { key: 'explorer', label: 'Explorer' },
-    { key: 'consultant', label: 'Consultant' },
-    { key: 'builder', label: 'Builder' },
-    { key: 'reviewer', label: 'Reviewer' },
-  ]
-  const claudeAgentModels: Partial<Record<AgentName, string>> = {}
-  if (provider === 'claude-code') {
-    for (const agent of AGENT_LABELS) {
-      const val = await p.select({
-        message: `Model for ${agent.label}`,
-        options: [
-          { value: 'inherit', label: 'inherit (default)' },
-          { value: 'haiku', label: 'haiku' },
-          { value: 'sonnet', label: 'sonnet' },
-          { value: 'opus', label: 'opus' },
-          { value: 'fable', label: 'fable' },
-        ],
-        initialValue: 'inherit',
-      })
-      if (p.isCancel(val)) {
-        p.cancel('Cancelled.')
-        process.exit(0)
-      }
-      claudeAgentModels[agent.key] = val as string
-    }
-  }
+  //
+  // The prompt loop itself lives in `promptClaudeAgentModels` (shared with
+  // `ahk models` and `ahk build --force`, which also re-run it to update an
+  // existing project's agent files — see claude-code.ts).
+  const claudeAgentModels = await promptClaudeAgentModels(provider)
 
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string

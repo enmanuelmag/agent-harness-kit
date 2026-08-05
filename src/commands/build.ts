@@ -5,6 +5,10 @@ import pc from 'picocolors'
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
 
+import { promptClaudeAgentModels } from './claude-model-prompt'
+
+import type { AgentName } from '@/core/materializer/agent-restrictions'
+
 interface BuildOptions {
   watch?: boolean
   sync?: boolean
@@ -38,14 +42,34 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
 }
 
 async function buildOnce(cwd: string, force?: boolean): Promise<void> {
+  // Load config OUTSIDE any spinner: when --force is set on a claude-code
+  // project, the per-role model prompt below needs the provider (from config)
+  // before it can decide whether to run, and an interactive p.select cannot
+  // render while a p.spinner is active. Loading config is fast (no spinner
+  // needed for it in practice), so it moved out of the spinner-wrapped block
+  // that used to say "Loading config...".
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    config = await loadConfig(cwd)
+  } catch (err) {
+    p.log.error(err instanceof Error ? err.message : String(err))
+    process.exit(1)
+  }
+
+  // Claude Code only, and only when --force is set: re-run the same per-role
+  // model prompt `ahk init` and `ahk models` use, before regenerating agent
+  // files. Must happen BEFORE the spinner below starts.
+  let claudeAgentModels: Partial<Record<AgentName, string>> | undefined
+  if (force && config.provider === 'claude-code') {
+    claudeAgentModels = await promptClaudeAgentModels(config.provider)
+  }
+
   const spinner = p.spinner()
-  spinner.start('Loading config...')
+  spinner.start('Rebuilding files...')
 
   try {
-    const config = await loadConfig(cwd)
-    spinner.message('Rebuilding files...')
     const materializer = getMaterializer(config.provider)
-    const report = await materializer.build(config, cwd, { force })
+    const report = await materializer.build(config, cwd, { force, claudeAgentModels })
     spinner.stop(pc.green('Build complete'))
 
     // ── Config-derived files (AGENTS.md, and CLAUDE.md for claude-code) ──

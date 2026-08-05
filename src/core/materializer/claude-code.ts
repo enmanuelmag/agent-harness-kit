@@ -31,11 +31,18 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
  *  duplicate this list, which is how `build()` kept overwriting user edits
  *  long after `scaffold()` had been fixed to preserve them.
  *
- *  `modelsByRole` is optional and only ever populated by `scaffold()` (from
- *  `ahk init`'s per-role model prompt, Claude Code only) — `build()` always
- *  calls this with no second argument, so regenerating an existing project's
- *  agent files never injects a model line. */
-function claudeAgentFiles(
+ *  `modelsByRole` is optional, collected via `promptClaudeAgentModels`
+ *  (Claude Code only). It is populated by `scaffold()` (from `ahk init`'s
+ *  per-role model prompt), and can also be threaded into `build()` via
+ *  `BuildMaterializerOptions.claudeAgentModels` — which happens when
+ *  `ahk build --force` re-runs the prompt, and always when `ahk models`
+ *  calls this directly to regenerate just the 5 agent files. A plain
+ *  `ahk build` (no `--force`) never collects models, so `build()`'s default
+ *  call still passes no second argument here, and existing agent files are
+ *  left untouched regardless (see `writeAgentFiles`'s user-ownership policy).
+ *  Exported so `ahk models` (src/commands/models.ts) can build the entry
+ *  list itself and hand it to `writeAgentFiles`. */
+export function claudeAgentFiles(
   config: HarnessConfig,
   modelsByRole?: ScaffoldOptions['claudeAgentModels']
 ): AgentFileEntry[] {
@@ -116,8 +123,11 @@ export class ClaudeCodeMaterializer implements Materializer {
 
     // Agent files are USER-OWNED. Without --force they are created when
     // missing and never touched again; --force regenerates them, backing up
-    // the previous content first.
-    const agents = writeAgentFiles(cwd, claudeAgentFiles(config), {
+    // the previous content first. `opts.claudeAgentModels` is only ever set
+    // when the caller (currently `ahk build --force`, see build.ts) collected
+    // fresh per-role models via `promptClaudeAgentModels` — a plain build
+    // never sets it, so this is `undefined` (no model line) exactly as before.
+    const agents = writeAgentFiles(cwd, claudeAgentFiles(config, opts.claudeAgentModels), {
       force: opts.force,
       backupRoot: join(cwd, config.storage.dir, 'backups'),
     })

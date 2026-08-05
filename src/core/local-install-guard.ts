@@ -6,8 +6,18 @@ import { pkg } from '@/core/package-data'
 
 /**
  * Determines whether `@cardor/agent-harness-kit` is available as a local
- * dependency of the project at `cwd`, or whether `cwd` IS the package
- * itself (self-dev case, e.g. working inside this repo).
+ * dependency of the project at `cwd` (see {@link hasRealLocalInstall}), OR
+ * whether `cwd` IS the package itself (self-dev case, e.g. working inside
+ * this repo) — either is treated as "satisfied" here.
+ *
+ * This is the self-dev-inclusive, general-purpose check. It powers the
+ * non-blocking install warning (`cli.ts`'s `preAction` hook) and the config
+ * file format decision (`detectConfigExtension` in `init-helpers.ts`), where
+ * self-dev genuinely behaves like a satisfied local install for those
+ * purposes. Callers that need to distinguish a *real* local install from the
+ * self-dev shortcut (e.g. `getMcpCommandParts`, which must not mediate
+ * through a package manager that has nothing to resolve in self-dev) should
+ * call {@link hasRealLocalInstall} directly instead.
  *
  * The generated config no longer needs the package resolvable at runtime
  * (`import type` is erased at compile time, and the .mjs/.cjs templates
@@ -20,17 +30,36 @@ export function isLocalInstallSatisfied(cwd: string): boolean {
   // Self-dev case: cwd is the agent-harness-kit repo itself, so there is
   // no (and should be no) node_modules/@cardor/agent-harness-kit entry.
   const selfPkgPath = join(cwd, 'package.json')
-  let projectPkg: Record<string, unknown> | null = null
   if (existsSync(selfPkgPath)) {
     try {
       const selfPkg = JSON.parse(readFileSync(selfPkgPath, 'utf8'))
       if (selfPkg?.name === pkg.name) return true
-      projectPkg = selfPkg
     } catch {
-      // Malformed package.json — ignore and fall through to the node_modules check.
+      // Malformed package.json — ignore and fall through to the real-install check.
     }
   }
 
+  return hasRealLocalInstall(cwd)
+}
+
+/**
+ * Determines whether `@cardor/agent-harness-kit` is available as a *real*
+ * local dependency of the project at `cwd` — a node_modules entry, or (for
+ * Yarn Berry PnP, which never creates node_modules) a declared dependency
+ * detected via the PnP loader files. Deliberately excludes the self-dev
+ * shortcut (`cwd` being the package's own repo): in self-dev there is no
+ * actual local install for a package manager to mediate through, so this
+ * returns `false` there even though {@link isLocalInstallSatisfied} returns
+ * `true`.
+ *
+ * Use this when the caller's decision hinges on there being something a
+ * package manager can genuinely resolve — e.g. `getMcpCommandParts`, which
+ * picks between a package-manager-mediated command and the bare global
+ * binary. Use {@link isLocalInstallSatisfied} for general-purpose
+ * "is this project set up with the package available" checks that should
+ * treat self-dev the same as a real local install.
+ */
+export function hasRealLocalInstall(cwd: string): boolean {
   const [scope, name] = pkg.name.split('/')
   const localPath = pkg.name.startsWith('@') ? join(cwd, 'node_modules', scope, name) : join(cwd, 'node_modules', pkg.name)
 
@@ -43,12 +72,20 @@ export function isLocalInstallSatisfied(cwd: string): boolean {
   // declared as a dependency in package.json — the only signal available
   // without depending on a node_modules layout PnP intentionally omits.
   const isPnp = existsSync(join(cwd, '.pnp.cjs')) || existsSync(join(cwd, '.pnp.loader.mjs'))
-  if (isPnp && projectPkg) {
-    const deps = {
-      ...((projectPkg.dependencies as Record<string, unknown>) ?? {}),
-      ...((projectPkg.devDependencies as Record<string, unknown>) ?? {}),
+  if (isPnp) {
+    const pkgPath = join(cwd, 'package.json')
+    if (existsSync(pkgPath)) {
+      try {
+        const projectPkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+        const deps = {
+          ...((projectPkg?.dependencies as Record<string, unknown>) ?? {}),
+          ...((projectPkg?.devDependencies as Record<string, unknown>) ?? {}),
+        }
+        if (Object.prototype.hasOwnProperty.call(deps, pkg.name)) return true
+      } catch {
+        // Malformed package.json — ignore and fall through to false.
+      }
     }
-    if (Object.prototype.hasOwnProperty.call(deps, pkg.name)) return true
   }
 
   return false

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { isLocalInstallSatisfied } from '@/core/local-install-guard'
+import { hasRealLocalInstall } from '@/core/local-install-guard'
 
 export type PackageManager = 'npm' | 'pnpm' | 'yarn-classic' | 'yarn-berry' | 'bun'
 
@@ -69,8 +69,8 @@ function detectFromPackageManagerField(cwd: string): PackageManager | null {
 /**
  * Returns the full command-line tokens for spawning the MCP server.
  *
- * When the package is installed locally in the project at `cwd` (or `cwd` IS
- * the package itself — the self-dev case), the command is mediated by the
+ * When the package is genuinely installed locally in the project at `cwd`
+ * (see {@link hasRealLocalInstall}), the command is mediated by the
  * project's package manager so the pinned local version is the one that runs:
  *
  * | Manager      | Tokens                                              |
@@ -81,11 +81,20 @@ function detectFromPackageManagerField(cwd: string): PackageManager | null {
  * | yarn berry   | `yarn run ahk serve --port <port>`                    |
  * | bun          | `bunx --no-install ahk serve --port <port>`           |
  *
- * When there is no local install, the package manager has nothing to resolve
- * and every one of those commands would fail. In that case the binary from
- * the global install is invoked directly, regardless of `pm`:
+ * When there is no real local install, the package manager has nothing to
+ * resolve and every one of those commands would fail. In that case the
+ * binary from the global install is invoked directly, regardless of `pm`:
  *
- * | (no local install) | `ahk serve --port <port>`                       |
+ * | (no real local install) | `ahk serve --port <port>`                  |
+ *
+ * This deliberately uses {@link hasRealLocalInstall} rather than
+ * {@link isLocalInstallSatisfied}: self-dev repos (where `cwd` IS this
+ * package's own root) are treated as "no local install" here, even though
+ * `isLocalInstallSatisfied` — used elsewhere for the non-blocking install
+ * warning — still reports self-dev as satisfied. There is no real
+ * node_modules entry for a package manager to mediate through in self-dev,
+ * so self-dev gets the same bare global command form as any other project
+ * with no local install.
  *
  * `cwd` is required on purpose: it must be the project root being configured,
  * never a process-wide default. Defaulting it to `process.cwd()` would make
@@ -98,9 +107,10 @@ function detectFromPackageManagerField(cwd: string): PackageManager | null {
 export function getMcpCommandParts(pm: PackageManager, port: number, cwd: string): string[] {
   const portStr = String(port)
 
-  // No local install → the package manager cannot resolve `ahk`; call the
-  // globally installed binary directly.
-  if (!isLocalInstallSatisfied(cwd)) {
+  // No real local install → the package manager cannot resolve `ahk`; call
+  // the globally installed binary directly. This intentionally excludes the
+  // self-dev shortcut (see JSDoc above).
+  if (!hasRealLocalInstall(cwd)) {
     return ['ahk', 'serve', '--port', portStr]
   }
 
