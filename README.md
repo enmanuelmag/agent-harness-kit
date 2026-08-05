@@ -88,7 +88,7 @@ ahk init
   └── creates config, agent definitions, task backlog, health check
 
 AI tool opens your project
-  └── reads .claude/mcp.json, opencode.json, or .codex/config.toml
+  └── reads .claude/mcp.json, opencode.json, .codex/config.toml, or .grok/config.toml
   └── spawns: ahk serve (stdio MCP server)
       via your package manager (npx/pnpm exec/yarn run/bunx) when the
       package is a local dependency, or the bare binary when it isn't
@@ -111,7 +111,9 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 
 ## Features
 
-- **Provider-agnostic** — works with Claude Code, OpenCode, Codex CLI, or any MCP-compatible AI tool. Switch providers without losing your task history or reconfiguring your workflow.
+- **Provider-agnostic** — works with Claude Code, OpenCode, Codex CLI, Grok Build, or any MCP-compatible AI tool. Switch providers without losing your task history or reconfiguring your workflow.
+
+> **Note:** "Grok Build" here refers to xAI's official Grok Build CLI (`provider: 'grok-cli'`) — it is unrelated to the unofficial, community-maintained `grok-cli`/`grok-dev` npm packages.
 - **Structured 5-agent workflow** — Lead, Explorer, Consultant, Builder, and Reviewer each have defined responsibilities and can only act within their role.
 - **Atomic task claiming** — agents use `tasks.claim()` which uses a SQLite transaction to prevent two agents from picking up the same task at the same time.
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
@@ -164,7 +166,7 @@ npx ahk init
 
 ## MCP command per package manager
 
-`ahk init` and `ahk build` detect which package manager your project uses and generate the MCP server launch command (`.mcp.json`, `opencode.json`, or `.codex/config.toml`) accordingly, instead of hardcoding `npx`:
+`ahk init` and `ahk build` detect which package manager your project uses and generate the MCP server launch command (`.mcp.json`, `opencode.json`, `.codex/config.toml`, or `.grok/config.toml`) accordingly, instead of hardcoding `npx`:
 
 | Package manager           | Detected via                                                              | Generated command                             |
 | -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
@@ -181,7 +183,7 @@ Detection order: the `packageManager` field in your `package.json` (e.g. `"packa
 
 Working inside the `agent-harness-kit` repository itself counts as a local install: the package manager can resolve the workspace binary, so the `pnpm exec` form is generated rather than the bare one.
 
-**Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` (or `ahk build --sync`), including if you've since switched package managers.
+**Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml`/`.grok/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` (or `ahk build --sync`), including if you've since switched package managers.
 
 ---
 
@@ -193,7 +195,7 @@ Interactive scaffold. Asks for your project name, description, AI provider, docs
 
 Claude Code only, init asks you to pick a model for each of the 5 core roles (lead, explorer, consultant, builder, reviewer) one at a time: `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable`. Each choice is written straight into that role's generated `.claude/agents/<role>.md` frontmatter as a `model:` line at scaffold time — it is never persisted to the config file. Picking `inherit` (the default) emits no `model:` line at all, leaving Claude Code to apply its own default. This prompt only runs during `ahk init`'s one-time scaffold, not on `ahk build` — agent files are user-owned once generated (see [Agent files are yours](#agent-files-are-yours) below), so after init the model is changed the same way as any other edit: hand-editing the `model:` frontmatter line directly.
 
-OpenCode and Codex CLI are unaffected by this prompt — it never appears for those providers. OpenCode has no closed model enum to prompt against, and Codex's model is still set by hand-editing `model = "..."` in its TOML.
+OpenCode, Codex CLI, and Grok Build are unaffected by this prompt — it never appears for those providers. OpenCode and Grok Build have no closed model enum to prompt against, and Codex's model is still set by hand-editing `model = "..."` in its TOML.
 
 **Storage scope** — where the harness DB (and its `current.md` fallback) physically lives:
 
@@ -210,6 +212,7 @@ ahk init
 # Skip prompts with flags
 ahk init --name "my-app" --provider claude-code --docs ./docs --tasks local --storage-scope local
 ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local --storage-scope global
+ahk init --name "my-app" --provider grok-cli    --docs ./docs --tasks local --storage-scope local
 ```
 
 Run this once per project. If the project is already initialized, the command prints an 'already initialized' message with suggested next-step commands (`ahk build`, `ahk build --sync`, `ahk reset`, `ahk serve`) and exits without overwriting anything.
@@ -231,7 +234,7 @@ ahk build --sync     # kept for backwards compatibility — now a no-op on every
 
 ### Agent files are yours
 
-`ahk build` **creates agent files that are missing and never modifies ones that already exist.** Edit `.claude/agents/<role>.md` (or `.opencode/agents/<role>.md`, or `.codex/agents/<role>.toml`) freely — change the role prompt, set a `model:` line, adjust the restriction fields. Rebuilding will not revert your work. `ahk doctor` does not report hand-edited files either; it checks existence only.
+`ahk build` **creates agent files that are missing and never modifies ones that already exist.** Edit `.claude/agents/<role>.md` (or `.opencode/agents/<role>.md`, `.codex/agents/<role>.toml`, or `.grok/agents/<role>.md`) freely — change the role prompt, set a `model:` line, adjust the restriction fields. Rebuilding will not revert your work. `ahk doctor` does not report hand-edited files either; it checks existence only.
 
 Everything else `build` writes — MCP config and skills — is derived from your config and **is** regenerated on every run.
 
@@ -416,13 +419,14 @@ ahk reset --force                  # skip all confirmation prompts
 ahk reset --provider claude-code   # also delete agent files for this provider
 ahk reset --provider opencode
 ahk reset --provider codex-cli
+ahk reset --provider grok-cli
 ```
 
 What it can reset:
 
 - The SQLite `.db` file (plus WAL and SHM files if present)
 - `.harness/feature_list.json`
-- Agent definition files in `.claude/agents/`, `.opencode/agents/`, or `.codex/agents/`
+- Agent definition files in `.claude/agents/`, `.opencode/agents/`, `.codex/agents/`, or `.grok/agents/`
 
 After a reset, run `ahk init` to scaffold a fresh harness.
 
@@ -440,6 +444,7 @@ Migrates provider-specific files from one AI provider to another. Useful when sw
 ahk migrate provider --to opencode
 ahk migrate provider --to claude-code
 ahk migrate provider --to codex-cli
+ahk migrate provider --to grok-cli
 
 # Backward-compatible alias (identical behavior):
 ahk migrate --to opencode
@@ -547,6 +552,23 @@ your-project/
         └── default.toml           ← overrides Codex's built-in default agent → routes to lead
 ```
 
+**Grok Build** (`provider: 'grok-cli'`):
+
+```
+your-project/
+├── agent-harness-kit.config.{json|ts|mjs|cjs}
+├── AGENTS.md
+├── health.sh
+├── .harness/
+└── .grok/
+    ├── config.toml                ← MCP server registration
+    └── agents/
+        ├── lead.md
+        ├── explorer.md
+        ├── builder.md
+        └── reviewer.md
+```
+
 ### What each file does
 
 | File                          | Purpose                                                                               | Edit it?                                                    |
@@ -565,6 +587,8 @@ your-project/
 | `opencode.json`               | MCP server + `default_agent` + compaction config for OpenCode. Merged by `ahk build`  | Yes, carefully                                              |
 | `.codex/agents/*.toml`        | Agent role definitions (Codex CLI). Created once, never overwritten (`ahk build --force` regenerates)                   | **Yes — customize agent behavior**                          |
 | `.codex/config.toml`          | MCP server registration for Codex CLI. Merged by `ahk build`                          | Yes, carefully                                              |
+| `.grok/agents/*.md`           | Agent role definitions (Grok Build). Created once, never overwritten (`ahk build --force` regenerates)                  | **Yes — customize agent behavior**                          |
+| `.grok/config.toml`           | MCP server registration for Grok Build. Merged by `ahk build`                         | Yes, carefully                                              |
 
 ---
 
@@ -590,7 +614,7 @@ const config: HarnessConfig = {
     docsPath: './docs', // where agents search for documentation
   },
 
-  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli'
 
   // There is no `agents` key. Per-agent settings live in the generated agent
   // file itself, which is yours to edit — see "Agent files are yours" below.
@@ -788,7 +812,35 @@ You are the builder agent for MyApp. Follow these rules:
 
 Codex CLI has no per-agent tool denylist, so `sandbox_mode` is the only real mechanism: `"read-only"` for lead, explorer, consultant, and reviewer; `"workspace-write"` for builder. Because Codex keeps the write tools *visible* to the model even under a read-only sandbox, the restriction is additionally restated in prose inside `developer_instructions` — without it the model burns turns on calls the sandbox will reject.
 
-The equivalent constraint under Claude Code is expressed as `disallowedTools: [Write, Edit]`, and under OpenCode as `permission: { edit: deny }`.
+**Grok Build** (`.grok/agents/*.md`) uses markdown + YAML frontmatter, like Claude Code and OpenCode — but its `tools:` field is an **allowlist**, the inverse shape of Claude's `disallowedTools`. A restricted role must enumerate every tool it IS allowed to use, since there is no way to say "everything except Write/Edit":
+
+```markdown
+---
+name: explorer
+description: Explorer agent — reads and maps the codebase, never writes
+tools:
+  - Bash
+  - Read
+  - NotebookRead
+  - Grep
+  - Glob
+  - WebFetch
+  - WebSearch
+  - search_tool
+  - use_tool
+---
+
+# Explorer Agent
+
+You are the explorer agent for MyApp. Follow these rules:
+
+- Map the modules relevant to the task and report where each concern lives
+- Never modify files — record every file you read
+```
+
+For the builder, `tools:` is omitted entirely, same as every other provider — the agent inherits every tool.
+
+The equivalent constraint under Claude Code is expressed as `disallowedTools: [Write, Edit]`, under OpenCode as `permission: { edit: deny }`, and under Grok Build as the `tools:` allowlist shown above.
 
 ### `.harness/feature_list.json`
 
@@ -851,7 +903,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | **builder**    | Implements the plan. The only role that writes — its write tools are enabled where every other role's are disabled. Records every file modified. |
 | **reviewer**   | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving.                                           |
 
-> **Scope note.** What a role may not do is enforced **per tool, not per path**. There is no per-agent path scoping and it is not configurable: the `allowedPaths` / `writablePaths` fields were removed because they were only interpolated into prompt text and no provider ever enforced them — they looked like a security control without being one. The real restriction lives in `src/core/materializer/agent-restrictions.ts`, which each provider translates natively: `disallowedTools` in Claude Code, `permission.edit` in OpenCode, `sandbox_mode` in Codex CLI. If a config still declares the removed fields they are stripped at load time with a warning.
+> **Scope note.** What a role may not do is enforced **per tool, not per path**. There is no per-agent path scoping and it is not configurable: the `allowedPaths` / `writablePaths` fields were removed because they were only interpolated into prompt text and no provider ever enforced them — they looked like a security control without being one. The real restriction lives in `src/core/materializer/agent-restrictions.ts`, which each provider translates natively: `disallowedTools` in Claude Code, `permission.edit` in OpenCode, `sandbox_mode` in Codex CLI, and a `tools:` allowlist in Grok Build. If a config still declares the removed fields they are stripped at load time with a warning.
 >
 > **The entire `agents` config key has since been removed too**, for the same underlying reason: everything left in it was either dead or better expressed elsewhere. `instructionsPath`, `context` and `custom` were written by the generator and never read by anything; `model` was the only field with an effect, and it now belongs in the agent file's frontmatter alongside the role prompt, since that file is user-owned. A config that still declares `agents` loads normally — the key is ignored, with one aggregated warning pointing at the agent file.
 >
@@ -903,6 +955,8 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `opencode.json`               | Yes                 |
 | `.codex/agents/*.toml`        | Yes                 |
 | `.codex/config.toml`          | Yes                 |
+| `.grok/agents/*.md`           | Yes                 |
+| `.grok/config.toml`           | Yes                 |
 | `.harness/harness.db`         | **No** (gitignored, local scope only) |
 | `.harness/current.md`         | **No** (gitignored, local scope only) |
 | `.harness/storage-state.json` | Yes (metadata, not gitignored — always present regardless of scope) |
@@ -1010,6 +1064,7 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability reporting process, suppor
 - ✅ **Global installation** — `ahk init` can install the harness to your home directory, shared across projects.
 - ✅ **Input validation** — all CLI prompts validate and retry on bad values.
 - ✅ **Codex CLI provider** — full support for OpenAI Codex CLI. Generates `.codex/agents/*.toml` files with proper `sandbox_mode` per role and merges `.codex/config.toml` for MCP registration. Overrides the built-in `default` agent so the harness lead runs by default.
+- ✅ **Grok Build provider** — full support for xAI's Grok Build. Generates `.grok/agents/*.md` files with a `tools:` allowlist per role and merges `.grok/config.toml` for MCP registration.
 - **Graphify integration** — connect the harness to Graphify to visualize agent workflows, task dependencies, and action timelines as interactive graphs.
 - **Open Telemetry integration** — emit OpenTelemetry spans for all agent actions, file operations, and tool calls.
 - **Jira task adapter** — pull tasks directly from Jira instead of maintaining `feature_list.json` manually.

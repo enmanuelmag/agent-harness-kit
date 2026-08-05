@@ -195,7 +195,7 @@ project: {
 Agents are not configured from `agent-harness-kit.config.ts` — there is no
 `agents` key. Every per-agent setting lives in the generated agent file itself
 (`.claude/agents/<role>.md`, `.opencode/agents/<role>.md`,
-`.codex/agents/<role>.toml`), which is user-owned:
+`.codex/agents/<role>.toml`, `.grok/agents/<role>.md`), which is user-owned:
 
 - **Model**: set the `model:` frontmatter line (`model = "..."` for Codex CLI).
   Omit it to let the provider apply its default.

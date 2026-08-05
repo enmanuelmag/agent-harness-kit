@@ -200,7 +200,7 @@ export default defineHarness({
     description: 'What this project does',
     docsPath: './docs',
   },
-  provider: 'claude-code', // or 'opencode'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli'
   // No `agents` key — per-agent settings (model, role instructions) live in
   // the generated agent file, which is yours to edit.
   // `database` never carries a file path — physical location is a `storage`

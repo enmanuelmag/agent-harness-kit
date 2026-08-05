@@ -6,7 +6,7 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 
 ## Key Features
 
-- **Provider Agnostic**: Works with Claude Code, OpenCode, or any MCP-compatible AI tool
+- **Provider Agnostic**: Works with Claude Code, OpenCode, Codex CLI, Grok Build, or any MCP-compatible AI tool
 - **Structured Workflow**: Implements a multi-agent workflow (Lead, Explorer, Consultant (conditional), Builder, Reviewer) 
 - **Task Management**: Provides a task backlog with acceptance criteria
 - **Audit Trail**: Full logging of every action, file modification, and tool usage
@@ -16,7 +16,7 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 ## Architecture Overview
 
 ```
-AI Tool (Claude Code/OpenCode) 
+AI Tool (Claude Code/OpenCode/Codex CLI/Grok Build) 
         ↓
 MCP Protocol → Agent Harness Kit (Node.js/Bun)
         ↓
@@ -113,7 +113,7 @@ export default defineHarness({
     description: 'A project using agent harness kit',
     docsPath: './docs',
   },
-  provider: 'claude-code', // or 'opencode'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli'
   // `database` never carries a file path — physical location is a `storage`
   // concern (see `storage.sqlitePath` below), not a `database` one.
   database: { type: 'sqlite' },
@@ -239,6 +239,9 @@ project/
         ├── explorer.md
         ├── builder.md
         └── reviewer.md
+# Codex CLI (`.codex/agents/*.toml`) and Grok Build (`.grok/agents/*.md`)
+# follow the same shape — see the main README's "Files created by ahk init"
+# section for the full per-provider trees.
 ```
 
 ## Command Reference
@@ -261,7 +264,7 @@ ahk dashboard                     # Open web dashboard (http://localhost:4242)
 # Configure and maintain
 ahk build                         # Regenerate config from config file
 ahk sync                          # Sync tasks with JSON file
-ahk migrate --to claude-code     # Switch provider configurations  
+ahk migrate --to claude-code     # Switch provider configurations (also: opencode, codex-cli, grok-cli)
 ```
 
 ## Best Practices

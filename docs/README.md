@@ -6,7 +6,7 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 
 ## Key Features
 
-- **Provider Agnostic**: Works with Claude Code, OpenCode, or any MCP-compatible AI tool
+- **Provider Agnostic**: Works with Claude Code, OpenCode, Codex CLI, Grok Build, or any MCP-compatible AI tool
 - **Structured Workflow**: Implements a 4-agent workflow (Lead, Explorer, Builder, Reviewer) 
 - **Task Management**: Provides a task backlog with acceptance criteria
 - **Audit Trail**: Full logging of every action, file modification, and tool usage

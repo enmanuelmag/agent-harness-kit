@@ -91,7 +91,7 @@ export default defineHarness({
     docsPath: './docs',
   },
   
-  provider: 'claude-code', // or 'opencode'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli'
   
   // No `agents` key — per-agent settings (model, role instructions) live in
   // the generated agent file, which is yours to edit.
@@ -267,8 +267,10 @@ ahk task done add-auth-flow  # By slug
 #### `ahk migrate`
 Migrates between provider configurations:
 ```bash
-ahk migrate --to opencode   # Migrate to OpenCode
+ahk migrate --to opencode    # Migrate to OpenCode
 ahk migrate --to claude-code # Migrate to Claude Code
+ahk migrate --to codex-cli   # Migrate to Codex CLI
+ahk migrate --to grok-cli    # Migrate to Grok Build
 ```
 
 #### `ahk export` 
@@ -291,14 +293,16 @@ This directory contains all runtime data:
 - `current.md` - Auto-generated session snapshot for non-MCP environments  
 
 #### Provider Configuration
-The system supports two major providers:
+The system supports four providers:
 
 1. **Claude Code** (`/.claude/`)
 2. **OpenCode** (`/.opencode/`)
+3. **Codex CLI** (`/.codex/`)
+4. **Grok Build** (`/.grok/`)
 
 Each provider directory contains:
-- Agent definition files (`.claude/agents/*.md` or `.opencode/agents/*.md`)
-- MCP configuration file (`mcp.json`)
+- Agent definition files (`.claude/agents/*.md`, `.opencode/agents/*.md`, `.codex/agents/*.toml`, or `.grok/agents/*.md`)
+- MCP configuration file (`.claude/mcp.json`, `opencode.json`, `.codex/config.toml`, or `.grok/config.toml`)
 
 ### Configuration File Structure
 
@@ -309,7 +313,7 @@ The main configuration file with all customizable settings. It includes:
    - Name and description
    - Documentation path
 2. **Provider Settings** 
-   - AI provider selection (claude-code, opencode)
+   - AI provider selection (claude-code, opencode, codex-cli, grok-cli)
 3. **Agent Definitions**
    - Permissions for each agent type
    - Allowed paths for each role
@@ -484,7 +488,7 @@ To extend agent capabilities, you can create custom instructions by modifying:
 
 1. **Agent Instructions**
 ```bash
-# Edit agent files directly in .claude/agents/ or .opencode/agents/
+# Edit agent files directly in .claude/agents/, .opencode/agents/, .codex/agents/, or .grok/agents/
 # For example, modify the builder's behavior:
 ```
 
@@ -528,9 +532,10 @@ ls -la .harness/harness.db
 **Solution**:
 ```bash
 # Write access is per-tool, not per-path: check the generated agent file
-# (.claude/agents/<role>.md, .opencode/agents/<role>.md, .codex/agents/<role>.toml).
+# (.claude/agents/<role>.md, .opencode/agents/<role>.md, .codex/agents/<role>.toml,
+# .grok/agents/<role>.md).
 # Only the builder has write tools enabled; every other role has them denied
-# via disallowedTools / permission.edit / sandbox_mode.
+# via disallowedTools / permission.edit / sandbox_mode / the tools: allowlist.
 # If a non-builder agent needs to write, that is the plan being wrong, not the config.
 ```
 
