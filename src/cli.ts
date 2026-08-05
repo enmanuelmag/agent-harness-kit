@@ -59,7 +59,7 @@ program
   .command('init')
   .description('Scaffold a harness interactively in the current directory')
   .option('--name <name>', 'Project name (skip prompt)')
-  .option('--provider <provider>', 'AI provider: claude-code | opencode (skip prompt)')
+  .option('--provider <provider>', 'AI provider: claude-code | opencode | codex-cli | grok-cli (skip prompt)')
   .option('--docs <path>', 'Docs folder path (skip prompt)')
   .option('--tasks <adapter>', 'Task adapter: local | jira | linear (skip prompt)')
   .option('--storage-scope <scope>', 'Storage scope: local | global (skip prompt)')
@@ -181,7 +181,7 @@ const migrate = program
 migrate
   .command('provider')
   .description('Migrate provider-specific files to a different provider')
-  .option('--to <provider>', 'Target provider: claude-code | opencode | codex-cli')
+  .option('--to <provider>', 'Target provider: claude-code | opencode | codex-cli | grok-cli')
   .action(async (opts) => {
     await runMigrate(cwd, opts)
   })
@@ -219,7 +219,7 @@ program
   .command('reset')
   .description('Reset/clear harness data (DB, feature list, agent files)')
   .option('--force', 'Skip confirmation prompts')
-  .option('--provider <claude-code|opencode>', 'Reset agent MD files for specified provider')
+  .option('--provider <claude-code|opencode|codex-cli|grok-cli>', 'Reset agent MD files for specified provider')
   .action(async (opts) => {
     await runReset(cwd, opts)
   })

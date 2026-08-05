@@ -114,6 +114,8 @@ function getProviderAgentInfo(provider: string): {
       return { agentsDir: '.opencode/agents', ext: '.md' }
     case 'codex-cli':
       return { agentsDir: '.codex/agents', ext: '.toml' }
+    case 'grok-cli':
+      return { agentsDir: '.grok/agents', ext: '.md' }
     default:
       return { agentsDir: '.claude/agents', ext: '.md' }
   }
@@ -147,6 +149,8 @@ function getProviderSkillsDir(provider: string): string {
       return '.opencode/skills'
     case 'codex-cli':
       return '.agents/skills'
+    case 'grok-cli':
+      return '.grok/skills'
     default:
       return '.claude/skills'
   }

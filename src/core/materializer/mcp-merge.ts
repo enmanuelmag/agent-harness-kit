@@ -285,3 +285,39 @@ export function mergeCodexConfigToml(filePath: string, port: number, cwd: string
 
   writeFileSync(filePath, content, 'utf8')
 }
+
+// ─── Grok Build ───────────────────────────────────────────────────────────────
+
+/**
+ * Writes/merges `.grok/config.toml`'s `[mcp_servers.agent-harness-kit]`
+ * section. Follows `mergeCodexConfigToml`'s pattern above exactly, reusing the
+ * already-generic `mergeTomlSection` helper — chosen (task #76 consultant
+ * decision) over relying on `.mcp.json` compatibility, because that file is
+ * written exclusively by Claude Code's materializer (a Grok-only project would
+ * have none), and because Grok's own `.mcp.json` read is conditional on an
+ * interactive Claude-import prompt that can also be disabled entirely via
+ * `[compat.claude] mcps = false`.
+ *
+ * Unlike Codex's section, no `default_tools_approval_mode` key is emitted —
+ * that key is Codex-specific, and Grok's own documented MCP TOML schema
+ * (07-mcp-servers.md) does not call for it for a straightforward always-on
+ * local stdio server. Kept minimal (`command`/`args` only) to match the
+ * project's existing minimal-emission style and reduce drift surface on
+ * re-merge.
+ */
+export function mergeGrokConfigToml(filePath: string, port: number, cwd: string, pm: PackageManager = 'npm'): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+
+  let content = ''
+  if (existsSync(filePath)) {
+    content = readFileSync(filePath, 'utf8')
+  }
+
+  const [command, ...args] = getMcpCommandParts(pm, port, cwd)
+
+  const sectionBody = [`command = ${JSON.stringify(command)}`, `args = ${JSON.stringify(args)}`].join('\n')
+
+  content = mergeTomlSection(content, 'mcp_servers.agent-harness-kit', sectionBody)
+
+  writeFileSync(filePath, content, 'utf8')
+}

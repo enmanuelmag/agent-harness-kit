@@ -6,6 +6,7 @@ import {
   claudeDisallowedTools,
   codexRestrictionNotice,
   codexSandboxMode,
+  grokToolsAllowlist,
   opencodePermissions,
 } from './agent-restrictions'
 
@@ -663,6 +664,29 @@ export function translateFrontmatterForOpenCode(md: string, agentName: AgentName
   let result = stripFrontmatterBlockSequence(md, 'tools')
   result = stripFrontmatterBlockSequence(result, 'disallowedTools')
   return appendFrontmatterMapping(result, 'permission', opencodePermissions(agentName))
+}
+
+// ─── Grok Build frontmatter translation ──────────────────────────────────────
+
+/**
+ * Translates a template's frontmatter into the Grok Build agent shape.
+ *
+ * Grok Build's format is markdown + YAML frontmatter, like Claude Code and
+ * OpenCode (unlike Codex's TOML), so this reuses the same generic
+ * block-sequence helpers `translateFrontmatterForClaudeCode` uses — structural
+ * twin to `translateFrontmatterForOpenCode` above.
+ *
+ * Unlike Claude's `disallowedTools` (a denylist), Grok's `tools:` field is an
+ * ALLOWLIST: `grokToolsAllowlist()` returns the full set of permitted tool
+ * names for 'no-write' roles, or `[]` for the unrestricted 'none' role (which
+ * `appendFrontmatterBlockSequence` turns into an omitted `tools:` key,
+ * inheriting every tool — matching Claude/OpenCode's "inherit all" behaviour
+ * for `builder`).
+ */
+export function translateFrontmatterForGrok(md: string, agentName: AgentName): string {
+  let result = stripFrontmatterBlockSequence(md, 'tools')
+  result = stripFrontmatterBlockSequence(result, 'disallowedTools')
+  return appendFrontmatterBlockSequence(result, 'tools', grokToolsAllowlist(agentName))
 }
 
 // ─── .gitignore additions ─────────────────────────────────────────────────────

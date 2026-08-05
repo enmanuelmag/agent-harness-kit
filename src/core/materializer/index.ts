@@ -1,5 +1,6 @@
 import { ClaudeCodeMaterializer } from './claude-code'
 import { CodexCliMaterializer } from './codex-cli'
+import { GrokMaterializer } from './grok'
 import { OpenCodeMaterializer } from './opencode'
 
 import type { ReconcileResult, WriteAgentFilesResult } from './scaffold-utils'
@@ -36,6 +37,8 @@ export function getMaterializer(provider: Provider): Materializer {
       return new OpenCodeMaterializer()
     case 'codex-cli':
       return new CodexCliMaterializer()
+    case 'grok-cli':
+      return new GrokMaterializer()
     default:
       throw new Error(`Unknown provider: ${provider as string}`)
   }

@@ -64,6 +64,11 @@ const PROVIDERS: { provider: Provider; dir: string; files: string[] }[] = [
     dir: '.codex/agents',
     files: ['lead.toml', 'explorer.toml', 'consultant.toml', 'builder.toml', 'reviewer.toml', 'default.toml'],
   },
+  {
+    provider: 'grok-cli',
+    dir: '.grok/agents',
+    files: ['lead.md', 'explorer.md', 'consultant.md', 'builder.md', 'reviewer.md'],
+  },
 ]
 
 for (const { provider, dir, files } of PROVIDERS) {

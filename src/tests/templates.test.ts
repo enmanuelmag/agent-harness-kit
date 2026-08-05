@@ -5,8 +5,9 @@ import { describe, test } from 'node:test'
 
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { getDoctorStatus } from '@/core/doctor'
+import { grokToolsAllowlist } from '@/core/materializer/agent-restrictions'
 import { getMaterializer } from '@/core/materializer/index'
-import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeGrokConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
   __configObjectForTests,
   agentBuilder,
@@ -27,6 +28,7 @@ import {
   configTs,
   featureListJson,
   translateFrontmatterForClaudeCode,
+  translateFrontmatterForGrok,
   translateFrontmatterForOpenCode,
 } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
@@ -193,6 +195,79 @@ describe('mergeCodexConfigToml', () => {
   })
 })
 
+describe('mergeGrokConfigToml', () => {
+  test('creates file when it does not exist (defaults to npm command)', () => {
+    setupLocalInstall()
+    const path = join(TMP, '.grok/config.toml')
+    mergeGrokConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
+    assert.match(content, /command = "npx"/)
+    assert.match(content, /args = \["--no","ahk","serve","--port","3456"\]/)
+    teardown()
+  })
+
+  test('generates pnpm command/args when pm is pnpm', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-pnpm.toml')
+    mergeGrokConfigToml(path, 3456, TMP, 'pnpm')
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /command = "pnpm"/)
+    assert.match(content, /args = \["exec","ahk","serve","--port","3456"\]/)
+    teardown()
+  })
+
+  test('generates yarn command/args when pm is yarn-berry', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-yarn.toml')
+    mergeGrokConfigToml(path, 3456, TMP, 'yarn-berry')
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /command = "yarn"/)
+    assert.match(content, /args = \["run","ahk","serve","--port","3456"\]/)
+    teardown()
+  })
+
+  test('unlike Codex, emits no default_tools_approval_mode key', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-no-approval-mode.toml')
+    mergeGrokConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    assert.doesNotMatch(content, /default_tools_approval_mode/)
+    teardown()
+  })
+
+  test('preserves other existing TOML sections when merging', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-preserve.toml')
+    writeFileSync(path, '[mcp_servers.other_tool]\ncommand = "foo"\n\n[some_top_level]\nfoo = "bar"\n')
+    mergeGrokConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /\[mcp_servers\.other_tool\]/)
+    assert.match(content, /command = "foo"/)
+    assert.match(content, /\[some_top_level\]/)
+    assert.match(content, /foo = "bar"/)
+    assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
+    teardown()
+  })
+
+  test('is idempotent — calling it twice does not duplicate or corrupt the section', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-idempotent.toml')
+    writeFileSync(path, '[mcp_servers.other_tool]\ncommand = "foo"\n')
+    mergeGrokConfigToml(path, 3456, TMP)
+    const once = readFileSync(path, 'utf8')
+    mergeGrokConfigToml(path, 3456, TMP)
+    const twice = readFileSync(path, 'utf8')
+
+    assert.equal(twice, once, 're-merging identical inputs must be a no-op')
+    // Exactly one occurrence of the section header, not duplicated.
+    assert.equal(twice.match(/\[mcp_servers\.agent-harness-kit\]/g)?.length, 1)
+    assert.match(twice, /\[mcp_servers\.other_tool\]/)
+    assert.match(twice, /command = "foo"/)
+    teardown()
+  })
+})
+
 describe('mergers — global install emits the bare ahk binary', () => {
   // setup() leaves TMP bare: no package.json, no node_modules/@cardor/agent-harness-kit.
   // That is exactly what a project configured against a globally installed
@@ -341,6 +416,64 @@ describe('translateFrontmatterForOpenCode — permission translation', () => {
   test('leaves other frontmatter fields and body unchanged', () => {
     const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body content\n`
     const result = translateFrontmatterForOpenCode(input, 'explorer')
+    assert.ok(result.includes('name: explorer'))
+    assert.ok(result.includes('description: some desc'))
+    assert.ok(result.includes('# Body content'))
+  })
+})
+
+describe('translateFrontmatterForGrok — tools allowlist translation', () => {
+  // Grok's `tools:` frontmatter field is an ALLOWLIST (the inverse shape of
+  // Claude's `disallowedTools` denylist) — a no-write role must enumerate
+  // everything it IS allowed, while the unrestricted 'none' role (builder)
+  // omits the key entirely so it inherits every tool. No direct unit test of
+  // grokToolsAllowlist() exists elsewhere, so this exercises it indirectly
+  // through the translator's output, mirroring the OpenCode block above.
+  test('a no-write role emits a tools: block sequence containing the full allowlist', () => {
+    const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body\n`
+    const result = translateFrontmatterForGrok(input, 'explorer')
+    const allowlist = grokToolsAllowlist('explorer')
+    assert.match(result, /^tools:\n(?:  - [^\n]+\n)+/m)
+    for (const tool of allowlist) {
+      assert.match(result, new RegExp(`^  - ${tool}$`, 'm'), `${tool} missing from emitted allowlist`)
+    }
+  })
+
+  test('a no-write role never allows Write or Edit', () => {
+    const result = translateFrontmatterForGrok(`---\nname: reviewer\n---\n\n# Body\n`, 'reviewer')
+    assert.doesNotMatch(result, /^\s+- Write$/m)
+    assert.doesNotMatch(result, /^\s+- Edit$/m)
+  })
+
+  test('builder (unrestricted, "none") emits no tools: key at all', () => {
+    const result = translateFrontmatterForGrok(`---\nname: builder\n---\n\n# Body\n`, 'builder')
+    assert.doesNotMatch(result, /^tools:/m)
+    assert.equal(grokToolsAllowlist('builder').length, 0)
+  })
+
+  test('never emits the denylist-shaped disallowedTools key', () => {
+    const result = translateFrontmatterForGrok(`---\nname: explorer\n---\n\n# Body\n`, 'explorer')
+    assert.doesNotMatch(result, /^disallowedTools:/m)
+  })
+
+  test('strips a legacy tools allowlist carried in the input before re-emitting', () => {
+    const legacy = `---\nname: explorer\ntools:\n  - Read\n  - Bash\n  - Task\n---\n\n# Body\n`
+    const result = translateFrontmatterForGrok(legacy, 'explorer')
+    // Only one tools: block in the output, and it must be the real allowlist
+    // (containing NotebookRead, which the stale input never had), not the stale one.
+    assert.equal(result.match(/^tools:/gm)?.length, 1)
+    assert.match(result, /^  - NotebookRead$/m)
+  })
+
+  test('is idempotent — re-translating already-translated output is stable', () => {
+    const once = translateFrontmatterForGrok(`---\nname: explorer\n---\n\n# Body\n`, 'explorer')
+    const twice = translateFrontmatterForGrok(once, 'explorer')
+    assert.equal(twice, once)
+  })
+
+  test('leaves other frontmatter fields and body unchanged', () => {
+    const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body content\n`
+    const result = translateFrontmatterForGrok(input, 'explorer')
     assert.ok(result.includes('name: explorer'))
     assert.ok(result.includes('description: some desc'))
     assert.ok(result.includes('# Body content'))

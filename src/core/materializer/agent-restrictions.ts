@@ -7,10 +7,10 @@
  * Each provider's materializer translates the restriction below into its own
  * native semantics:
  *
- *   restriction   | Claude Code                  | OpenCode                 | Codex CLI
- *   --------------|------------------------------|--------------------------|-----------------------------
- *   'none'        | omit `tools` (inherit all)   | omit `permission`        | sandbox_mode="workspace-write"
- *   'no-write'    | disallowedTools: Write, Edit | permission: { edit: deny } | sandbox_mode="read-only"
+ *   restriction   | Claude Code                  | OpenCode                 | Codex CLI                    | Grok Build
+ *   --------------|------------------------------|--------------------------|-------------------------------|---------------------------------
+ *   'none'        | omit `tools` (inherit all)   | omit `permission`        | sandbox_mode="workspace-write" | omit `tools` (inherit all)
+ *   'no-write'    | disallowedTools: Write, Edit | permission: { edit: deny } | sandbox_mode="read-only"      | tools: <allowlist, no Write/Edit>
  *
  * Notes on the asymmetries this abstraction hides:
  *  - OpenCode has NO separate `write` permission. Its `edit` permission is
@@ -21,6 +21,17 @@
  *    shell). Because the tools stay *visible* to the model under Codex, the
  *    restriction is additionally restated in `developer_instructions` so the
  *    model does not burn turns on calls the sandbox will reject.
+ *  - Grok Build's `tools:` frontmatter field is the INVERSE shape of Claude's:
+ *    an ALLOWLIST, not a denylist. There is no way to say "everything except
+ *    Write/Edit" — the no-write role must enumerate every tool it IS allowed.
+ *    The allowlist below (PascalCase tool-class names, matching the vocabulary
+ *    Grok's own permission-rule engine enforces against, plus the two MCP
+ *    discovery meta-tools `search_tool`/`use_tool`) was resolved by the task
+ *    #76 consultant advisory after the docs turned out to use two competing
+ *    naming conventions with no single reconciling reference page. Bash is
+ *    included deliberately, consistent with Claude/OpenCode's existing
+ *    no-write scope (a tool-visibility restriction, not an OS sandbox like
+ *    Codex's) — see `grokToolsAllowlist` below.
  */
 
 export type AgentName = 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'
@@ -82,4 +93,38 @@ These tools may still appear available to you. The sandbox will reject the call.
 
 export function codexRestrictionNotice(agentName: AgentName): string {
   return restrictionFor(agentName) === 'no-write' ? CODEX_READ_ONLY_NOTICE : ''
+}
+
+// ─── Grok Build ──────────────────────────────────────────────────────────────
+
+/**
+ * Tool allowlist for Grok Build's `tools:` frontmatter field.
+ *
+ * Unlike Claude Code's `disallowedTools`/OpenCode's `permission` (both
+ * denylist-shaped), Grok Build's `tools:` field is an ALLOWLIST: an agent may
+ * only call tools named in this list, so "no-write" must enumerate everything
+ * it IS allowed rather than the two things it isn't.
+ *
+ * Names are PascalCase tool-class names (`Bash`, `Read`, `NotebookRead`,
+ * `Grep`, `Glob`, `WebFetch`, `WebSearch`) plus the two MCP discovery
+ * meta-tools (`search_tool`, `use_tool`) that have no PascalCase form
+ * documented anywhere in Grok Build's docs. This is Convention A per the task
+ * #76 consultant advisory: Grok's own permission-rule engine
+ * (22-permissions-and-safety.md "Tool Names") only recognizes these names, so
+ * they are not just best-evidence but the only reading under which the
+ * frontmatter allowlist and the permission-rule engine can refer to the same
+ * tool. `Bash` is included even for 'no-write' roles — matching the existing
+ * precedent that Claude's `disallowedTools: ['Write','Edit']` and OpenCode's
+ * `edit: deny` both already leave Bash fully permitted for a tool-visibility
+ * restriction (as opposed to Codex's OS-level sandbox).
+ *
+ * Returns `[]` for the 'none' role (builder) so the caller's
+ * `appendFrontmatterBlockSequence` no-ops and `tools:` is omitted entirely,
+ * inheriting every tool — the same "empty array means inherit everything"
+ * contract `claudeDisallowedTools` already uses.
+ */
+export function grokToolsAllowlist(agentName: AgentName): string[] {
+  return restrictionFor(agentName) === 'no-write'
+    ? ['Bash', 'Read', 'NotebookRead', 'Grep', 'Glob', 'WebFetch', 'WebSearch', 'search_tool', 'use_tool']
+    : []
 }
