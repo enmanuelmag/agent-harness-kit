@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
-import { isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
+import { hasRealLocalInstall, isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
 
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-local-install-guard')
@@ -82,6 +82,41 @@ describe('isLocalInstallSatisfied', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'some-other-project' }))
     writeFileSync(join(dir, '.pnp.cjs'), '')
     assert.equal(isLocalInstallSatisfied(dir), false)
+    cleanTmp()
+  })
+})
+
+describe('hasRealLocalInstall', () => {
+  test('returns false for the self-dev case even though isLocalInstallSatisfied returns true', () => {
+    const dir = makeTmp('self-dev-real-vs-satisfied')
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: pkg.name }))
+    assert.equal(hasRealLocalInstall(dir), false)
+    assert.equal(isLocalInstallSatisfied(dir), true)
+    cleanTmp()
+  })
+
+  test('returns true when package is present in local node_modules', () => {
+    const dir = makeTmp('real-local-present')
+    const [scope, name] = pkg.name.split('/')
+    mkdirSync(join(dir, 'node_modules', scope, name), { recursive: true })
+    assert.equal(hasRealLocalInstall(dir), true)
+    cleanTmp()
+  })
+
+  test('returns false when there is no real install and no self-dev package.json', () => {
+    const dir = makeTmp('real-none')
+    assert.equal(hasRealLocalInstall(dir), false)
+    cleanTmp()
+  })
+
+  test('returns true in Yarn Berry PnP mode when the package is declared as a dependency', () => {
+    const dir = makeTmp('real-pnp-declared')
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'some-other-project', devDependencies: { [pkg.name]: '^1.0.0' } })
+    )
+    writeFileSync(join(dir, '.pnp.cjs'), '')
+    assert.equal(hasRealLocalInstall(dir), true)
     cleanTmp()
   })
 })

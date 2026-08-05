@@ -34,6 +34,7 @@ npx ahk init
   - [Commands](#commands)
     - [`ahk init`](#ahk-init)
     - [`ahk build`](#ahk-build)
+    - [`ahk models`](#ahk-models)
     - [`ahk dashboard`](#ahk-dashboard)
     - [`ahk status`](#ahk-status)
     - [`ahk health`](#ahk-health)
@@ -179,9 +180,9 @@ npx ahk init
 
 Detection order: the `packageManager` field in your `package.json` (e.g. `"packageManager": "pnpm@8.15.0"`) takes priority when present; otherwise `ahk` falls back to lockfile heuristics; if nothing is detected, it defaults to npm.
 
-**Global installs bypass the package manager entirely.** Every command in the table above asks your package manager to resolve a *locally installed* `ahk` binary — `npx --no` deliberately refuses to download one, and `pnpm exec`/`yarn run`/`bunx --no-install` have nothing to point at. If you installed the CLI globally and never added it to the project, all five of those commands fail. So `ahk` checks for the local install first (the same check that decides your config file format, above) and, when there is none, generates the bare `ahk serve --port <port>` — resolved from your `PATH` like any other global binary. The package-manager-specific commands are used only when a local install actually exists. If, on that global-install path, `ahk` is not resolvable on your `PATH` at generation time, `ahk` prints a non-blocking warning (the command still succeeds) pointing you at `npm i -g @cardor/agent-harness-kit` or a local install — moving the "binary not found" failure earlier instead of surfacing it later when the MCP server is spawned.
+**Global installs bypass the package manager entirely.** Every command in the table above asks your package manager to resolve a *locally installed* `ahk` binary — `npx --no` deliberately refuses to download one, and `pnpm exec`/`yarn run`/`bunx --no-install` have nothing to point at. If you installed the CLI globally and never added it to the project, all five of those commands fail. So `ahk` checks for a *real* local install first and, when there is none, generates the bare `ahk serve --port <port>` — resolved from your `PATH` like any other global binary. The package-manager-specific commands are used only when a local install actually exists. If, on that global-install path, `ahk` is not resolvable on your `PATH` at generation time, `ahk` prints a non-blocking warning (the command still succeeds) pointing you at `npm i -g @cardor/agent-harness-kit` or a local install — moving the "binary not found" failure earlier instead of surfacing it later when the MCP server is spawned.
 
-Working inside the `agent-harness-kit` repository itself counts as a local install: the package manager can resolve the workspace binary, so the `pnpm exec` form is generated rather than the bare one.
+Working inside the `agent-harness-kit` repository itself does **not** count as a local install for this decision: there is no real `node_modules/@cardor/agent-harness-kit` entry for a package manager to resolve, so self-dev generates the bare global `ahk serve --port <port>` form, same as any other project with no local install. This is a narrower check than the one deciding your config file format, above (`ahk init`'s `.ts`/`.mjs`/`.cjs` vs. `.json` choice) — that check still treats self-dev as satisfied, since it only cares whether the package is resolvable for type-checking purposes, not whether a package manager can mediate a spawned command.
 
 **Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml`/`.grok/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` (or `ahk build --sync`), including if you've since switched package managers.
 
@@ -193,7 +194,7 @@ Working inside the `agent-harness-kit` repository itself counts as a local insta
 
 Interactive scaffold. Asks for your project name, description, AI provider, docs path, storage scope, task adapter, and an optional first task. Creates all harness files in the current directory.
 
-Claude Code only, init asks you to pick a model for each of the 5 core roles (lead, explorer, consultant, builder, reviewer) one at a time: `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable`. Each choice is written straight into that role's generated `.claude/agents/<role>.md` frontmatter as a `model:` line at scaffold time — it is never persisted to the config file. Picking `inherit` (the default) emits no `model:` line at all, leaving Claude Code to apply its own default. This prompt only runs during `ahk init`'s one-time scaffold, not on `ahk build` — agent files are user-owned once generated (see [Agent files are yours](#agent-files-are-yours) below), so after init the model is changed the same way as any other edit: hand-editing the `model:` frontmatter line directly.
+Claude Code only, init asks you to pick a model for each of the 5 core roles (lead, explorer, consultant, builder, reviewer) one at a time: `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable`. Each choice is written straight into that role's generated `.claude/agents/<role>.md` frontmatter as a `model:` line at scaffold time — it is never persisted to the config file. Picking `inherit` (the default) emits no `model:` line at all, leaving Claude Code to apply its own default. Agent files are user-owned once generated (see [Agent files are yours](#agent-files-are-yours) below), so after init the model can be changed three ways: hand-editing the `model:` frontmatter line directly, running [`ahk models`](#ahk-models) to re-prompt and regenerate just the 5 agent files, or running `ahk build --force` (which re-prompts too, then regenerates everything `--force` regenerates).
 
 OpenCode, Codex CLI, and Grok Build are unaffected by this prompt — it never appears for those providers. OpenCode and Grok Build have no closed model enum to prompt against, and Codex's model is still set by hand-editing `model = "..."` in its TOML.
 
@@ -267,12 +268,28 @@ ahk build --force
 - **It discards your customizations.** Every agent file is rewritten from the template. Prompt edits, `model:` lines, and restriction tweaks are all lost.
 - **It backs up first.** Before overwriting anything, the current content of every affected file is copied under `.harness/backups/` — agent files to `agents-<timestamp>/`, hand-edited `AGENTS.md`/`CLAUDE.md` to `derived-<timestamp>/`. If that backup cannot be written, the command aborts and **no file is modified** — the same fail-safe as [`ahk migrate storage --force`](#storage-migration).
 - **It names what it touched.** The command prints every file it overwrote and the backup location, so you can diff or restore.
+- **Claude Code only, it also re-prompts for models.** Before regenerating, `ahk build --force` runs the same per-role model prompt as `ahk init` (see above) and injects the fresh choices into the regenerated frontmatter. Other providers are unaffected — no prompt appears for them.
 
 `--force` also regenerates a hand-edited `AGENTS.md` or `CLAUDE.md` (backing it up first) — the only time you need it for those files, since an *unedited* one already re-generates on its own when config changes.
 
 `--watch` never forces, even if you pass both flags: an automatic rebuild triggered by a file change must not destroy your edits in the background.
 
 `--sync` used to rewrite the `tools:` frontmatter of agent files so it matched a canonical allowlist. Agent files no longer declare an allowlist at all — they inherit every tool and declare only restrictions — so there is nothing left to synchronise. Use `ahk build --force` to regenerate agent files.
+
+---
+
+### `ahk models`
+
+Claude Code only. Re-runs `ahk init`'s per-role model prompt and regenerates ONLY the 5 `.claude/agents/*.md` files with the chosen models — nothing else (not `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.claude/settings.json`, your config file, docs path, storage scope, or task adapter).
+
+```bash
+ahk models
+```
+
+- Prompts once per role (lead, explorer, consultant, builder, reviewer): `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable` — same prompt as `ahk init`.
+- Always regenerates all 5 agent files, backing up the previous content first under `.harness/backups/agents-<timestamp>/` — the same fail-safe [`--force`](#--force) uses.
+- On a non-Claude-Code project, it prints a one-line no-op message and exits — no prompt.
+- If no `agent-harness-kit.config` is found, it prints a message pointing at `ahk init` and exits — no prompt, no stack trace.
 
 ---
 

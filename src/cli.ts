@@ -9,6 +9,7 @@ import { runHealth } from '@/commands/health'
 import { runInit } from '@/commands/init'
 import { runMigrate } from '@/commands/migrate'
 import { runMigrateStorage } from '@/commands/migrate-storage'
+import { runModels } from '@/commands/models'
 import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
@@ -230,6 +231,14 @@ program
   .description('Check lib version, agent files, and harness skills sync status')
   .action(async () => {
     await runDoctor(cwd)
+  })
+
+// ─── models ───────────────────────────────────────────────────────────────────
+program
+  .command('models')
+  .description('Re-prompt per-role Claude Code models and regenerate .claude/agents/*.md (claude-code projects only)')
+  .action(async () => {
+    await runModels(cwd)
   })
 
 // Prints a non-blocking warning (but not for --version/--help, which

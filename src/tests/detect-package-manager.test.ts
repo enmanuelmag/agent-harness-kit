@@ -183,16 +183,19 @@ describe('getMcpCommandParts — global install (no local dependency)', () => {
 })
 
 describe('getMcpCommandParts — self-dev (cwd IS the agent-harness-kit package)', () => {
-  test('keeps the package-manager command and does NOT collapse to bare ahk', () => {
+  test('collapses to bare ahk, bypassing the package manager', () => {
     const dir = makeTmp('cmd-self-dev')
     // Mirrors the self-dev early return in isLocalInstallSatisfied: the repo
-    // itself has no node_modules/@cardor/agent-harness-kit entry, but the
-    // package manager can still resolve the local bin.
+    // itself has no node_modules/@cardor/agent-harness-kit entry. Unlike
+    // isLocalInstallSatisfied, getMcpCommandParts uses hasRealLocalInstall,
+    // which deliberately excludes this self-dev shortcut — there's no real
+    // local install for a package manager to mediate through, so this must
+    // get the same bare global form as any other project with no install.
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: pkg.name }))
 
     const parts = getMcpCommandParts('pnpm', 3456, dir)
-    assert.deepEqual(parts, ['pnpm', 'exec', 'ahk', 'serve', '--port', '3456'])
-    assert.notDeepEqual(parts, ['ahk', 'serve', '--port', '3456'])
+    assert.deepEqual(parts, ['ahk', 'serve', '--port', '3456'])
+    assert.notDeepEqual(parts, ['pnpm', 'exec', 'ahk', 'serve', '--port', '3456'])
     cleanTmp()
   })
 })

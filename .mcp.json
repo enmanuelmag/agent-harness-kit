@@ -2,14 +2,8 @@
   "mcpServers": {
     "agent-harness-kit": {
       "type": "stdio",
-      "command": "pnpm",
-      "args": [
-        "exec",
-        "ahk",
-        "serve",
-        "--port",
-        "3742"
-      ]
+      "command": "ahk",
+      "args": ["serve", "--port", "3742"]
     }
   }
 }
