@@ -272,7 +272,7 @@ ahk build --force
 - **It discards your customizations.** Every agent file is rewritten from the template. Prompt edits, `model:` lines, and restriction tweaks are all lost.
 - **It backs up first.** Before overwriting anything, the current content of every affected file is copied under `.harness/backups/` — agent files to `agents-<timestamp>/`, hand-edited `AGENTS.md`/`CLAUDE.md` to `derived-<timestamp>/`. If that backup cannot be written, the command aborts and **no file is modified** — the same fail-safe as [`ahk migrate storage --force`](#storage-migration).
 - **It names what it touched.** The command prints every file it overwrote and the backup location, so you can diff or restore.
-- **Claude Code only, it also re-prompts for models.** Before regenerating, `ahk build --force` runs the same per-role model prompt as `ahk init` (see above) and injects the fresh choices into the regenerated frontmatter. Other providers are unaffected — no prompt appears for them.
+- **Claude Code and Codex CLI also re-prompt for models.** Before regenerating, `ahk build --force` runs the same per-role prompt as `ahk init` for the current provider — the model prompt on Claude Code, or the model **and** reasoning-effort prompt on Codex CLI (see above) — and injects the fresh choices into the regenerated frontmatter/TOML. OpenCode and Grok Build are unaffected — no prompt appears for them, since neither has a closed model enum to prompt against.
 
 `--force` also regenerates a hand-edited `AGENTS.md` or `CLAUDE.md` (backing it up first) — the only time you need it for those files, since an *unedited* one already re-generates on its own when config changes.
 
@@ -470,6 +470,8 @@ ahk migrate provider --to grok-cli
 # Backward-compatible alias (identical behavior):
 ahk migrate --to opencode
 ```
+
+Migrating always regenerates the target provider's agent files from scratch, so — same as `ahk init` and `ahk build --force` — it also runs that target's per-role prompt first, before anything is written: the model prompt when migrating **to** Claude Code, or the model **and** reasoning-effort prompt when migrating **to** Codex CLI (see [`ahk init`](#ahk-init) above for what each prompt asks). Migrating to OpenCode or Grok CLI shows no prompt at all, since neither has a closed model enum to prompt against.
 
 #### `ahk migrate storage` — ⚠️ sensitive, reads/writes real harness data
 

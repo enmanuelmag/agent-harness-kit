@@ -73,4 +73,20 @@ describe('ahk migrate — provider subcommand + backward-compatible alias (integ
     assert.equal(result.status, 0, result.stderr)
     assert.ok(existsSync(join(dir, '.harness', 'storage-state.json')))
   })
+
+  // Task #84: `runMigrate` now unconditionally calls both
+  // `promptClaudeAgentModels` and `promptCodexAgentModels` before building the
+  // target provider's files. Both self-guard on the provider argument, so
+  // migrating to a target that is neither 'claude-code' nor 'codex-cli' never
+  // reaches an interactive p.select — safe to drive through this spawned,
+  // non-TTY CLI test. This exercises the new prompt-wiring's happy path
+  // without needing to drive p.select itself (out of scope, same rule as
+  // task #81).
+  test('`migrate --to opencode` from a claude-code project completes without prompting (self-guarded)', () => {
+    const dir = join(TMP_BASE, 'migrate-opencode-no-prompt')
+    setupProject(dir)
+    const result = runCli(['migrate', '--to', 'opencode'], dir)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /Migrated to opencode/)
+  })
 })

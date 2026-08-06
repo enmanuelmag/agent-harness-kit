@@ -6,8 +6,10 @@ import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
 
 import { promptClaudeAgentModels } from './claude-model-prompt'
+import { promptCodexAgentModels } from './codex-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
+import type { CodexAgentModelChoice } from '@/types'
 
 interface BuildOptions {
   watch?: boolean
@@ -64,12 +66,20 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
     claudeAgentModels = await promptClaudeAgentModels(config.provider)
   }
 
+  // Codex CLI only, and only when --force is set: mirror the claude-code
+  // branch above with the same per-role model + reasoning-effort prompt
+  // `ahk init` uses. Must also happen BEFORE the spinner below starts.
+  let codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>> | undefined
+  if (force && config.provider === 'codex-cli') {
+    codexAgentModels = await promptCodexAgentModels(config.provider)
+  }
+
   const spinner = p.spinner()
   spinner.start('Rebuilding files...')
 
   try {
     const materializer = getMaterializer(config.provider)
-    const report = await materializer.build(config, cwd, { force, claudeAgentModels })
+    const report = await materializer.build(config, cwd, { force, claudeAgentModels, codexAgentModels })
     spinner.stop(pc.green('Build complete'))
 
     // ── Config-derived files (AGENTS.md, and CLAUDE.md for claude-code) ──

@@ -4,6 +4,9 @@ import pc from 'picocolors'
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
 
+import { promptClaudeAgentModels } from './claude-model-prompt'
+import { promptCodexAgentModels } from './codex-model-prompt'
+
 import type { Provider } from '@/types'
 
 interface MigrateOptions {
@@ -38,13 +41,22 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
     return
   }
 
+  // Re-run the same per-role model prompt `ahk init` and `ahk build --force`
+  // use, scoped to whichever provider we're migrating to. Both helpers
+  // self-guard on the provider argument, so calling both unconditionally is
+  // safe — only the target's own questions actually appear. Must happen
+  // BEFORE the spinner below starts: an interactive p.select cannot render
+  // while a p.spinner is active.
+  const claudeAgentModels = await promptClaudeAgentModels(target)
+  const codexAgentModels = await promptCodexAgentModels(target)
+
   const spinner = p.spinner()
   spinner.start(`Migrating from ${config.provider} to ${target}...`)
 
   try {
     // Scaffold the new provider's files
     const targetMaterializer = getMaterializer(target)
-    await targetMaterializer.build(config, cwd)
+    await targetMaterializer.build(config, cwd, { claudeAgentModels, codexAgentModels })
 
     spinner.stop(pc.green(`Migrated to ${target}`))
     p.log.warn(`Update agent-harness-kit.config.ts: set provider: '${target}'`)
