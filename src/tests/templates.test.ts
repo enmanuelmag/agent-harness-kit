@@ -1065,8 +1065,8 @@ describe('agent*Toml — no opts → still no model line', () => {
   }
 
   test('sandbox_mode survives — removing model must not disturb the real restriction', () => {
-    assert.match(agentExplorerToml({ projectName: 'demo' }), /sandbox_mode = "read-only"/)
-    assert.match(agentBuilderToml({ projectName: 'demo' }), /sandbox_mode = "workspace-write"/)
+    assert.match(agentExplorerToml({ projectName: 'demo' }), /sandbox_mode = "danger-full-access"/)
+    assert.match(agentBuilderToml({ projectName: 'demo' }), /sandbox_mode = "danger-full-access"/)
   })
 })
 
@@ -1133,11 +1133,11 @@ describe('agent*Toml — per-role model + effort injection', () => {
   test('sandbox_mode is unaffected by model/effort injection', () => {
     assert.match(
       agentExplorerToml({ projectName: 'demo' }, { model: 'gpt-5.6-luna', effort: 'low' }),
-      /sandbox_mode = "read-only"/,
+      /sandbox_mode = "danger-full-access"/,
     )
     assert.match(
       agentBuilderToml({ projectName: 'demo' }, { model: 'gpt-5.6-luna', effort: 'low' }),
-      /sandbox_mode = "workspace-write"/,
+      /sandbox_mode = "danger-full-access"/,
     )
   })
 
@@ -1320,23 +1320,31 @@ describe('translateFrontmatterForClaudeCode — denylist translation', () => {
 })
 
 describe('agent*Toml — sandbox_mode and restriction reinforcement (Codex CLI)', () => {
-  test('read-only roles get sandbox_mode = "read-only"', () => {
-    const out = agentExplorerToml({ projectName: 'demo' })
-    assert.match(out, /^sandbox_mode = "read-only"$/m)
-  })
-
-  test('builder gets sandbox_mode = "workspace-write"', () => {
-    const out = agentBuilderToml({ projectName: 'demo' })
-    assert.match(out, /^sandbox_mode = "workspace-write"$/m)
+  // task #83: all 5 Codex roles run fully unsandboxed (danger-full-access) by
+  // deliberate, user-chosen project configuration. This is the actual
+  // behavior change — every role, not just one, must emit it.
+  test('ALL 5 roles get sandbox_mode = "danger-full-access"', () => {
+    const generators: [string, () => string][] = [
+      ['lead', () => agentLeadToml({ projectName: 'demo' })],
+      ['explorer', () => agentExplorerToml({ projectName: 'demo' })],
+      ['consultant', () => agentConsultantToml({ projectName: 'demo' })],
+      ['builder', () => agentBuilderToml({ projectName: 'demo' })],
+      ['reviewer', () => agentReviewerToml({ projectName: 'demo' })],
+    ]
+    for (const [, generate] of generators) {
+      assert.match(generate(), /^sandbox_mode = "danger-full-access"$/m)
+    }
   })
 
   test('read-only roles restate the prohibition in developer_instructions', () => {
-    // Codex keeps write tools visible to the model, so config alone is not
-    // enough — the restriction must also appear in the instructions.
+    // sandbox_mode no longer enforces anything for these roles — config alone
+    // is not enough — the restriction must also appear in the instructions,
+    // and it is now the ONLY enforcement mechanism left.
     const out = agentExplorerToml({ projectName: 'demo' })
     const instructions = out.split('developer_instructions = """')[1]
     assert.ok(instructions, 'developer_instructions block missing')
-    assert.match(instructions, /sandbox_mode = .read-only/)
+    assert.match(instructions, /sandbox_mode = .danger-full-access/)
+    assert.match(instructions, /UNSANDBOXED/)
     assert.match(instructions, /MUST NOT create, modify, or delete any file/)
   })
 
@@ -1547,15 +1555,16 @@ describe('agent prompt text — no path placeholders (task #59)', () => {
     const builder = agentBuilderToml({ projectName: 'demo' })
     assert.doesNotMatch(builder, /\{\{writablePaths\}\}/)
     assert.doesNotMatch(builder, /\{\{allowedPaths\}\}/)
-    // The real restriction — the one that is actually enforced — must remain.
-    assert.match(builder, /sandbox_mode = "workspace-write"/)
+    // sandbox_mode is danger-full-access for every role (task #83) — no
+    // longer OS-enforced, but still the emitted value that must remain.
+    assert.match(builder, /sandbox_mode = "danger-full-access"/)
   })
 
-  test('the explorer prompt carries no path placeholder and stays read-only', () => {
+  test('the explorer prompt carries no path placeholder and is unsandboxed (task #83)', () => {
     const explorer = agentExplorerToml({ projectName: 'demo' })
     assert.doesNotMatch(explorer, /\{\{allowedPaths\}\}/)
     assert.doesNotMatch(explorer, /\{\{writablePaths\}\}/)
-    assert.match(explorer, /sandbox_mode = "read-only"/)
+    assert.match(explorer, /sandbox_mode = "danger-full-access"/)
     assert.doesNotMatch(explorer, /You may write anywhere/)
   })
 })

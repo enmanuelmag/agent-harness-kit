@@ -814,7 +814,7 @@ For the **builder**, which has no restrictions, the key is omitted entirely — 
 
 ```toml
 name = "builder"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 
 description = """
 Builder agent — implements the plan produced by explorer and lead.
@@ -831,7 +831,9 @@ You are the builder agent for MyApp. Follow these rules:
 """
 ```
 
-Codex CLI has no per-agent tool denylist, so `sandbox_mode` is the only real mechanism: `"read-only"` for lead, explorer, consultant, and reviewer; `"workspace-write"` for builder. Because Codex keeps the write tools *visible* to the model even under a read-only sandbox, the restriction is additionally restated in prose inside `developer_instructions` — without it the model burns turns on calls the sandbox will reject.
+**Deliberate security tradeoff (all 5 roles, not just builder).** Codex CLI has no per-agent tool denylist. Earlier versions of this project used `sandbox_mode` as the OS-level enforcement mechanism (`"read-only"` for lead/explorer/consultant/reviewer, `"workspace-write"` for builder). As of a deliberate, user-chosen configuration decision (task #83), **every role now runs with `sandbox_mode = "danger-full-access"`** — i.e. fully unsandboxed, with no OS-level write protection at all, for lead, explorer, consultant, builder, and reviewer alike.
+
+This means the no-write restriction for lead/explorer/consultant/reviewer under Codex CLI is enforced **entirely by prompt instruction**, not by the operating system. Nothing technically blocks or rejects a write from a "read-only" role under Codex anymore — the restriction is restated in prose inside `developer_instructions` (see `CODEX_READ_ONLY_NOTICE` in `src/core/materializer/agent-restrictions.ts`), and that prose is the *only* thing standing between a no-write role and it actually writing files. A violation won't fail loudly; it will silently corrupt the harness's audit trail and workflow guarantees. This tradeoff was explained to and knowingly chosen by the project's maintainer — it is not an oversight, and it is not a general recommendation. If you fork this project, you may want to reintroduce `"read-only"`/`"workspace-write"` for stronger guarantees under Codex.
 
 **Grok Build** (`.grok/agents/*.md`) uses markdown + YAML frontmatter, like Claude Code and OpenCode — but its `tools:` field is an **allowlist**, the inverse shape of Claude's `disallowedTools`. A restricted role must enumerate every tool it IS allowed to use, since there is no way to say "everything except Write/Edit":
 
@@ -924,7 +926,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | **builder**    | Implements the plan. The only role that writes — its write tools are enabled where every other role's are disabled. Records every file modified. |
 | **reviewer**   | Verifies all acceptance criteria are met. Approves or blocks. Runs health check before approving.                                           |
 
-> **Scope note.** What a role may not do is enforced **per tool, not per path**. There is no per-agent path scoping and it is not configurable: the `allowedPaths` / `writablePaths` fields were removed because they were only interpolated into prompt text and no provider ever enforced them — they looked like a security control without being one. The real restriction lives in `src/core/materializer/agent-restrictions.ts`, which each provider translates natively: `disallowedTools` in Claude Code, `permission.edit` in OpenCode, `sandbox_mode` in Codex CLI, and a `tools:` allowlist in Grok Build. If a config still declares the removed fields they are stripped at load time with a warning.
+> **Scope note.** What a role may not do is enforced **per tool, not per path**. There is no per-agent path scoping and it is not configurable: the `allowedPaths` / `writablePaths` fields were removed because they were only interpolated into prompt text and no provider ever enforced them — they looked like a security control without being one. The restriction lives in `src/core/materializer/agent-restrictions.ts`, which each provider translates natively: `disallowedTools` in Claude Code, `permission.edit` in OpenCode, `sandbox_mode` in Codex CLI, and a `tools:` allowlist in Grok Build. If a config still declares the removed fields they are stripped at load time with a warning. **Codex CLI is the one exception to "enforced":** by deliberate project configuration all 5 roles run with `sandbox_mode = "danger-full-access"` (see below), so under Codex specifically the restriction is enforced by prompt instruction only, not by the OS.
 >
 > **The entire `agents` config key has since been removed too**, for the same underlying reason: everything left in it was either dead or better expressed elsewhere. `instructionsPath`, `context` and `custom` were written by the generator and never read by anything; `model` was the only field with an effect, and it now belongs in the agent file's frontmatter alongside the role prompt, since that file is user-owned. A config that still declares `agents` loads normally — the key is ignored, with one aggregated warning pointing at the agent file.
 >
@@ -1084,7 +1086,7 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability reporting process, suppor
 - ✅ **`tasks.add` via MCP** — agents can create new tasks on the fly without leaving the conversation.
 - ✅ **Global installation** — `ahk init` can install the harness to your home directory, shared across projects.
 - ✅ **Input validation** — all CLI prompts validate and retry on bad values.
-- ✅ **Codex CLI provider** — full support for OpenAI Codex CLI. Generates `.codex/agents/*.toml` files with proper `sandbox_mode` per role and merges `.codex/config.toml` for MCP registration. Overrides the built-in `default` agent so the harness lead runs by default.
+- ✅ **Codex CLI provider** — full support for OpenAI Codex CLI. Generates `.codex/agents/*.toml` files (`sandbox_mode = "danger-full-access"` for all roles, by deliberate project configuration — see the Scope note above) and merges `.codex/config.toml` for MCP registration. Overrides the built-in `default` agent so the harness lead runs by default.
 - ✅ **Grok Build provider** — full support for xAI's Grok Build. Generates `.grok/agents/*.md` files with a `tools:` allowlist per role and merges `.grok/config.toml` for MCP registration.
 - **Graphify integration** — connect the harness to Graphify to visualize agent workflows, task dependencies, and action timelines as interactive graphs.
 - **Open Telemetry integration** — emit OpenTelemetry spans for all agent actions, file operations, and tool calls.

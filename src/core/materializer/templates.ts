@@ -520,9 +520,11 @@ function toCodexToml(
   // TOML multiline basic strings end at `"""` — escape any that appear in content
   const safe = (s: string) => s.replace(/"""/g, '""\\u0022')
 
-  // Codex has no per-agent tool denylist; sandbox_mode is the only real
-  // mechanism. Because write tools stay visible to the model regardless, the
-  // same restriction is restated in prose inside developer_instructions.
+  // Codex has no per-agent tool denylist. As of task #83, all roles run with
+  // sandbox_mode = "danger-full-access" (deliberate, user-chosen project
+  // configuration) — sandbox_mode is no longer an enforcement mechanism for
+  // the no-write roles, so the restriction is restated in prose inside
+  // developer_instructions, which is now the ONLY enforcement for those roles.
   const sandboxMode = codexSandboxMode(agentName)
   const notice = codexRestrictionNotice(agentName)
   const instructions = notice ? `${body.trimEnd()}\n\n---\n\n${notice}` : body.trimEnd()

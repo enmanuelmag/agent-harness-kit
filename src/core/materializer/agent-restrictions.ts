@@ -9,18 +9,22 @@
  *
  *   restriction   | Claude Code                  | OpenCode                 | Codex CLI                    | Grok Build
  *   --------------|------------------------------|--------------------------|-------------------------------|---------------------------------
- *   'none'        | omit `tools` (inherit all)   | omit `permission`        | sandbox_mode="workspace-write" | omit `tools` (inherit all)
- *   'no-write'    | disallowedTools: Write, Edit | permission: { edit: deny } | sandbox_mode="read-only"      | tools: <allowlist, no Write/Edit>
+ *   'none'        | omit `tools` (inherit all)   | omit `permission`        | sandbox_mode="danger-full-access" | omit `tools` (inherit all)
+ *   'no-write'    | disallowedTools: Write, Edit | permission: { edit: deny } | sandbox_mode="danger-full-access" (enforced by prose only — see below) | tools: <allowlist, no Write/Edit>
  *
  * Notes on the asymmetries this abstraction hides:
  *  - OpenCode has NO separate `write` permission. Its `edit` permission is
  *    documented as "file modifications including write/patch", so a single
  *    `edit: deny` covers Write + Edit + patch. Emitting two keys would be wrong.
- *  - Codex CLI has no per-agent tool denylist at all. `sandbox_mode` is the only
- *    real mechanism, and it is coarse (it also blocks writes performed via
- *    shell). Because the tools stay *visible* to the model under Codex, the
- *    restriction is additionally restated in `developer_instructions` so the
- *    model does not burn turns on calls the sandbox will reject.
+ *  - Codex CLI has no per-agent tool denylist at all, and as of task #83 it
+ *    also has no OS-level sandbox: by deliberate, user-chosen project
+ *    configuration, ALL 5 roles run with `sandbox_mode = "danger-full-access"`
+ *    (fully unsandboxed), including the 'no-write' roles. `restrictionFor()`
+ *    is intentionally ignored by `codexSandboxMode()` for this reason. The
+ *    no-write restriction for those roles under Codex is therefore enforced
+ *    ENTIRELY by the prose restated in `developer_instructions`
+ *    (`CODEX_READ_ONLY_NOTICE`) — there is no technical enforcement left. See
+ *    README.md for the documented tradeoff.
  *  - Grok Build's `tools:` frontmatter field is the INVERSE shape of Claude's:
  *    an ALLOWLIST, not a denylist. There is no way to say "everything except
  *    Write/Edit" — the no-write role must enumerate every tool it IS allowed.
@@ -74,22 +78,34 @@ export function opencodePermissions(agentName: AgentName): Record<string, 'allow
 
 // ─── Codex CLI ───────────────────────────────────────────────────────────────
 
-export type CodexSandboxMode = 'workspace-write' | 'read-only'
+export type CodexSandboxMode = 'workspace-write' | 'read-only' | 'danger-full-access'
 
-export function codexSandboxMode(agentName: AgentName): CodexSandboxMode {
-  return restrictionFor(agentName) === 'no-write' ? 'read-only' : 'workspace-write'
+/**
+ * All 5 Codex roles run fully unsandboxed by deliberate, user-chosen project
+ * configuration (task #83) — `restrictionFor()` is intentionally NOT consulted
+ * here. This removes the only OS-level enforcement Codex CLI had for the
+ * no-write roles; see `CODEX_READ_ONLY_NOTICE` below for the prose-only
+ * backstop that replaces it, and README.md for the documented tradeoff.
+ */
+export function codexSandboxMode(_agentName: AgentName): CodexSandboxMode {
+  return 'danger-full-access'
 }
 
 /**
- * Prose restated inside `developer_instructions`. Codex keeps write tools
- * visible to the model even under a read-only sandbox, so config alone is not
- * enough — without this the model repeatedly attempts writes and fails.
+ * Prose restated inside `developer_instructions`. Since sandbox_mode is now
+ * `danger-full-access` for every role (task #83, user-chosen), this notice is
+ * no longer a redundant backstop to an OS sandbox — it is the ONLY thing
+ * enforcing the no-write restriction for lead/explorer/consultant/reviewer
+ * under Codex CLI. A violation will not be technically rejected by anything;
+ * it will silently corrupt the harness's audit trail and workflow guarantees.
  */
-export const CODEX_READ_ONLY_NOTICE = `## Tool restrictions (enforced by the sandbox)
+export const CODEX_READ_ONLY_NOTICE = `## Tool restrictions (enforced by instruction only — NOT by the sandbox)
 
-This agent runs with \`sandbox_mode = "read-only"\`. You MUST NOT create, modify, or delete any file: no \`Write\`, no \`Edit\`, no \`apply_patch\`, and no shell command that writes to disk (\`>\`, \`tee\`, \`sed -i\`, \`mv\`, \`rm\`, ...).
+This agent runs UNSANDBOXED: \`sandbox_mode = "danger-full-access"\`. There is no OS-level write protection. This is a deliberate project configuration choice, not an oversight.
 
-These tools may still appear available to you. The sandbox will reject the call. Do not retry a rejected write — report it as a blocker instead.`
+You MUST NOT create, modify, or delete any file: no \`Write\`, no \`Edit\`, no \`apply_patch\`, and no shell command that writes to disk (\`>\`, \`tee\`, \`sed -i\`, \`mv\`, \`rm\`, ...). This restriction is enforced ONLY by you following this instruction — nothing will technically block or reject the call.
+
+If you find yourself about to perform a write, STOP. Do not perform it. Report it as a blocker instead. Treat this as a hard rule: breaking it will not fail loudly, it will silently break the harness's audit trail and workflow guarantees.`
 
 export function codexRestrictionNotice(agentName: AgentName): string {
   return restrictionFor(agentName) === 'no-write' ? CODEX_READ_ONLY_NOTICE : ''
