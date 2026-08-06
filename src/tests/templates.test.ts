@@ -197,6 +197,18 @@ describe('mergeCodexConfigToml', () => {
     teardown()
   })
 
+  // ─── task #82: default_tools_approval_mode = "approve" (pre-approved, no prompts) ───
+
+  test('emits default_tools_approval_mode = "approve" — pre-approved, no per-call prompts', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-approval-mode.toml')
+    mergeCodexConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /default_tools_approval_mode = "approve"/)
+    assert.doesNotMatch(content, /default_tools_approval_mode = "auto"/)
+    teardown()
+  })
+
   // ─── task #81: top-level model / model_reasoning_effort default ───────────
 
   test('fresh file gets top-level model + model_reasoning_effort defaults, before any [section]', () => {

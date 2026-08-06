@@ -312,7 +312,7 @@ export function mergeCodexConfigToml(filePath: string, port: number, cwd: string
   const sectionBody = [
     `command = ${JSON.stringify(command)}`,
     `args = ${JSON.stringify(args)}`,
-    'default_tools_approval_mode = "auto"',
+    'default_tools_approval_mode = "approve"',
   ].join('\n')
 
   // Top-level defaults — written into the preamble, before any [section]
