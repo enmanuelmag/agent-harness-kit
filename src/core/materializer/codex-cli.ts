@@ -25,22 +25,35 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
  *  built-in `default` agent so `lead` runs when no agent is selected, but it is
  *  still an agent file the user may edit, so it follows the same user-owned
  *  policy as the five roles: created when missing, regenerated only with
- *  --force. */
-function codexAgentFiles(config: HarnessConfig): AgentFileEntry[] {
+ *  --force.
+ *
+ *  `modelsByRole` is optional, collected via `promptCodexAgentModels` (Codex
+ *  CLI only). It is populated by `scaffold()` (from `ahk init`'s per-role
+ *  model+effort prompt), and can also be threaded into `build()` via
+ *  `BuildMaterializerOptions.codexAgentModels`. A plain `ahk build` (no
+ *  `--force`) never collects models, so `build()`'s default call still passes
+ *  no second argument here, and existing agent files are left untouched
+ *  regardless (see `writeAgentFiles`'s user-ownership policy). Exported —
+ *  mirroring `claude-code.ts`'s exported `claudeAgentFiles` — so it can be
+ *  tested directly with an explicit map, without mocking `@clack/prompts`. */
+export function codexAgentFiles(
+  config: HarnessConfig,
+  modelsByRole?: ScaffoldOptions['codexAgentModels']
+): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.codex/agents/lead.toml', content: agentLeadToml({ projectName }) },
-    { relPath: '.codex/agents/explorer.toml', content: agentExplorerToml({ projectName }) },
-    { relPath: '.codex/agents/consultant.toml', content: agentConsultantToml({ projectName }) },
-    { relPath: '.codex/agents/builder.toml', content: agentBuilderToml({ projectName }) },
-    { relPath: '.codex/agents/reviewer.toml', content: agentReviewerToml({ projectName }) },
-    { relPath: '.codex/agents/default.toml', content: agentLeadAsDefaultToml({ projectName }) },
+    { relPath: '.codex/agents/lead.toml', content: agentLeadToml({ projectName }, modelsByRole?.lead) },
+    { relPath: '.codex/agents/explorer.toml', content: agentExplorerToml({ projectName }, modelsByRole?.explorer) },
+    { relPath: '.codex/agents/consultant.toml', content: agentConsultantToml({ projectName }, modelsByRole?.consultant) },
+    { relPath: '.codex/agents/builder.toml', content: agentBuilderToml({ projectName }, modelsByRole?.builder) },
+    { relPath: '.codex/agents/reviewer.toml', content: agentReviewerToml({ projectName }, modelsByRole?.reviewer) },
+    { relPath: '.codex/agents/default.toml', content: agentLeadAsDefaultToml({ projectName }, modelsByRole?.lead) },
   ]
 }
 
 export class CodexCliMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
-    const { cwd } = opts
+    const { cwd, codexAgentModels } = opts
 
     const write = (relPath: string, content: string, mode?: number) => {
       const abs = join(cwd, relPath)
@@ -75,7 +88,7 @@ export class CodexCliMaterializer implements Materializer {
     }
 
     // .codex/agents/ — user-owned: create when missing, never overwrite
-    writeAgentFiles(cwd, codexAgentFiles(config))
+    writeAgentFiles(cwd, codexAgentFiles(config, codexAgentModels))
 
     // .codex/config.toml — MERGE, never overwrite whole file. Detect the
     // project's package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
@@ -95,7 +108,7 @@ export class CodexCliMaterializer implements Materializer {
       { force: opts.force, backupRoot: join(cwd, config.storage.dir, 'backups') },
     )
 
-    const agents = writeAgentFiles(cwd, codexAgentFiles(config), {
+    const agents = writeAgentFiles(cwd, codexAgentFiles(config, opts.codexAgentModels), {
       force: opts.force,
       backupRoot: join(cwd, config.storage.dir, 'backups'),
     })

@@ -198,7 +198,15 @@ Agents are not configured from `agent-harness-kit.config.ts` — there is no
 `.codex/agents/<role>.toml`, `.grok/agents/<role>.md`), which is user-owned:
 
 - **Model**: set the `model:` frontmatter line (`model = "..."` for Codex CLI).
-  Omit it to let the provider apply its default.
+  Omit it to let the provider apply its default. Claude Code and Codex CLI
+  both prompt for a per-role model at `ahk init` time (Codex also prompts for
+  a `model_reasoning_effort`, written as its own `model_reasoning_effort =
+  "..."` TOML line) — the answer is written straight into the generated file,
+  never into config. OpenCode and Grok Build have no closed model enum, so
+  neither is prompted; hand-edit the frontmatter for those providers.
+  Separately, Codex's `.codex/config.toml` always carries a project-wide
+  top-level default (`model = "gpt-5.6-terra"`, `model_reasoning_effort =
+  "medium"`), preserved across re-runs once hand-edited.
 - **Role instructions**: written in the body of the file.
 
 `ahk build` creates these files when missing and never overwrites them.

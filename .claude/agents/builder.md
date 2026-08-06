@@ -5,6 +5,7 @@ description: >
   and analyzed by explorer. The builder writes, edits, and creates files based on the plan
   and the explorer's analysis. Invoke only after the explorer has completed its action.
   Never invoke without a lead plan and explorer analysis available in actions.get(taskId).
+model: sonnet
 ---
 
 # Builder Agent — @cardor/agent-harness-kit

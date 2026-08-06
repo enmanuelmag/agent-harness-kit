@@ -13,6 +13,7 @@ import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
 
 import { promptClaudeAgentModels } from './claude-model-prompt'
+import { promptCodexAgentModels } from './codex-model-prompt'
 import {
   applyConfigDefaults,
   detectConfigExtension,
@@ -176,14 +177,25 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // 'inherit' (no override). The choice is written straight into that role's
   // generated `.claude/agents/<role>.md` frontmatter at scaffold time — never
   // into config (the old `config.agents.<role>.model` mechanism stays
-  // removed). Other providers (OpenCode, Codex CLI) are unaffected — Codex's
-  // model is still hand-edited via `model = "..."` in its TOML, and OpenCode
-  // has no closed model enum to prompt against.
+  // removed). OpenCode is unaffected — it has no closed model enum to prompt
+  // against.
   //
   // The prompt loop itself lives in `promptClaudeAgentModels` (shared with
   // `ahk models` and `ahk build --force`, which also re-run it to update an
   // existing project's agent files — see claude-code.ts).
   const claudeAgentModels = await promptClaudeAgentModels(provider)
+
+  // Codex CLI only: prompt once per generated role for a model AND a
+  // reasoning-effort preference. Both choices are written straight into that
+  // role's generated `.codex/agents/<role>.toml` at scaffold time — never
+  // into config.toml, which carries its own separate top-level default (see
+  // `ensureTomlTopLevelKey` in mcp-merge.ts). OpenCode and Grok Build are
+  // unaffected — same rationale as above.
+  //
+  // The prompt loop itself lives in `promptCodexAgentModels`
+  // (codex-model-prompt.ts), mirroring `promptClaudeAgentModels`'s shape and
+  // cancel-handling.
+  const codexAgentModels = await promptCodexAgentModels(provider)
 
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string
@@ -342,7 +354,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     await db.writeStorageState(installDir)
 
     // Scaffold provider-specific files
-    await materializer.scaffold(config, { cwd: installDir, firstTask, claudeAgentModels })
+    await materializer.scaffold(config, { cwd: installDir, firstTask, claudeAgentModels, codexAgentModels })
 
     // Reconcile .harness/feature_list.json — the "human-editable task seed
     // list". Owned by init (not the scaffold), and MERGED rather than

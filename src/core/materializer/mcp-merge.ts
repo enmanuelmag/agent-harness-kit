@@ -265,6 +265,40 @@ function mergeTomlSection(content: string, sectionName: string, sectionBody: str
   return newLines.join('\n')
 }
 
+/**
+ * Inserts a bare top-level `key = "value"` into a TOML document's preamble
+ * (the region before the first `[section]` header), ONLY if that exact key is
+ * not already present there. Never overwrites — once written, the value is
+ * the user's, and re-running this must be a no-op that preserves their edit.
+ *
+ * A sibling to `mergeTomlSection` above, not a modification of it — that
+ * helper is shared with the Grok path and only ever merges bracketed section
+ * bodies. It appends an absent section at EOF, which is exactly the trap this
+ * helper exists to avoid for bare top-level keys: TOML scalars belong to
+ * whichever `[section]` header precedes them, so appending `model = "..."` at
+ * EOF would silently land inside `[mcp_servers.agent-harness-kit]` and
+ * corrupt that server's config (its struct almost certainly denies unknown
+ * fields) instead of being a harmless top-level default.
+ */
+export function ensureTomlTopLevelKey(content: string, key: string, value: string): string {
+  // Guard against `''.split('\n')` → `['']`, which would otherwise insert a
+  // spurious leading blank line into a brand-new file.
+  const lines = content.length > 0 ? content.split('\n') : []
+  const firstSectionIdx = lines.findIndex((l) => /^\s*\[/.test(l))
+  const preambleEnd = firstSectionIdx === -1 ? lines.length : firstSectionIdx
+
+  // Anchored with `\s*=` immediately after `key` so `model` never matches a
+  // `model_reasoning_effort = ...` line (and vice versa) — the two keys share
+  // a prefix, and a loose `.includes()`-style check would collide them.
+  const keyRe = new RegExp(`^\\s*${key}\\s*=`)
+  const alreadyPresent = lines.slice(0, preambleEnd).some((l) => keyRe.test(l))
+  if (alreadyPresent) return content
+
+  const newLines = [...lines]
+  newLines.splice(preambleEnd, 0, `${key} = ${JSON.stringify(value)}`)
+  return newLines.join('\n')
+}
+
 export function mergeCodexConfigToml(filePath: string, port: number, cwd: string, pm: PackageManager = 'npm'): void {
   mkdirSync(dirname(filePath), { recursive: true })
 
@@ -280,6 +314,12 @@ export function mergeCodexConfigToml(filePath: string, port: number, cwd: string
     `args = ${JSON.stringify(args)}`,
     'default_tools_approval_mode = "auto"',
   ].join('\n')
+
+  // Top-level defaults — written into the preamble, before any [section]
+  // header. Merge-safe: only written once, a user's hand-edit is preserved
+  // forever across re-runs (see `ensureTomlTopLevelKey`).
+  content = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
+  content = ensureTomlTopLevelKey(content, 'model_reasoning_effort', 'medium')
 
   content = mergeTomlSection(content, 'mcp_servers.agent-harness-kit', sectionBody)
 

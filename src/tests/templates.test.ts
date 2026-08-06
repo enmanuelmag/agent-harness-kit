@@ -6,8 +6,9 @@ import { describe, test } from 'node:test'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { getDoctorStatus } from '@/core/doctor'
 import { grokToolsAllowlist } from '@/core/materializer/agent-restrictions'
+import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { getMaterializer } from '@/core/materializer/index'
-import { mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeGrokConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import { ensureTomlTopLevelKey, mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeGrokConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
 import {
   __configObjectForTests,
   agentBuilder,
@@ -32,6 +33,8 @@ import {
   translateFrontmatterForOpenCode,
 } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
+
+import type { CodexAgentModelChoice } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
@@ -192,6 +195,103 @@ describe('mergeCodexConfigToml', () => {
     assert.match(content, /foo = "bar"/)
     assert.match(content, /\[mcp_servers\.agent-harness-kit\]/)
     teardown()
+  })
+
+  // ─── task #81: top-level model / model_reasoning_effort default ───────────
+
+  test('fresh file gets top-level model + model_reasoning_effort defaults, before any [section]', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-model-default.toml')
+    mergeCodexConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /^model = "gpt-5\.6-terra"$/m)
+    assert.match(content, /^model_reasoning_effort = "medium"$/m)
+    // Both keys must land BEFORE the first [section] header — anywhere else
+    // would risk them being swallowed into that section by a TOML parser.
+    const modelIdx = content.indexOf('model = "gpt-5.6-terra"')
+    const sectionIdx = content.indexOf('[mcp_servers.agent-harness-kit]')
+    assert.ok(modelIdx < sectionIdx && modelIdx !== -1 && sectionIdx !== -1)
+    teardown()
+  })
+
+  test('re-running mergeCodexConfigToml is idempotent — defaults are not duplicated', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-model-idempotent.toml')
+    mergeCodexConfigToml(path, 3456, TMP)
+    mergeCodexConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    assert.equal(content.match(/^model = /gm)?.length, 1)
+    assert.equal(content.match(/^model_reasoning_effort = /gm)?.length, 1)
+    teardown()
+  })
+
+  test("a user-edited model default is preserved across re-runs — merge never overwrites it", () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-model-preserved.toml')
+    mergeCodexConfigToml(path, 3456, TMP)
+    // Simulate the user hand-editing their model choice.
+    let content = readFileSync(path, 'utf8')
+    content = content.replace('model = "gpt-5.6-terra"', 'model = "gpt-5.6-sol"')
+    writeFileSync(path, content, 'utf8')
+
+    mergeCodexConfigToml(path, 3456, TMP)
+    const after = readFileSync(path, 'utf8')
+    assert.match(after, /^model = "gpt-5\.6-sol"$/m)
+    assert.doesNotMatch(after, /gpt-5\.6-terra/)
+    teardown()
+  })
+
+  test('a file whose first line is already the [mcp_servers...] section still gets top-level defaults inserted before it', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-model-first-line-section.toml')
+    writeFileSync(path, '[mcp_servers.agent-harness-kit]\ncommand = "old"\n')
+    mergeCodexConfigToml(path, 3456, TMP)
+    const content = readFileSync(path, 'utf8')
+    const modelIdx = content.indexOf('model = "gpt-5.6-terra"')
+    const sectionIdx = content.indexOf('[mcp_servers.agent-harness-kit]')
+    assert.ok(modelIdx !== -1 && sectionIdx !== -1 && modelIdx < sectionIdx)
+    teardown()
+  })
+})
+
+describe('ensureTomlTopLevelKey', () => {
+  test('inserts the key into an empty document with no spurious leading blank line', () => {
+    const result = ensureTomlTopLevelKey('', 'model', 'gpt-5.6-terra')
+    assert.equal(result, 'model = "gpt-5.6-terra"')
+  })
+
+  test('no-ops when the key is already present in the preamble', () => {
+    const content = 'model = "gpt-5.6-sol"\n[section]\nfoo = "bar"\n'
+    const result = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
+    assert.equal(result, content)
+  })
+
+  test('a comment mentioning the key does not count as present', () => {
+    const content = '# model = "not real"\n'
+    const result = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
+    assert.match(result, /^model = "gpt-5\.6-terra"$/m)
+  })
+
+  test("'model' key presence-check does not collide with 'model_reasoning_effort'", () => {
+    const content = 'model_reasoning_effort = "high"\n'
+    const result = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
+    assert.match(result, /^model = "gpt-5\.6-terra"$/m)
+    assert.match(result, /^model_reasoning_effort = "high"$/m)
+  })
+
+  test("'model_reasoning_effort' key presence-check does not collide with 'model'", () => {
+    const content = 'model = "gpt-5.6-terra"\n'
+    const result = ensureTomlTopLevelKey(content, 'model_reasoning_effort', 'medium')
+    assert.match(result, /^model = "gpt-5\.6-terra"$/m)
+    assert.match(result, /^model_reasoning_effort = "medium"$/m)
+  })
+
+  test('a same-named key under a [section] does not suppress the top-level default', () => {
+    const content = '[profiles.fast]\nmodel = "gpt-5.6-luna"\n'
+    const result = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
+    const topLevelIdx = result.indexOf('model = "gpt-5.6-terra"')
+    const sectionIdx = result.indexOf('[profiles.fast]')
+    assert.ok(topLevelIdx !== -1 && sectionIdx !== -1 && topLevelIdx < sectionIdx)
   })
 })
 
@@ -923,16 +1023,20 @@ describe('configJson — loaded by loadConfig()', () => {
   })
 })
 
-// ─── no generated model line (replaces the task-43 model-personalization suite)
+// ─── no generated model line by default (replaces the task-43 model-
+// personalization suite; narrowed by task #81 — see the injection suite below)
 //
 // The per-agent `model` config was removed along with the whole `agents` key.
 // The generated agent file is user-owned, so the model is set by editing the
-// file. Emitting NO model line is what makes that work: each provider then
-// applies its own default, which is exactly what the old 'inherit' option meant.
-// These tests pin the absence, because a reintroduced model line would silently
-// override the user's own edit on every --force regeneration.
+// file. Emitting NO model line by default is what makes that work: each
+// provider then applies its own default, which is exactly what the old
+// 'inherit' option meant. These tests pin the absence when no opts are given,
+// because a reintroduced model line would silently override the user's own
+// edit on every --force regeneration. Task #81 adds `promptCodexAgentModels`
+// (Codex CLI only), which DOES inject a line — but only when the caller
+// actually supplies opts; see the sibling suite below for that behavior.
 
-describe('agent*Toml — never emits a model line', () => {
+describe('agent*Toml — no opts → still no model line', () => {
   const generators: [string, () => string][] = [
     ['lead', () => agentLeadToml({ projectName: 'demo' })],
     ['explorer', () => agentExplorerToml({ projectName: 'demo' })],
@@ -951,6 +1055,141 @@ describe('agent*Toml — never emits a model line', () => {
   test('sandbox_mode survives — removing model must not disturb the real restriction', () => {
     assert.match(agentExplorerToml({ projectName: 'demo' }), /sandbox_mode = "read-only"/)
     assert.match(agentBuilderToml({ projectName: 'demo' }), /sandbox_mode = "workspace-write"/)
+  })
+})
+
+// ahk init's per-role Codex model+effort prompt (`promptCodexAgentModels`,
+// Codex CLI only) writes straight into each role's generated TOML via this
+// opts param — never into config.toml. These tests cover every real role
+// getting its own correct model/effort lines with no cross-role leakage,
+// modeled on the Claude equivalent (`translateFrontmatterForClaudeCode —
+// per-role model injection`, above).
+describe('agent*Toml — per-role model + effort injection', () => {
+  const generators: [string, (opts?: CodexAgentModelChoice) => string][] = [
+    ['lead', (opts) => agentLeadToml({ projectName: 'demo' }, opts)],
+    ['explorer', (opts) => agentExplorerToml({ projectName: 'demo' }, opts)],
+    ['consultant', (opts) => agentConsultantToml({ projectName: 'demo' }, opts)],
+    ['builder', (opts) => agentBuilderToml({ projectName: 'demo' }, opts)],
+    ['reviewer', (opts) => agentReviewerToml({ projectName: 'demo' }, opts)],
+  ]
+
+  for (const [role, generate] of generators) {
+    test(`${role}: opts with model + effort → emits both lines with exact keys`, () => {
+      const result = generate({ model: 'gpt-5.6-sol', effort: 'high' })
+      assert.match(result, /^model = "gpt-5\.6-sol"$/m)
+      assert.match(result, /^model_reasoning_effort = "high"$/m)
+    })
+
+    test(`${role}: opts with model only → emits model, no effort line`, () => {
+      const result = generate({ model: 'gpt-5.4' })
+      assert.match(result, /^model = "gpt-5\.4"$/m)
+      assert.doesNotMatch(result, /model_reasoning_effort/)
+    })
+
+    test(`${role}: opts with effort only → emits effort, no model line`, () => {
+      const result = generate({ effort: 'xhigh' })
+      assert.doesNotMatch(result, /^model = /m)
+      assert.match(result, /^model_reasoning_effort = "xhigh"$/m)
+    })
+
+    test(`${role}: undefined opts → no model/effort line (same as no-opts case)`, () => {
+      const result = generate(undefined)
+      assert.doesNotMatch(result, /model\s*=/)
+    })
+
+    test(`${role}: opts with empty-string model/effort → never emits an empty value`, () => {
+      // Empty string is not a real reasoning-effort value — the cast below
+      // simulates a defensive/malformed caller to prove the runtime guard
+      // (not just the type system) rejects it, since Codex's own parser
+      // explicitly errors on an empty effort string.
+      const result = generate({ model: '', effort: '' as CodexAgentModelChoice['effort'] })
+      assert.doesNotMatch(result, /model\s*=\s*""/)
+      assert.doesNotMatch(result, /model_reasoning_effort/)
+      assert.doesNotMatch(result, /^model = /m)
+    })
+  }
+
+  test('no cross-role contamination — choosing sol/high for builder must not affect explorer', () => {
+    const builderResult = agentBuilderToml({ projectName: 'demo' }, { model: 'gpt-5.6-sol', effort: 'high' })
+    const explorerResult = agentExplorerToml({ projectName: 'demo' }, { model: 'gpt-5.6-sol', effort: 'high' })
+    assert.match(builderResult, /^model = "gpt-5\.6-sol"$/m)
+    assert.match(explorerResult, /^model = "gpt-5\.6-sol"$/m)
+    const reviewerNoOpts = agentReviewerToml({ projectName: 'demo' })
+    assert.doesNotMatch(reviewerNoOpts, /model\s*=/)
+  })
+
+  test('sandbox_mode is unaffected by model/effort injection', () => {
+    assert.match(
+      agentExplorerToml({ projectName: 'demo' }, { model: 'gpt-5.6-luna', effort: 'low' }),
+      /sandbox_mode = "read-only"/,
+    )
+    assert.match(
+      agentBuilderToml({ projectName: 'demo' }, { model: 'gpt-5.6-luna', effort: 'low' }),
+      /sandbox_mode = "workspace-write"/,
+    )
+  })
+
+  test('default.toml (lead shim) also accepts opts, mirroring agentLeadToml', () => {
+    const result = agentLeadAsDefaultToml({ projectName: 'demo' }, { model: 'gpt-5.5', effort: 'minimal' })
+    assert.match(result, /^model = "gpt-5\.5"$/m)
+    assert.match(result, /^model_reasoning_effort = "minimal"$/m)
+  })
+})
+
+// task #81: codexAgentFiles (exported from codex-cli.ts, mirroring
+// claudeAgentFiles) is the pure entry point `ahk init`/tests use — no
+// @clack/prompts mocking anywhere in this repo (see models.test.ts).
+describe('codexAgentFiles — direct export, per-role model+effort map', () => {
+  test('injects the given per-role model+effort map into each generated TOML, no cross-contamination', () => {
+    const config = applyConfigDefaults({
+      name: 'demo-app',
+      description: 'demo',
+      provider: 'codex-cli',
+      docsPath: './docs',
+      tasksAdapter: 'local',
+    })
+    const entries = codexAgentFiles(config, {
+      explorer: { model: 'gpt-5.6-sol', effort: 'high' },
+      reviewer: { model: 'gpt-5.4-mini' },
+    })
+    const byPath = Object.fromEntries(entries.map((e) => [e.relPath, e.content]))
+
+    assert.match(byPath['.codex/agents/explorer.toml'], /^model = "gpt-5\.6-sol"$/m)
+    assert.match(byPath['.codex/agents/explorer.toml'], /^model_reasoning_effort = "high"$/m)
+    assert.match(byPath['.codex/agents/reviewer.toml'], /^model = "gpt-5\.4-mini"$/m)
+    assert.doesNotMatch(byPath['.codex/agents/reviewer.toml'], /model_reasoning_effort/)
+    assert.doesNotMatch(byPath['.codex/agents/lead.toml'], /model\s*=/, 'lead was left unset — no model line')
+    assert.doesNotMatch(byPath['.codex/agents/builder.toml'], /model\s*=/, 'builder was left unset — no model line')
+    assert.doesNotMatch(byPath['.codex/agents/consultant.toml'], /model\s*=/, 'consultant was left unset — no model line')
+    assert.doesNotMatch(byPath['.codex/agents/default.toml'], /model\s*=/, 'default (lead shim) mirrors lead, left unset')
+  })
+
+  test('no modelsByRole arg → no model line for any role (same as before extraction)', () => {
+    const config = applyConfigDefaults({
+      name: 'demo-app',
+      description: 'demo',
+      provider: 'codex-cli',
+      docsPath: './docs',
+      tasksAdapter: 'local',
+    })
+    const entries = codexAgentFiles(config)
+    for (const entry of entries) {
+      assert.doesNotMatch(entry.content, /model\s*=/)
+    }
+  })
+
+  test("lead's choice also applies to default.toml (the lead shim)", () => {
+    const config = applyConfigDefaults({
+      name: 'demo-app',
+      description: 'demo',
+      provider: 'codex-cli',
+      docsPath: './docs',
+      tasksAdapter: 'local',
+    })
+    const entries = codexAgentFiles(config, { lead: { model: 'gpt-5.6-terra', effort: 'medium' } })
+    const byPath = Object.fromEntries(entries.map((e) => [e.relPath, e.content]))
+    assert.match(byPath['.codex/agents/lead.toml'], /^model = "gpt-5\.6-terra"$/m)
+    assert.match(byPath['.codex/agents/default.toml'], /^model = "gpt-5\.6-terra"$/m)
   })
 })
 

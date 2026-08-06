@@ -220,6 +220,31 @@ export interface McpToolResult {
 
 // ─── Materializer interface ───────────────────────────────────────────────────
 
+/** Codex's real reasoning-effort wire enum is wider (none|minimal|low|medium|
+ *  high|xhigh|max|ultra|Custom — see `openai_models.rs`), but this type is
+ *  narrowed to the intersection Codex's own per-agent-role-file writer
+ *  accepts (`subagents.rs::map_agent_reasoning_effort`). Codex performs no
+ *  client-side validation of this field (any unrecognized non-empty string
+ *  is silently accepted as a `Custom` value and only fails later, at request
+ *  time), so this closed TS union is the only real guard the prompt has —
+ *  keep it a literal union, unlike `CodexAgentModelChoice.model` below. */
+export type CodexReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+
+/** A single role's Codex CLI model + reasoning-effort choice, collected by
+ *  `ahk init`'s Codex-conditional prompt (`promptCodexAgentModels`) and
+ *  written into that role's generated `.codex/agents/<role>.toml`.
+ *
+ *  `model` is a plain `string`, not a literal union, deliberately — model
+ *  catalogs go stale with every provider release, and a hardcoded compile-time
+ *  union would turn a stale/renamed slug into a build-breaking type error for
+ *  someone hand-editing a newer model into their TOML. `effort` is a closed,
+ *  stable union (see `CodexReasoningEffort`) because Codex does not validate
+ *  it client-side. This model/effort asymmetry is intentional. */
+export interface CodexAgentModelChoice {
+  model?: string
+  effort?: CodexReasoningEffort
+}
+
 export interface ScaffoldOptions {
   cwd: string
   firstTask?: {
@@ -237,4 +262,15 @@ export interface ScaffoldOptions {
    *  exposes one `scaffold(config, opts)` signature across all providers;
    *  OpenCode's and Codex CLI's materializers simply never read this field. */
   claudeAgentModels?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>>
+  /** Codex CLI only: per-role model + reasoning-effort choice collected by
+   *  `ahk init`'s provider-conditional prompt (`promptCodexAgentModels`).
+   *  Consumed exclusively by `CodexCliMaterializer.scaffold()` to inject
+   *  `model = "..."` / `model_reasoning_effort = "..."` lines into each
+   *  role's generated `.codex/agents/<role>.toml` at scaffold time — never
+   *  persisted to config.toml, which carries its own separate top-level
+   *  default (see `ensureTomlTopLevelKey` in mcp-merge.ts). Mirrors
+   *  `claudeAgentModels` above; Claude Code's and OpenCode's materializers
+   *  simply never read this field, exactly as claude-code.ts's materializer
+   *  never reads `claudeAgentModels`'s Codex counterpart. */
+  codexAgentModels?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', CodexAgentModelChoice>>
 }

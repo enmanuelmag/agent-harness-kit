@@ -11,7 +11,7 @@ import {
 } from './agent-restrictions'
 
 import type { AgentName } from './agent-restrictions'
-import type { HarnessConfig } from '@/types'
+import type { CodexAgentModelChoice, HarnessConfig } from '@/types'
 
 // ─── Agent template loader ────────────────────────────────────────────────────
 
@@ -494,16 +494,28 @@ function stripFrontmatter(md: string): { description: string; body: string } {
 }
 
 /**
- * No `model` line is emitted. The generated file is user-owned, so the model is
- * set by editing `model = "..."` directly in `.codex/agents/<role>.toml`;
- * omitting it here lets Codex apply its own default, which is what the old
- * 'inherit' option meant.
+ * No `model` / `model_reasoning_effort` line is emitted unless `opts` supplies
+ * one. The generated file is user-owned, so by default the model is set by
+ * editing those lines directly in `.codex/agents/<role>.toml`; omitting them
+ * here lets Codex apply its own default, which is what the old 'inherit'
+ * option meant. `opts` is the one caller-controlled exception — it is how
+ * `ahk init`'s per-role Codex model+effort prompt (`promptCodexAgentModels`)
+ * applies a user's actual answer, mirroring `translateFrontmatterForClaudeCode`'s
+ * `opts.model` for Claude Code.
+ *
+ * Both fields are guarded against empty strings: Codex's per-agent-role file
+ * format uses `#[serde(deny_unknown_fields)]`, so a malformed key takes the
+ * WHOLE role file offline, and its reasoning-effort parser explicitly rejects
+ * an empty string (every other unrecognized value is silently accepted as a
+ * custom effort, but `""` is the one hard error) — so a line is only ever
+ * emitted for a genuinely non-empty value.
  */
 function toCodexToml(
   tomlName: string,
   agentName: AgentName,
   description: string,
-  body: string
+  body: string,
+  opts?: CodexAgentModelChoice
 ): string {
   // TOML multiline basic strings end at `"""` — escape any that appear in content
   const safe = (s: string) => s.replace(/"""/g, '""\\u0022')
@@ -515,9 +527,14 @@ function toCodexToml(
   const notice = codexRestrictionNotice(agentName)
   const instructions = notice ? `${body.trimEnd()}\n\n---\n\n${notice}` : body.trimEnd()
 
+  const modelLines: string[] = []
+  if (opts?.model) modelLines.push(`model = "${opts.model}"`)
+  if (opts?.effort) modelLines.push(`model_reasoning_effort = "${opts.effort}"`)
+  const modelBlock = modelLines.length > 0 ? `${modelLines.join('\n')}\n` : ''
+
   return `name = "${tomlName}"
 sandbox_mode = "${sandboxMode}"
-
+${modelBlock}
 description = """
 ${safe(description)}
 """
@@ -528,34 +545,34 @@ ${safe(instructions)}
 `
 }
 
-export function agentLeadToml(vars: { projectName: string }): string {
+export function agentLeadToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  return toCodexToml('lead', 'lead', description, body)
+  return toCodexToml('lead', 'lead', description, body, opts)
 }
 
-export function agentLeadAsDefaultToml(vars: { projectName: string }): string {
+export function agentLeadAsDefaultToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  return toCodexToml('default', 'lead', description, body)
+  return toCodexToml('default', 'lead', description, body, opts)
 }
 
-export function agentExplorerToml(vars: { projectName: string }): string {
+export function agentExplorerToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('explorer', vars))
-  return toCodexToml('explorer', 'explorer', description, body)
+  return toCodexToml('explorer', 'explorer', description, body, opts)
 }
 
-export function agentBuilderToml(vars: { projectName: string }): string {
+export function agentBuilderToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('builder', vars))
-  return toCodexToml('builder', 'builder', description, body)
+  return toCodexToml('builder', 'builder', description, body, opts)
 }
 
-export function agentReviewerToml(vars: { projectName: string }): string {
+export function agentReviewerToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('reviewer', vars))
-  return toCodexToml('reviewer', 'reviewer', description, body)
+  return toCodexToml('reviewer', 'reviewer', description, body, opts)
 }
 
-export function agentConsultantToml(vars: { projectName: string }): string {
+export function agentConsultantToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('consultant', vars))
-  return toCodexToml('consultant', 'consultant', description, body)
+  return toCodexToml('consultant', 'consultant', description, body, opts)
 }
 
 // ─── Claude Code frontmatter translation ─────────────────────────────────────

@@ -21,6 +21,14 @@ export interface BuildMaterializerOptions {
    *  and `grok.ts` share the identical `build()` signature and simply never
    *  read this field. */
   claudeAgentModels?: ScaffoldOptions['claudeAgentModels']
+  /** Codex CLI only: per-role model + reasoning-effort choice collected via
+   *  `promptCodexAgentModels`, keyed by `AgentName`. Same shape as
+   *  `ScaffoldOptions['codexAgentModels']` — reused verbatim rather than
+   *  redeclared. Purely additive and optional: `claude-code.ts`, `opencode.ts`,
+   *  and `grok.ts` share the identical `build()` signature and simply never
+   *  read this field — this cuts both ways, since `codex-cli.ts` likewise
+   *  never reads `claudeAgentModels`. */
+  codexAgentModels?: ScaffoldOptions['codexAgentModels']
 }
 
 export interface BuildReport {

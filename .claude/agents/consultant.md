@@ -4,6 +4,7 @@ description: >
   Technical advisor agent for @cardor/agent-harness-kit. Runs after the explorer and before the builder.
   Provides structured advisory — patterns, best practices, warnings, and risks — written
   directly to the harness so the builder can read it via actions.get. Never writes code.
+model: opus
 disallowedTools:
   - Write
   - Edit
