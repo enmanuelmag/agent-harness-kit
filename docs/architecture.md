@@ -169,6 +169,10 @@ Agents interact through:
 - `tasks.claim()` - Atomically claim a task (prevents race conditions)
 - `actions.start()` / `actions.complete()` - Register and complete actions  
 - `actions.write()` - Log information about the action
+- `actions.get(taskId)` - Full legacy audit history. It returns all actions and section content, so do not use it for normal handoffs.
+- `actions.list()` / `actions.get_by_id()` - Compact action discovery and one-action metadata.
+- `actions.sections.list()` / `actions.sections.get()` - Locate section evidence, then read only an explicit character range.
+- `actions.handoff.write()` / `actions.handoff.get()` - Validated, recipient-directed continuation context. Handoffs are capped at 12,000 UTF-8 bytes and a missing handoff returns `HANDOFF_NOT_FOUND`; it never falls back to the full history.
 - `docs.search()` - Search project documentation
 
 #### Data Flow

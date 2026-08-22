@@ -206,7 +206,7 @@ Each agent follows a specific workflow pattern:
 4. Log all file reads for audit trail
 
 #### For the Builder Agent:
-1. Read full action history (lead's plan, explorer's analysis)
+1. Read the canonical handoff for the receiving role. Use compact action and section reads only when it names evidence that needs inspection; reserve the full history for audit or diagnosis.
 2. Implement changes following established patterns
 3. Log every file modified
 4. Run tests after implementing changes

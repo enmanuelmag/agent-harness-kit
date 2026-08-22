@@ -1551,6 +1551,14 @@ describe('configTs — no `agents` key', () => {
 })
 
 describe('agent prompt text — no path placeholders (task #59)', () => {
+  test('builder startup uses the bounded handoff protocol, not full history', () => {
+    for (const prompt of [agentBuilder({ projectName: 'demo' }), agentBuilderToml({ projectName: 'demo' })]) {
+      assert.match(prompt, /actions\.handoff\.get\(taskId, recipient: 'builder'\)/)
+      assert.doesNotMatch(prompt, /Read ALL previous actions/)
+      assert.match(prompt, /Reserve `actions\.get\(taskId\)` for audit or diagnosis only/)
+    }
+  })
+
   test('the builder prompt states its scope without an uninterpolated placeholder', () => {
     const builder = agentBuilderToml({ projectName: 'demo' })
     assert.doesNotMatch(builder, /\{\{writablePaths\}\}/)
