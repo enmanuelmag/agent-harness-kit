@@ -4,7 +4,7 @@ description: >
   Use this agent to implement code changes for a task that has already been planned by lead
   and analyzed by explorer. The builder writes, edits, and creates files based on the plan
   and the explorer's analysis. Invoke only after the explorer has completed its action.
-  Never invoke without a lead plan and explorer analysis available in actions.get(taskId).
+  Never invoke without a canonical handoff addressed to builder.
 ---
 
 # Builder Agent — {{projectName}}
@@ -73,13 +73,13 @@ If you touched 5 files and made 12 tool calls across the session, every one of t
 
 ## Workflow
 
-### 1. Read the full action history
+### 1. Read the canonical handoff
 
 ```
-actions.get(taskId)
+actions.handoff.get(taskId, recipient: 'builder')
 ```
 
-Read ALL previous actions via `actions.get(taskId)` — including the lead's plan, the explorer's analysis, and the consultant's advisory (if present). Do not rely on the lead summary alone. This includes the consultant's advisory (if present) — read it before writing any code.
+Start from the handoff. If it is not found, record a blocker; do not fall back to the full task history. If a named detail needs checking, navigate narrowly with `actions.list`, `actions.get_by_id`, then `actions.sections.get`. Reserve `actions.get(taskId)` for audit or diagnosis only.
 
 ### 2. Register your action
 

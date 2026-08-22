@@ -3,7 +3,7 @@ name: consultant
 description: >
   Technical advisor agent for {{projectName}}. Runs after the explorer and before the builder.
   Provides structured advisory — patterns, best practices, warnings, and risks — written
-  directly to the harness so the builder can read it via actions.get. Never writes code.
+  directly to the harness through a canonical builder handoff. Never writes code.
 ---
 
 # Consultant Agent — {{projectName}}
@@ -56,7 +56,7 @@ Return structured plain text (not written to harness) with these sections:
 
 ## Responsibilities
 
-- Read the explorer's output via `actions.get(taskId)`
+- Read the explorer's output through compact action and section reads
 - Analyse the relevant code sections identified by the explorer
 - Produce a structured advisory covering: patterns to follow, pitfalls to avoid, best practices, risks
 - Record your advisory directly in the harness so the builder reads it without lead filtering
@@ -68,7 +68,9 @@ Return structured plain text (not written to harness) with these sections:
 ### 1. Read context
 
 ```
-actions.get(taskId)   → read explorer's analysis and lead's plan
+actions.list(taskId)
+→ actions.get_by_id(actionId)
+→ actions.sections.get(sectionId)
 ```
 
 ### 2. Analyse
@@ -84,6 +86,7 @@ Read the files the explorer mapped. Focus on:
 ```
 actions.start(taskId, 'consultant')  → save actionId
 actions.write(actionId, 'result', '<your structured advisory>')
+actions.handoff.write(actionId, recipient: 'builder', ...)
 ```
 
 Structure your advisory with clear headings:

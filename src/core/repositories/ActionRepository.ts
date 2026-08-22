@@ -7,6 +7,18 @@ export interface ActionWithDetails extends ActionRow {
   tools: ActionToolRow[]
 }
 
+export interface ActionListRow extends ActionRow {
+  section_count: number
+}
+
+export interface ActionSectionIndexRow {
+  id: number
+  action_id: number
+  section_type: string
+  chars: number
+  created_at: string
+}
+
 export class ActionRepository {
   constructor(private driver: DBDriver) {}
 
@@ -45,6 +57,42 @@ export class ActionRepository {
     )
   }
 
+  /** Compact newest-first index used by actions.list. The cursor is the last
+   *  row from the previous page, so it remains stable when new actions arrive. */
+  async listForTask(
+    taskId: number,
+    options: {
+      agent?: AgentName
+      status?: ActionRow['status']
+      cursor?: { createdAt: string; id: number }
+      limit: number
+    },
+  ): Promise<ActionListRow[]> {
+    const where = ['a.task_id = ?']
+    const params: unknown[] = [taskId]
+    if (options.agent) {
+      where.push('a.agent = ?')
+      params.push(options.agent)
+    }
+    if (options.status) {
+      where.push('a.status = ?')
+      params.push(options.status)
+    }
+    if (options.cursor) {
+      where.push('(a.created_at < ? OR (a.created_at = ? AND a.id < ?))')
+      params.push(options.cursor.createdAt, options.cursor.createdAt, options.cursor.id)
+    }
+    params.push(options.limit)
+    return this.driver.query<ActionListRow>(
+      `SELECT a.*, COUNT(s.id) AS section_count
+       FROM actions a LEFT JOIN action_sections s ON s.action_id = a.id
+       WHERE ${where.join(' AND ')}
+       GROUP BY a.id, a.task_id, a.agent, a.status, a.created_at, a.completed_at, a.summary
+       ORDER BY a.created_at DESC, a.id DESC LIMIT ?`,
+      params,
+    )
+  }
+
   async getAll(): Promise<ActionRow[]> {
     return this.driver.query<ActionRow>(`SELECT * FROM actions ORDER BY created_at`)
   }
@@ -74,6 +122,42 @@ export class ActionRepository {
     return this.driver.query<ActionSectionRow>(
       `SELECT * FROM action_sections WHERE action_id = ? ORDER BY created_at`,
       [actionId],
+    )
+  }
+
+  async getSectionById(sectionId: number): Promise<ActionSectionRow | null> {
+    return this.driver.queryOne<ActionSectionRow>(`SELECT * FROM action_sections WHERE id = ?`, [sectionId])
+  }
+
+  async listSections(
+    actionId: number,
+    options: { types?: string[]; cursor?: number; limit: number },
+  ): Promise<ActionSectionIndexRow[]> {
+    const where = ['action_id = ?']
+    const params: unknown[] = [actionId]
+    if (options.types?.length) {
+      where.push(`section_type IN (${options.types.map(() => '?').join(', ')})`)
+      params.push(...options.types)
+    }
+    if (options.cursor !== undefined) {
+      where.push('id < ?')
+      params.push(options.cursor)
+    }
+    params.push(options.limit)
+    return this.driver.query<ActionSectionIndexRow>(
+      `SELECT id, action_id, section_type, LENGTH(content) AS chars, created_at
+       FROM action_sections WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`,
+      params,
+    )
+  }
+
+  async getCompletedHandoffSections(taskId: number): Promise<Array<ActionSectionRow & Pick<ActionRow, 'agent' | 'completed_at'>>> {
+    return this.driver.query(
+      `SELECT s.*, a.agent, a.completed_at
+       FROM action_sections s JOIN actions a ON a.id = s.action_id
+       WHERE a.task_id = ? AND a.status = 'completed' AND s.section_type = 'handoff'
+       ORDER BY s.created_at DESC, s.id DESC`,
+      [taskId],
     )
   }
 

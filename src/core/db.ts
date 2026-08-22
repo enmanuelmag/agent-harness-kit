@@ -234,8 +234,32 @@ export class HarnessDB {
     return this.actions.getForTask(taskId)
   }
 
+  async listActionsForTask(
+    taskId: number,
+    options: {
+      agent?: AgentName
+      status?: ActionRow['status']
+      cursor?: { createdAt: string; id: number }
+      limit: number
+    },
+  ) {
+    return this.actions.listForTask(taskId, options)
+  }
+
   async getActionSections(actionId: number): Promise<ActionSectionRow[]> {
     return this.actions.getSections(actionId)
+  }
+
+  async getActionSection(sectionId: number): Promise<ActionSectionRow | null> {
+    return this.actions.getSectionById(sectionId)
+  }
+
+  async listActionSections(actionId: number, options: { types?: string[]; cursor?: number; limit: number }) {
+    return this.actions.listSections(actionId, options)
+  }
+
+  async getCompletedHandoffSections(taskId: number) {
+    return this.actions.getCompletedHandoffSections(taskId)
   }
 
   /** Batch-only (task #74) — records N files in one atomic transaction. There

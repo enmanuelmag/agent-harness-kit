@@ -57,7 +57,9 @@ Example flush after a few calls:
 ### 1. Read the lead's plan
 
 ```
-actions.get(taskId)   → find the lead's action, read the 'result' section
+actions.list(taskId, agent: 'lead', status: 'completed')
+→ actions.get_by_id(actionId)
+→ actions.sections.get(sectionId)
 ```
 
 Understand exactly what you need to map before reading anything.

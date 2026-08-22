@@ -2,7 +2,7 @@
 name: reviewer
 description: >
   Use this agent to verify that a completed implementation meets all acceptance criteria
-  for the current task. The reviewer reads the full action history, checks the builder's
+  for the current task. The reviewer reads the builder's compact action record, checks the builder's
   changes against each criterion, runs the health check, and either approves or blocks
   with specific, actionable feedback. Invoke only after the builder has completed its action.
 ---
@@ -55,10 +55,12 @@ If the task has 3 criteria, you must make exactly 3 `tasks.acceptance.update` ca
 
 ## Workflow
 
-### 1. Read the full task history
+### 1. Read the builder record
 
 ```
-actions.get(taskId)
+actions.list(taskId, agent: 'builder')
+→ actions.get_by_id(actionId)
+→ actions.sections.get(sectionId)
 ```
 
 Read in order:

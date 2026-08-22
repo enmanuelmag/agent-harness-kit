@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS actions (
   id           SERIAL  PRIMARY KEY,
   task_id      INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   agent        TEXT    NOT NULL
-               CHECK(agent IN ('lead','explorer','builder','reviewer') OR agent LIKE 'custom:%'),
+               CHECK(agent IN ('lead','explorer','consultant','builder','reviewer') OR agent LIKE 'custom:%'),
   status       TEXT    NOT NULL DEFAULT 'in_progress'
                CHECK(status IN ('in_progress','completed','blocked')),
   created_at   TEXT    NOT NULL,

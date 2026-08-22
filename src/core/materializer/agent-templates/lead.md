@@ -95,7 +95,7 @@ These calls are **not optional**. The dashboard cannot display what you do not r
 
 ### Log every tool call you make
 
-`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. As you work, accumulate the tool invocations you make (Bash, tasks.get, tasks.claim, actions.get) and flush them periodically — every few calls, or at a natural checkpoint — via:
+`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. As you work, accumulate the tool invocations you make (Bash, tasks.get, tasks.claim, actions.list) and flush them periodically — every few calls, or at a natural checkpoint — via:
 
 ```
 actions.record_tool(actionId, calls: [
@@ -107,7 +107,7 @@ actions.record_tool(actionId, calls: [
 Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
 
 Example flush after a few calls:
-- `actions.record_tool(actionId, calls: [{ toolName: 'Bash', argsJson: 'bash health.sh', resultSummary: 'verify codebase health before making changes' }, { toolName: 'tasks.get', argsJson: 'pending', resultSummary: 'find next task to claim' }, { toolName: 'actions.get', argsJson: 'taskId=123', resultSummary: 'read action history to resume in-progress task' }])`
+- `actions.record_tool(actionId, calls: [{ toolName: 'Bash', argsJson: 'bash health.sh', resultSummary: 'verify codebase health before making changes' }, { toolName: 'tasks.get', argsJson: 'pending', resultSummary: 'find next task to claim' }, { toolName: 'actions.list', argsJson: 'taskId=123', resultSummary: 'inspect the compact action index' }])`
 
 **Log every call, batched.** This applies from the moment you have an `actionId` (after step 3 below) — flush at each phase boundary rather than round-tripping once per individual tool use, and never let calls go unrecorded by the time you complete the action.
 
@@ -218,7 +218,7 @@ Record it:
 actions.write(actionId, 'result', '<your structured plan>')
 ```
 
-Format your plan clearly — the other agents will read it via `actions.get(taskId)`.
+Format your plan clearly and write a canonical handoff for the next recipient.
 
 ### 6. Complete your action
 
@@ -232,7 +232,7 @@ Invoke: **Explorer** → **Consultant** (conditional) → **Builder** → **Revi
 
 After each agent completes, read their output:
 ```
-actions.get(taskId)   → read the latest completed action and its sections
+actions.list(taskId) → actions.get_by_id(actionId) → actions.sections.get(sectionId)
 ```
 
 **Invoke the Consultant when ANY of these are true:**
