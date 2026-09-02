@@ -14,6 +14,7 @@ import {
   __configObjectForTests,
   agentBuilder,
   agentBuilderToml,
+  agentConsultant,
   agentConsultantToml,
   agentExplorer,
   agentExplorerToml,
@@ -1982,4 +1983,64 @@ describe('ahk-test — regression: four existing skills still present and matchi
       }
     })
   }
+})
+
+// ─── research-policy — content assertions on essential phrases ──────────────
+
+describe('research-policy — content assertions on essential phrases', () => {
+  test('lead template contains research trigger section', () => {
+    const lead = agentLead({ projectName: 'demo' })
+    assert.ok(lead.includes('Research IS required'))
+    assert.ok(lead.includes('Research is NOT required'))
+    assert.ok(lead.includes('library, framework, SDK, API, CLI, cloud service'))
+  })
+
+  test('explorer template contains version mapping section', () => {
+    const explorer = agentExplorer({ projectName: 'demo' })
+    assert.ok(explorer.includes('Version and Dependency Mapping'))
+    assert.ok(explorer.includes('installed versions'))
+    assert.ok(explorer.includes('Do NOT recommend upgrades'))
+  })
+
+  test('consultant template contains dependency protocol', () => {
+    const consultant = agentConsultant({ projectName: 'demo' })
+    assert.ok(consultant.includes('Dependency-Bound Research Protocol'))
+    assert.ok(consultant.includes('Source Order'))
+    assert.ok(consultant.includes('Dependency-Impact Conclusion'))
+  })
+
+  test('builder template contains dependency handling section', () => {
+    const builder = agentBuilder({ projectName: 'demo' })
+    assert.ok(builder.includes('Handle dependency changes') || builder.includes('dependency changes'))
+  })
+
+  test('reviewer template contains dependency block criteria', () => {
+    const reviewer = agentReviewer({ projectName: 'demo' })
+    assert.ok(reviewer.includes('dependency-related') || reviewer.includes('Dependency-related'))
+    assert.ok(reviewer.includes('dependency-impact') || reviewer.includes('Dependency impact'))
+  })
+
+  test('research policy sections are present in all agent templates', () => {
+    const lead = agentLead({ projectName: 'demo' })
+    assert.ok(lead.includes('Research IS required'), 'lead must have research IS required')
+    assert.ok(lead.includes('Research is NOT required'), 'lead must have research NOT required')
+    assert.ok(lead.includes('Context7 library IDs'), 'lead must mention Context7')
+    assert.ok(lead.includes('Mintlify Index'), 'lead must mention Mintlify Index')
+
+    const explorer = agentExplorer({ projectName: 'demo' })
+    assert.ok(explorer.includes('Version and Dependency Mapping'), 'explorer must have version mapping')
+    assert.ok(explorer.includes('installed versions'), 'explorer must mention installed versions')
+
+    const consultant = agentConsultant({ projectName: 'demo' })
+    assert.ok(consultant.includes('Dependency-Bound Research Protocol'), 'consultant must have protocol')
+    assert.ok(consultant.includes('Source Order'), 'consultant must have source order')
+    assert.ok(consultant.includes('Dependency-Impact Conclusion'), 'consultant must have impact conclusion')
+
+    const builder = agentBuilder({ projectName: 'demo' })
+    assert.ok(builder.includes('Handle dependency changes') || builder.includes('dependency changes'), 'builder must have dependency handling')
+
+    const reviewer = agentReviewer({ projectName: 'demo' })
+    assert.ok(reviewer.includes('Dependency-related') || reviewer.includes('dependency-impact'), 'reviewer must have dependency blocks')
+    assert.ok(reviewer.includes('dependency-impact') || reviewer.includes('Dependency impact'), 'reviewer must check dependency-impact')
+  })
 })
