@@ -361,9 +361,29 @@ Reports three categories:
 
 - **lib version** — compares installed version against the latest on npm. Shows `[✓]` if up to date, `[!]` if an update is available, or `[~]` if the registry could not be reached.
 - **agent files** — checks only that a definition file exists for every role. Reports `[!]` with the file name if one is missing. The contents are never read, so **editing an agent file by hand is a fully supported state and is never reported** — customise the body, the description, or the restrictions freely and `ahk doctor` stays green.
-- **harness skills** — checks that `ahk-ask`, `ahk-consultant`, `ahk-triage`, and `ahk-review` skills exist and match the bundled source. Reports `[!]` if missing or outdated.
+- **harness skills** — checks that `ahk-ask`, `ahk-consultant`, `ahk-triage`, `ahk-review`, and `ahk-test` skills exist and match the bundled source. Reports `[!]` if missing or outdated.
 
 Run `ahk build` to fix any reported issues.
+
+### Bundled skills
+
+The kit ships five lightweight skills that are materialized into every provider's skills directory on `init` and restored by `build`. Each skill is read-only instruction text — no MCP tools, no CLI commands, no database changes. They guide AI agents through focused workflows using only subagent invocations.
+
+| Skill | Purpose | Limits |
+|-------|---------|--------|
+| `ahk-ask` | Answer codebase questions by reading relevant files and summarizing findings | Read-only; no writes, no MCP calls, no builder/reviewer |
+| `ahk-consultant` | Give technical advice on approaches, designs, or trade-offs before implementation | Advisory only; never writes code or creates tasks |
+| `ahk-triage` | Diagnose bugs and unexpected behavior with deep diagnostic analysis | Diagnostic only; does not fix the bug itself |
+| `ahk-review` | Preview a code review against ticket/objective alignment with semantic analysis | Review only; does not modify code |
+| `ahk-test` | Design, write, and run behavior-focused tests for an objective or existing code | Test files only; production is READ-ONLY unless explicitly authorized; NO harness MCP calls |
+
+Invocation example for `ahk-test`:
+
+```text
+Use the ahk-test skill to create tests for toLibraryListBody. all must send movie and series; never anime.
+```
+
+All skills follow the same contract: they invoke Explorer, Builder, or Reviewer as subagents with bounded instructions, never call harness MCP tools directly, and never create or modify harness tasks.
 
 ---
 

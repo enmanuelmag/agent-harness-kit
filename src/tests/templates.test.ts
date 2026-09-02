@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
@@ -9,6 +9,7 @@ import { grokToolsAllowlist } from '@/core/materializer/agent-restrictions'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { getMaterializer } from '@/core/materializer/index'
 import { ensureTomlTopLevelKey, mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeGrokConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import { writeSkills } from '@/core/materializer/scaffold-utils'
 import {
   __configObjectForTests,
   agentBuilder,
@@ -34,7 +35,7 @@ import {
 } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
 
-import type { CodexAgentModelChoice } from '@/types'
+import type { CodexAgentModelChoice, Provider } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
@@ -1640,4 +1641,345 @@ describe('record_tool/record_file tracking guidance — batch-only, no per-call 
     assert.match(reviewer, /tasks\.acceptance\.update\(criterionId\)/)
     assert.match(reviewer, /one per criterion/)
   })
+})
+
+// ─── ahk-test skill materialization and doctor states (task #95) ──────────────
+
+describe('ahk-test — skill materialization across all providers', () => {
+  const TMP_SKILL = join(import.meta.dirname, '../../.tmp-skill-materialize')
+  const CANONICAL_SRC = join(import.meta.dirname, '../core/materializer/skills/ahk-test/SKILL.md')
+
+  function setup(): void { mkdirSync(TMP_SKILL, { recursive: true }) }
+  function teardown(): void { rmSync(TMP_SKILL, { recursive: true, force: true }) }
+
+  // writeSkills is the generic pipeline used by both scaffold() and build() for all four providers.
+  // Testing it once per provider confirms every materializer copies the skill correctly.
+  const providers: [string, string][] = [
+    ['claude-code', '.claude/skills'],
+    ['opencode', '.opencode/skills'],
+    ['codex-cli', '.agents/skills'],
+    ['grok-cli', '.grok/skills'],
+  ]
+
+  for (const [providerName, skillsSubdir] of providers) {
+    test(`${providerName}: ahk-test/SKILL.md exists after writeSkills`, () => {
+      setup()
+      try {
+        const destDir = join(TMP_SKILL, skillsSubdir)
+        mkdirSync(destDir, { recursive: true })
+        writeSkills(TMP_SKILL, skillsSubdir)
+        const materialized = join(destDir, 'ahk-test', 'SKILL.md')
+        assert.ok(existsSync(materialized), `${providerName}: ${materialized} should exist`)
+      } finally {
+        teardown()
+      }
+    })
+
+    test(`${providerName}: byte-for-byte match with canonical source`, () => {
+      setup()
+      try {
+        writeSkills(TMP_SKILL, skillsSubdir)
+        const materialized = join(TMP_SKILL, skillsSubdir, 'ahk-test', 'SKILL.md')
+        const live = readFileSync(materialized, 'utf8')
+        const canonical = readFileSync(CANONICAL_SRC, 'utf8')
+        assert.equal(live, canonical, `${providerName}: must match canonical source byte-for-byte`)
+      } finally {
+        teardown()
+      }
+    })
+  }
+
+  test('all four providers produce identical content regardless of skills subdirectory', () => {
+    setup()
+    try {
+      for (const [, skillsSubdir] of providers) {
+        writeSkills(TMP_SKILL, skillsSubdir)
+      }
+      const contents = providers.map(([, sd]) =>
+        readFileSync(join(TMP_SKILL, sd, 'ahk-test', 'SKILL.md'), 'utf8'),
+      )
+      for (let i = 1; i < contents.length; i++) {
+        assert.equal(contents[0], contents[i], `content should be identical across all providers`)
+      }
+    } finally {
+      teardown()
+    }
+  })
+})
+
+describe('ahk-test — doctor states', () => {
+  const TMP_DOC = join(import.meta.dirname, '../../.tmp-ahk-test-doctor')
+
+  function makeTmp(suffix: string): string {
+    const dir = join(TMP_DOC, suffix)
+    mkdirSync(dir, { recursive: true })
+    return dir
+  }
+
+  function cleanup(): void {
+    rmSync(TMP_DOC, { recursive: true, force: true })
+  }
+
+  async function buildProject(
+    dir: string,
+    provider: 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' = 'claude-code',
+  ): Promise<void> {
+    const config = applyConfigDefaults({
+      name: 'demo-app',
+      description: 'demo',
+      provider: provider as Provider,
+      docsPath: './docs',
+      tasksAdapter: 'local',
+    })
+    const configContent = configMjs({
+      name: 'demo-app',
+      description: 'demo',
+      provider: provider as 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli',
+      docsPath: './docs',
+      tasksAdapter: 'local',
+      port: config.tools.mcp.port,
+      scope: config.storage.scope,
+      projectId: config.storage.projectId,
+    })
+    writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent, 'utf8')
+    await getMaterializer(provider as Provider).build(config, dir)
+  }
+
+  function skillPathForProvider(dir: string, provider: string): string {
+    switch (provider) {
+      case 'claude-code':
+        return join(dir, '.claude/skills/ahk-test/SKILL.md')
+      case 'opencode':
+        return join(dir, '.opencode/skills/ahk-test/SKILL.md')
+      case 'codex-cli':
+        return join(dir, '.agents/skills/ahk-test/SKILL.md')
+      case 'grok-cli':
+        return join(dir, '.grok/skills/ahk-test/SKILL.md')
+      default:
+        return join(dir, '.claude/skills/ahk-test/SKILL.md')
+    }
+  }
+
+  test('ok when skill present and identical to canonical source', async () => {
+    const dir = makeTmp('skill-ok')
+    try {
+      await buildProject(dir, 'claude-code')
+      const status = await getDoctorStatus(dir)
+      const skill = status.skills.find((s) => s.name === 'ahk-test')
+      assert.ok(skill, 'ahk-test should appear in skills list')
+      assert.equal(skill.status, 'ok', 'ahk-test should be ok when freshly built')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('missing when skill file is deleted', async () => {
+    const dir = makeTmp('skill-missing')
+    try {
+      await buildProject(dir, 'opencode')
+      rmSync(skillPathForProvider(dir, 'opencode'))
+      const status = await getDoctorStatus(dir)
+      const skill = status.skills.find((s) => s.name === 'ahk-test')
+      assert.ok(skill)
+      assert.equal(skill.status, 'missing', 'ahk-test should be missing after deletion')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('outdated when skill file is modified', async () => {
+    const dir = makeTmp('skill-outdated')
+    try {
+      await buildProject(dir, 'codex-cli')
+      const p = skillPathForProvider(dir, 'codex-cli')
+      writeFileSync(p, readFileSync(p, 'utf8') + '\n\n--- hand edited ---\n', 'utf8')
+      const status = await getDoctorStatus(dir)
+      const skill = status.skills.find((s) => s.name === 'ahk-test')
+      assert.ok(skill)
+      assert.equal(skill.status, 'outdated', 'ahk-test should be outdated after modification')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('build restores missing skill back to ok', async () => {
+    const dir = makeTmp('skill-restore-missing')
+    try {
+      await buildProject(dir, 'grok-cli')
+      rmSync(skillPathForProvider(dir, 'grok-cli'))
+      let status = await getDoctorStatus(dir)
+      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'missing')
+
+      // Re-run build (simulates `ahk build`) — must write config file first
+      const config2 = applyConfigDefaults({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'grok-cli' as const,
+        docsPath: './docs',
+        tasksAdapter: 'local',
+      })
+      const configContent2 = configMjs({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'grok-cli' as const,
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        port: config2.tools.mcp.port,
+        scope: config2.storage.scope,
+        projectId: config2.storage.projectId,
+      })
+      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent2, 'utf8')
+      await getMaterializer('grok-cli').build(config2, dir)
+
+      status = await getDoctorStatus(dir)
+      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'ok')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('build restores outdated skill back to ok', async () => {
+    const dir = makeTmp('skill-restore-outdated')
+    try {
+      await buildProject(dir, 'claude-code')
+      const p = skillPathForProvider(dir, 'claude-code')
+      writeFileSync(p, readFileSync(p, 'utf8') + '\n\n--- tampered ---\n', 'utf8')
+      let status = await getDoctorStatus(dir)
+      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'outdated')
+
+      // Re-run build — must write config file first
+      const config2 = applyConfigDefaults({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'claude-code' as const,
+        docsPath: './docs',
+        tasksAdapter: 'local',
+      })
+      const configContent2 = configMjs({
+        name: 'demo-app',
+        description: 'demo',
+        provider: 'claude-code' as const,
+        docsPath: './docs',
+        tasksAdapter: 'local',
+        port: config2.tools.mcp.port,
+        scope: config2.storage.scope,
+        projectId: config2.storage.projectId,
+      })
+      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent2, 'utf8')
+      await getMaterializer('claude-code').build(config2, dir)
+
+      status = await getDoctorStatus(dir)
+      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'ok')
+    } finally {
+      cleanup()
+    }
+  })
+})
+
+describe('ahk-test — content assertions on essential contract phrases', () => {
+  const CANONICAL_SRC = join(import.meta.dirname, '../core/materializer/skills/ahk-test/SKILL.md')
+
+  const content = readFileSync(CANONICAL_SRC, 'utf8')
+
+  test('frontmatter declares name and description', () => {
+    assert.match(content, /^name:\s*ahk-test$/m)
+    assert.match(content, /^description:/m)
+  })
+
+  test('declares lightweight test mode', () => {
+    assert.ok(content.includes('lightweight test mode'), 'must declare lightweight test mode')
+  })
+
+  test('prohibits MCP calls — no tasks.*, no actions.*', () => {
+    assert.ok(content.includes('NO MCP calls'), 'must prohibit MCP calls')
+    assert.ok(content.includes("no tasks.*"), 'must reference no tasks.*')
+    assert.ok(content.includes("no actions.*"), 'must reference no actions.*')
+  })
+
+  test('production files are READ-ONLY', () => {
+    assert.ok(
+      content.includes('Production files are READ-ONLY'),
+      'must state production files are read-only',
+    )
+  })
+
+  test('test matrix columns are defined', () => {
+    assert.ok(content.includes('Behavior'), 'matrix must have Behavior column')
+    assert.ok(content.includes('Expected observable result'), 'matrix must have Expected result column')
+    assert.ok(content.includes('Test level'), 'matrix must have Test level column')
+    assert.ok(content.includes('Source of expectation'), 'matrix must have Source column')
+  })
+
+  test('ambiguity gate before Builder writes', () => {
+    assert.ok(
+      content.includes('Stop and ask the user before any write'),
+      'must stop before writing on ambiguity',
+    )
+  })
+
+  test('Builder restricted to __tests__/ directory', () => {
+    assert.ok(
+      content.includes('__tests__/'),
+      'Builder must place tests inside __tests__/',
+    )
+  })
+
+  test('prohibitions listed', () => {
+    assert.ok(content.includes('Do not delete, weaken, skip'), 'must prohibit weakening existing tests')
+    assert.ok(content.includes('.only'), 'must prohibit .only')
+    assert.ok(content.includes('.skip'), 'must prohibit .skip')
+  })
+
+  test('required output sections present', () => {
+    assert.ok(content.includes('Test matrix'), 'must require Test matrix section')
+    assert.ok(content.includes('Files changed'), 'must require Files changed section')
+    assert.ok(content.includes('Verification'), 'must require Verification section')
+    assert.ok(content.includes('Evidence boundary'), 'must require Evidence boundary section')
+    assert.ok(content.includes('Blocked or next step'), 'must require Blocked or next step section')
+  })
+
+  test('Reviewer instruction includes no file edits', () => {
+    assert.ok(content.includes('no file edits'), 'Reviewer must not edit files')
+  })
+})
+
+describe('ahk-test — regression: four existing skills still present and matching', () => {
+  const TMP_REG = join(import.meta.dirname, '../../.tmp-skill-regression')
+
+  function setup(): void { mkdirSync(TMP_REG, { recursive: true }) }
+  function teardown(): void { rmSync(TMP_REG, { recursive: true, force: true }) }
+
+  const ALL_SKILLS = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test']
+
+  for (const skillName of ALL_SKILLS) {
+    test(`${skillName}: materialized by all four providers`, () => {
+      setup()
+      try {
+        for (const [, skillsSubdir] of [
+          ['claude-code', '.claude/skills'],
+          ['opencode', '.opencode/skills'],
+          ['codex-cli', '.agents/skills'],
+          ['grok-cli', '.grok/skills'],
+        ]) {
+          writeSkills(TMP_REG, skillsSubdir)
+          const path = join(TMP_REG, skillsSubdir, skillName, 'SKILL.md')
+          assert.ok(existsSync(path), `${skillName} should exist for ${skillsSubdir}`)
+        }
+      } finally {
+        teardown()
+      }
+    })
+
+    test(`${skillName}: matches canonical source`, () => {
+      setup()
+      try {
+        writeSkills(TMP_REG, '.claude/skills')
+        const materialized = readFileSync(join(TMP_REG, '.claude/skills', skillName, 'SKILL.md'), 'utf8')
+        const canonical = readFileSync(join(import.meta.dirname, `../core/materializer/skills/${skillName}/SKILL.md`), 'utf8')
+        assert.equal(materialized, canonical, `${skillName} must match canonical source`)
+      } finally {
+        teardown()
+      }
+    })
+  }
 })

@@ -43,7 +43,7 @@ const TIMEOUT_MS = 2000
 const LIB_VERSION_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const AGENT_NAMES = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 export type AgentName = (typeof AGENT_NAMES)[number]
-const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review'] as const
+const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test'] as const
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -161,7 +161,7 @@ function getProviderSkillsDir(provider: string): string {
 // by the caller.
 function checkSkillsAtRoot(skillsRoot: string): SkillStatus[] {
   // Skills are in src/core/materializer/skills/ — at runtime dist/core/materializer/skills/
-  const skillSourceBase = join(__dirname, 'skills')
+  const skillSourceBase = join(__dirname, 'materializer', 'skills')
 
   return SKILL_NAMES.map((name) => {
     const livePath = join(skillsRoot, name, 'SKILL.md')

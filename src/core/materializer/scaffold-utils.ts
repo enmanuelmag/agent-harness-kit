@@ -336,7 +336,7 @@ export function slugify(title: string): string {
 }
 
 export function writeSkills(cwd: string, skillsDir: string): void {
-  const skillNames = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review']
+  const skillNames = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test']
   for (const skillName of skillNames) {
     const src = join(__dirname, 'skills', skillName, 'SKILL.md')
     const destDir = join(cwd, skillsDir, skillName)
