@@ -3,6 +3,7 @@ import { join } from 'path'
 
 import { write } from '@/utils/file'
 
+import { renderDelegationGuidance } from './delegation-guidance'
 import { detectPackageManager } from './detect-package-manager'
 import {
   mergeClaudeMcpJson,
@@ -10,7 +11,6 @@ import {
   mergeClaudeSettingsLocalJson,
 } from './mcp-merge'
 import { buildCapabilityHints } from './provider-research-capabilities'
-import { renderDelegationGuidance } from './delegation-guidance'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilder,
@@ -108,7 +108,7 @@ export class ClaudeCodeMaterializer implements Materializer {
 
     // .gitignore additions
     appendGitignore(cwd)
-    writeSkills(cwd, '.claude/skills')
+    writeSkills(cwd, '.claude/skills', renderDelegationGuidance('claude-code', 'coordination-skill'))
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
@@ -145,7 +145,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
-    writeSkills(cwd, '.claude/skills')
+    writeSkills(cwd, '.claude/skills', renderDelegationGuidance('claude-code', 'coordination-skill'))
 
     return { agents, derived }
   }

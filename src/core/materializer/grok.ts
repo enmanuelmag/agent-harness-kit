@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import { renderDelegationGuidance } from './delegation-guidance'
 import { detectPackageManager } from './detect-package-manager'
 import { mergeGrokConfigToml } from './mcp-merge'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
-import { renderDelegationGuidance } from './delegation-guidance'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, HEALTH_SH, translateFrontmatterForGrok } from './templates'
 
 import type { BuildMaterializerOptions, BuildReport, Materializer } from './index'
@@ -81,7 +81,7 @@ export class GrokMaterializer implements Materializer {
     // .grok/skills/ — provider-namespaced (task #76 consultant decision: matches
     // Grok Build's own native skill-discovery path, and 2 of 3 existing
     // providers — Claude, OpenCode — already namespace their skills dir).
-    writeSkills(cwd, '.grok/skills')
+    writeSkills(cwd, '.grok/skills', renderDelegationGuidance('grok-cli', 'coordination-skill'))
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
@@ -102,7 +102,7 @@ export class GrokMaterializer implements Materializer {
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
     mergeGrokConfigToml(join(cwd, '.grok/config.toml'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
-    writeSkills(cwd, '.grok/skills')
+    writeSkills(cwd, '.grok/skills', renderDelegationGuidance('grok-cli', 'coordination-skill'))
 
     return { agents, derived }
   }

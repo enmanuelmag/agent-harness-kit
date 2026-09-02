@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import { renderDelegationGuidance } from './delegation-guidance'
 import { detectPackageManager } from './detect-package-manager'
 import { mergeOpencodeJson } from './mcp-merge'
 import { buildCapabilityHints } from './provider-research-capabilities'
-import { renderDelegationGuidance } from './delegation-guidance'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, HEALTH_SH, translateFrontmatterForOpenCode } from './templates'
 
@@ -69,7 +69,7 @@ export class OpenCodeMaterializer implements Materializer {
     mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
 
     appendGitignore(cwd)
-    writeSkills(cwd, '.opencode/skills')
+    writeSkills(cwd, '.opencode/skills', renderDelegationGuidance('opencode', 'coordination-skill'))
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
@@ -92,7 +92,7 @@ export class OpenCodeMaterializer implements Materializer {
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
     mergeOpencodeJson(join(cwd, 'opencode.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
-    writeSkills(cwd, '.opencode/skills')
+    writeSkills(cwd, '.opencode/skills', renderDelegationGuidance('opencode', 'coordination-skill'))
 
     return { agents, derived }
   }

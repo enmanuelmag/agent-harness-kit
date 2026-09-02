@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { GITIGNORE_ENTRIES } from './templates'
+import { GITIGNORE_ENTRIES, injectDelegationGuidance } from './templates'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -335,13 +335,17 @@ export function slugify(title: string): string {
     .slice(0, 64)
 }
 
-export function writeSkills(cwd: string, skillsDir: string): void {
+export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?: string): void {
   const skillNames = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test']
   for (const skillName of skillNames) {
     const src = join(__dirname, 'skills', skillName, 'SKILL.md')
     const destDir = join(cwd, skillsDir, skillName)
     const dest = join(destDir, 'SKILL.md')
     mkdirSync(destDir, { recursive: true })
-    writeFileSync(dest, readFileSync(src, 'utf8'), 'utf8')
+    let content = readFileSync(src, 'utf8')
+    if (delegationGuidance) {
+      content = injectDelegationGuidance(content, delegationGuidance)
+    }
+    writeFileSync(dest, content, 'utf8')
   }
 }

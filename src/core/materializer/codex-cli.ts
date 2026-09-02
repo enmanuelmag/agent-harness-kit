@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+import { renderDelegationGuidance } from './delegation-guidance'
 import { detectPackageManager } from './detect-package-manager'
 import { mergeCodexConfigToml } from './mcp-merge'
-import { renderDelegationGuidance } from './delegation-guidance'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilderToml,
@@ -97,7 +97,7 @@ export class CodexCliMaterializer implements Materializer {
     mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
 
     appendGitignore(cwd)
-    writeSkills(cwd, '.agents/skills')
+    writeSkills(cwd, '.agents/skills', renderDelegationGuidance('codex-cli', 'coordination-skill'))
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
@@ -118,7 +118,7 @@ export class CodexCliMaterializer implements Materializer {
     // Re-detecting on every build self-corrects the command if the user
     // switched package managers since `ahk init` — no migration flag needed.
     mergeCodexConfigToml(join(cwd, '.codex/config.toml'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
-    writeSkills(cwd, '.agents/skills')
+    writeSkills(cwd, '.agents/skills', renderDelegationGuidance('codex-cli', 'coordination-skill'))
 
     return { agents, derived }
   }

@@ -409,13 +409,7 @@ function injectCapabilityHints(md: string, capabilityHints: string): string {
   return `${headingMatch[1]}## Available Research Tools\n\n${capabilityHints}\n\n${md.slice(headingMatch[1].length)}`
 }
 
-/**
- * Inject provider delegation guidance into an agent template body.
- * The block is inserted after the "Available Research Tools" section (if
- * present) or right after the H1 heading block when no capabilities exist.
- * This keeps delegation mechanics close to the role declaration.
- */
-function injectDelegationGuidance(md: string, delegationGuidance: string): string {
+export function injectDelegationGuidance(md: string, delegationGuidance: string): string {
   if (!delegationGuidance) return md
   // Try to find the existing "Available Research Tools" section and insert
   // after its closing blank line; otherwise fall back to right after H1.
