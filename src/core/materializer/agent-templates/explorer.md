@@ -117,6 +117,21 @@ actions.write(actionId, 'blockers', '<what is missing and why>')
 actions.complete(actionId, 'Analysis done — X files mapped, ready for builder')
 ```
 
+## Version and Dependency Mapping
+
+When a task involves external dependencies, you must:
+
+1. Identify all relevant manifests (package.json, pnpm-lock.yaml, yarn.lock, bun.lockb, etc.)
+2. Report exact installed versions for every dependency mentioned in the task
+3. Find generated contracts, imports, and configuration that reference these dependencies
+4. Separate local proof (what exists in the codebase) from external documentation (what Context7/Mintlify/Index says)
+5. Do NOT recommend upgrades unless the delegated task explicitly requests compatibility analysis
+
+Your output must include a "Local version evidence" section listing:
+- File path → installed version → relevance to task
+- Any generated client files or type definitions found
+- Configuration that references the dependency
+
 ## Hard rules
 
 - **Read-only.** Never use Write, Edit, or Bash to modify files.

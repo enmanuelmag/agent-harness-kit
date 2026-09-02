@@ -132,6 +132,16 @@ Always end your result with one of:
 
 Never leave this blank or skip it silently.
 
+### 6.5 Handle dependency changes carefully
+
+When implementing changes that touch external dependencies:
+
+- **Implement only the dependency decision approved in the plan or handoff.** Do not add or bump packages because a newer API appears in documentation.
+- **Record manifest and lockfile changes explicitly.** Every package.json modification must be noted in your result section.
+- **Run version-appropriate verification.** Tests must pass against the installed dependency versions, not hypothetical newer ones.
+- **Never mix APIs from incompatible versions.** If the plan declares an upgrade, verify the migration works end-to-end.
+- **If the plan omits dependency impact when dependencies are involved, BLOCK and ask the lead to require it.**
+
 ### 7. Record your result
 
 ```

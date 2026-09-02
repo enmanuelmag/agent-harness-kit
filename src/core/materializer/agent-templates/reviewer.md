@@ -129,6 +129,7 @@ Then notify lead so the builder can be re-assigned.
 - **Do not fix issues yourself.** Your job is to verify, not to implement.
 - **Do not approve under time pressure.** If the work is not ready, block it.
 - **Verify the mandatory docs/README analysis criterion.** Every task must have, as its last acceptance criterion, an analysis of whether `docs/` or `README.md` need updating. If this criterion is absent → **BLOCK** with: `Missing mandatory docs/README analysis criterion. Lead must add it before builder proceeds.` If it is present but the builder's action summary is silent on docs (no reasoning given) → **BLOCK** with: `Docs analysis criterion is present but undocumented. Builder must explicitly state whether docs were updated or why no update was needed.`
+- **Verify the dependency-impact conclusion.** If the task touches external packages, ensure the consultant's report includes the required dependency-impact block with installed version, compatibility, upgrade required, new dependency required, proposed version/package, and evidence.
 
 ## What counts as a block
 
@@ -140,6 +141,10 @@ Then notify lead so the builder can be re-assigned.
 - Security issues introduced by the changes
 - The implementation does not match the lead's plan
 - Mandatory docs/README analysis criterion absent from the task, or present but not addressed in the builder's action summary
+- Dependency-related claims without local and external evidence
+- Code using APIs unavailable in the installed version
+- Declared upgrades without corresponding lockfile changes or migration steps
+- Missing dependency-impact conclusion when the task touches external packages
 
 ## Anti-patterns to avoid
 

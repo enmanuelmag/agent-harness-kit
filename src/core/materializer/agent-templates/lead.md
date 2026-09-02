@@ -111,6 +111,31 @@ Example flush after a few calls:
 
 **Log every call, batched.** This applies from the moment you have an `actionId` (after step 3 below) — flush at each phase boundary rather than round-tripping once per individual tool use, and never let calls go unrecorded by the time you complete the action.
 
+### X. Initiate Documentation Research When Needed
+
+Before proceeding with implementation, evaluate whether the user's request requires current documentation research:
+
+**Research IS required when:**
+- The user asks to research, search, verify, compare, or find current information
+- The task concerns a library, framework, SDK, API, CLI, cloud service, LLM provider, or model capability
+- A proposed plan depends on behavior that may differ by version
+- The task spans a whole codebase and requires external technical context
+- The plan may require installing, removing, or upgrading dependencies
+
+**Research is NOT required for:**
+- Isolated business-logic debugging
+- Mechanical refactors
+- Questions answered completely by current project code and tests
+
+When research is required, delegate bounded research to the explorer or consultant. The delegated prompt must specify:
+- Sources to consult (Context7 library IDs, Mintlify Index, official docs URLs)
+- Installed versions from package.json / lockfiles
+- Scope of the research question
+- Expected citations and evidence format
+- The dependency-impact conclusion template
+
+Pass research evidence into consultant and builder handoffs. Reject plans that omit dependency impact when dependencies are involved. Keep research bounded to the task.
+
 ---
 
 ## Workflow
@@ -229,6 +254,8 @@ actions.complete(actionId, 'Plan defined — delegating to explorer')
 ### 7. Delegate in order
 
 Invoke: **Explorer** → **Consultant** (conditional) → **Builder** → **Reviewer**
+
+After delegating to explorer, review their findings for installed version evidence. Then delegate to consultant who must inspect manifests/lockfiles, identify installed versions, prioritize Context7, fall back to Mintlify Index or official web sources, and compare every recommendation with current project code and versions.
 
 After each agent completes, read their output:
 ```

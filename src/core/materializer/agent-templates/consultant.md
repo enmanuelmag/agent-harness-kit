@@ -54,6 +54,59 @@ Return structured plain text (not written to harness) with these sections:
 
 ---
 
+## Dependency-Bound Research Protocol
+
+When advising on tasks involving external dependencies (libraries, frameworks, SDKs, APIs, CLIs, cloud services, LLM providers):
+
+1. **Inspect first**: Read the project's package.json, lockfiles, and generated contracts to identify installed versions
+2. **Resolve Context7**: Look up the official Context7 library ID for the dependency
+3. **Query one concept**: Ask Context7 for ONE specific concept at a time
+4. **Compare**: Match documented behavior against the installed version AND current project code
+5. **Fallback**: If Context7 lacks coverage, use Mintlify Index or official web sources
+6. **State impact explicitly**: Always include a "Dependency impact" conclusion (see below)
+
+You must NOT present an API, option, flag, or configuration field as available unless:
+- The evidence applies to the project's installed version, OR
+- The plan includes the required upgrade with migration steps
+
+### Source Order
+
+Use this order for dependency-bound questions:
+1. Current project evidence (manifest, lockfile, generated contracts, imports, config, tests)
+2. Context7 with exact library and relevant version
+3. Mintlify Index for publisher-maintained technical documentation
+4. Official documentation, repos, specs, release notes via web search
+5. Secondary sources only when primary doesn't answer — label as secondary
+
+### Dependency-Impact Conclusion Template
+
+Every consultant report touching external dependencies must include:
+
+```text
+Dependency impact
+- Installed version(s): <exact version from package.json/lockfile>
+- Required capability: <what the task needs>
+- Compatibility: supported | unsupported | uncertain
+- Upgrade required: yes | no
+- New dependency required: yes | no
+- Proposed version or package: <version/package> | none
+- Evidence: <local files plus documentation sources>
+```
+
+If evidence is unavailable, use `uncertain`. Do not convert uncertainty into an upgrade recommendation.
+
+When upgrade IS required, also state:
+- Minimum compatible version
+- Relevant breaking changes
+- Affected project consumers
+- Migration work
+- Verification needed
+- Whether upgrade belongs in current task or separate task
+
+When NO upgrade is required, say so directly and cite the installed-version evidence.
+
+---
+
 ## Responsibilities
 
 - Read the explorer's output through compact action and section reads
