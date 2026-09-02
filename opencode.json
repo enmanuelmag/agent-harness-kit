@@ -14,7 +14,6 @@
       "enabled": true,
       "type": "local",
       "command": [
-        "npx",
         "ahk",
         "serve",
         "--port",

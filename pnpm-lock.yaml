@@ -54,9 +54,6 @@ importers:
         specifier: ^8.18.0
         version: 8.21.1
     devDependencies:
-      '@cardor/agent-harness-kit':
-        specifier: ^1.8.1
-        version: 1.8.1(@types/node@22.20.1)(better-sqlite3@12.11.1)(typescript@5.9.3)(zod@4.4.3)
       '@commitlint/cli':
         specifier: ^20.5.3
         version: 20.5.3(@types/node@22.20.1)(conventional-commits-parser@6.4.0)(typescript@5.9.3)
@@ -236,11 +233,6 @@ packages:
   '@babel/types@7.29.7':
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
-
-  '@cardor/agent-harness-kit@1.8.1':
-    resolution: {integrity: sha512-1blJK1sAI/sObi4+cjvzB3uxFuW+D6DLAd+Lkcv3h3K/tYO7FkdoQOWuAh7kaFbtMGz3qp9odnHNbS2z9km6ow==}
-    engines: {node: '>=22.5.0'}
-    hasBin: true
 
   '@clack/core@0.4.1':
     resolution: {integrity: sha512-Pxhij4UXg8KSr7rPek6Zowm+5M22rbd2g1nfojHJkxp5YkFqiZ2+YLEM/XGVIzvGOcM0nqjIFxrpDwWRZYWYjA==}
@@ -1753,6 +1745,7 @@ packages:
   eslint@9.39.5:
     resolution: {integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -3029,58 +3022,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
-
-  '@cardor/agent-harness-kit@1.8.1(@types/node@22.20.1)(better-sqlite3@12.11.1)(typescript@5.9.3)(zod@4.4.3)':
-    dependencies:
-      '@clack/prompts': 0.9.1
-      '@hono/node-server': 1.19.14(hono@4.12.30)
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
-      cli-table3: 0.6.5
-      commander: 12.1.0
-      drizzle-orm: 0.45.2(better-sqlite3@12.11.1)(mysql2@3.23.0(@types/node@22.20.1))(postgres@3.4.9)
-      hono: 4.12.30
-      jiti: 2.7.0
-      mysql2: 3.23.0(@types/node@22.20.1)
-      open: 10.2.0
-      picocolors: 1.1.1
-      postgres: 3.4.9
-      valibot: 1.4.2(typescript@5.9.3)
-      ws: 8.21.1
-    transitivePeerDependencies:
-      - '@aws-sdk/client-rds-data'
-      - '@cfworker/json-schema'
-      - '@cloudflare/workers-types'
-      - '@electric-sql/pglite'
-      - '@libsql/client'
-      - '@libsql/client-wasm'
-      - '@neondatabase/serverless'
-      - '@op-engineering/op-sqlite'
-      - '@opentelemetry/api'
-      - '@planetscale/database'
-      - '@prisma/client'
-      - '@tidbcloud/serverless'
-      - '@types/better-sqlite3'
-      - '@types/node'
-      - '@types/pg'
-      - '@types/sql.js'
-      - '@upstash/redis'
-      - '@vercel/postgres'
-      - '@xata.io/client'
-      - better-sqlite3
-      - bufferutil
-      - bun-types
-      - expo-sqlite
-      - gel
-      - knex
-      - kysely
-      - pg
-      - prisma
-      - sql.js
-      - sqlite3
-      - supports-color
-      - typescript
-      - utf-8-validate
-      - zod
 
   '@clack/core@0.4.1':
     dependencies:

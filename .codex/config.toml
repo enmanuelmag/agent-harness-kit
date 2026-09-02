@@ -1,7 +1,0 @@
-[mcp_servers.agent-harness-kit]
-command = "ahk"
-args = [
-    "serve",
-    "--port",
-    "3702",
-]
