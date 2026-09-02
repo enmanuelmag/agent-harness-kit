@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { detectPackageManager } from './detect-package-manager'
 import { mergeGrokConfigToml } from './mcp-merge'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
+import { renderDelegationGuidance } from './delegation-guidance'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, HEALTH_SH, translateFrontmatterForGrok } from './templates'
 
 import type { BuildMaterializerOptions, BuildReport, Materializer } from './index'
@@ -19,7 +20,7 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 function grokAgentFiles(config: HarnessConfig): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.grok/agents/lead.md', content: translateFrontmatterForGrok(agentLead({ projectName }), 'lead') },
+    { relPath: '.grok/agents/lead.md', content: translateFrontmatterForGrok(agentLead({ projectName }, '', renderDelegationGuidance('grok-cli', 'lead')), 'lead') },
     { relPath: '.grok/agents/explorer.md', content: translateFrontmatterForGrok(agentExplorer({ projectName }), 'explorer') },
     { relPath: '.grok/agents/consultant.md', content: translateFrontmatterForGrok(agentConsultant({ projectName }), 'consultant') },
     { relPath: '.grok/agents/builder.md', content: translateFrontmatterForGrok(agentBuilder({ projectName }), 'builder') },

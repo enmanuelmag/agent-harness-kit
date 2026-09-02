@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { detectPackageManager } from './detect-package-manager'
 import { mergeOpencodeJson } from './mcp-merge'
 import { buildCapabilityHints } from './provider-research-capabilities'
+import { renderDelegationGuidance } from './delegation-guidance'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd, HEALTH_SH, translateFrontmatterForOpenCode } from './templates'
 
@@ -15,7 +16,7 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 function opencodeAgentFiles(config: HarnessConfig, capabilityHints = ''): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.opencode/agents/lead.md', content: translateFrontmatterForOpenCode(agentLead({ projectName }, capabilityHints), 'lead') },
+    { relPath: '.opencode/agents/lead.md', content: translateFrontmatterForOpenCode(agentLead({ projectName }, capabilityHints, renderDelegationGuidance('opencode', 'lead')), 'lead') },
     { relPath: '.opencode/agents/explorer.md', content: translateFrontmatterForOpenCode(agentExplorer({ projectName }, capabilityHints), 'explorer') },
     { relPath: '.opencode/agents/consultant.md', content: translateFrontmatterForOpenCode(agentConsultant({ projectName }, capabilityHints), 'consultant') },
     { relPath: '.opencode/agents/builder.md', content: translateFrontmatterForOpenCode(agentBuilder({ projectName }, capabilityHints), 'builder') },

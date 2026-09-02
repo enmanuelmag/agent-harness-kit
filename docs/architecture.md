@@ -45,10 +45,11 @@ The agent-harness-kit is built on a structured multi-agent workflow that leverag
                                 │                                           │     │
                       ┌─────────▼──────────┐                        │     │
                       │    Agent Roles       │                        │     │
-                      │  - Lead              │                        │     │
-                      │  - Explorer          │                        │     │  
-                      │  - Builder            │                        │     │
-                      │  - Reviewer           │                        │     │
+                       │  - Lead              │                        │     │
+                       │  - Explorer          │                        │     │  
+                       │  - Consultant        │                        │     │
+                       │  - Builder            │                        │     │
+                       │  - Reviewer           │                        │     │
                       └──────────────────────┘                        │     │
                                                                         │     │
                                                       ┌─────────────────┴─────┴─────────┐
@@ -72,7 +73,7 @@ The lead agent orchestrates the entire workflow for a task, managing the sequenc
 
 **Key Responsibilities:**
 - Claims tasks from the backlog
-- Coordinates the three-step workflow (Explore → Build → Review) 
+- Coordinates the four-step workflow (Explore → Consult → Build → Review) 
 - Ensures proper handoffs between agents
 - Manages session state and completion
 
@@ -160,7 +161,7 @@ The SQLite database stores all state information for the agent harness in a stru
 #### Task Lifecycle
 1. **Task Initiation**: Lead claims a task from the backlog
 2. **Planning Phase**: Lead defines plan in actions.start()
-3. **Execution Phase**: Explorer analyzes, Builder implements, Reviewer verifies
+3. **Execution Phase**: Consultant advises, Explorer analyzes, Builder implements, Reviewer verifies
 4. **Completion**: Reviewer approves or blocks with specific feedback
 
 #### Communication Protocol

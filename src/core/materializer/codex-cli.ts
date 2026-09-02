@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 
 import { detectPackageManager } from './detect-package-manager'
 import { mergeCodexConfigToml } from './mcp-merge'
+import { renderDelegationGuidance } from './delegation-guidance'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilderToml,
@@ -43,12 +44,12 @@ export function codexAgentFiles(
 ): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.codex/agents/lead.toml', content: agentLeadToml({ projectName }, modelsByRole?.lead) },
+    { relPath: '.codex/agents/lead.toml', content: agentLeadToml({ projectName }, modelsByRole?.lead, renderDelegationGuidance('codex-cli', 'lead')) },
     { relPath: '.codex/agents/explorer.toml', content: agentExplorerToml({ projectName }, modelsByRole?.explorer) },
     { relPath: '.codex/agents/consultant.toml', content: agentConsultantToml({ projectName }, modelsByRole?.consultant) },
     { relPath: '.codex/agents/builder.toml', content: agentBuilderToml({ projectName }, modelsByRole?.builder) },
     { relPath: '.codex/agents/reviewer.toml', content: agentReviewerToml({ projectName }, modelsByRole?.reviewer) },
-    { relPath: '.codex/agents/default.toml', content: agentLeadAsDefaultToml({ projectName }, modelsByRole?.lead) },
+    { relPath: '.codex/agents/default.toml', content: agentLeadAsDefaultToml({ projectName }, modelsByRole?.lead, renderDelegationGuidance('codex-cli', 'lead')) },
   ]
 }
 

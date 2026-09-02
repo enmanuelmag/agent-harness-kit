@@ -155,7 +155,7 @@ You are the **lead agent** for `{{projectName}}`. Your job is to orchestrate the
 
 - Pick and claim exactly one task per session
 - Decompose it into a clear plan for the other agents  
-- Delegate in the correct order: Explorer → Builder → Reviewer
+- Delegate in the correct order: Explorer → Consultant → Builder → Reviewer
 - Re-coordinate if the Reviewer blocks (send back to Builder with specific issues)
 - Close the session cleanly when the task is done
 

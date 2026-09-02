@@ -10,6 +10,7 @@ import {
   mergeClaudeSettingsLocalJson,
 } from './mcp-merge'
 import { buildCapabilityHints } from './provider-research-capabilities'
+import { renderDelegationGuidance } from './delegation-guidance'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilder,
@@ -50,7 +51,7 @@ export function claudeAgentFiles(
 ): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }, capabilityHints), 'lead', { model: modelsByRole?.lead }) },
+    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }, capabilityHints, renderDelegationGuidance('claude-code', 'lead')), 'lead', { model: modelsByRole?.lead }) },
     { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }, capabilityHints), 'explorer', { model: modelsByRole?.explorer }) },
     { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }, capabilityHints), 'consultant', { model: modelsByRole?.consultant }) },
     { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }, capabilityHints), 'builder', { model: modelsByRole?.builder }) },

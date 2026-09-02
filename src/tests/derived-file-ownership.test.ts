@@ -52,6 +52,7 @@ const PROVIDERS: { provider: Provider; files: string[] }[] = [
   { provider: 'claude-code', files: ['AGENTS.md', 'CLAUDE.md'] },
   { provider: 'opencode', files: ['AGENTS.md'] },
   { provider: 'codex-cli', files: ['AGENTS.md'] },
+  { provider: 'grok-cli', files: ['AGENTS.md'] },
 ]
 
 for (const { provider, files } of PROVIDERS) {
