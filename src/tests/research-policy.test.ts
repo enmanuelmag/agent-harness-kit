@@ -128,20 +128,20 @@ describe('research-policy — Mintlify Index and web search as fallbacks', () =>
 // ─── research-policy — Graphify and Autoskills not described as documentation evidence ──────────────
 
 describe('research-policy — Graphify and Autoskills not described as documentation evidence', () => {
-  test('AGENTS.md clarifies Graphify does not replace documentation', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
-    assert.ok(agentsMd.includes('Graphify'), 'must mention Graphify')
+  test('docs plan clarifies Graphify does not replace documentation', () => {
+    const planDoc = readFileSync(join(import.meta.dirname, '../../docs/documentation-research-policy-plan.md'), 'utf8')
+    assert.ok(planDoc.includes('Graphify'), 'must mention Graphify')
     assert.ok(
-      agentsMd.includes('does not replace') || agentsMd.includes('does not substitute') || agentsMd.includes('not documentation'),
+      planDoc.includes('does not replace') || planDoc.includes('does not substitute') || planDoc.includes('not documentation'),
       'must state Graphify does not replace documentation',
     )
   })
 
-  test('AGENTS.md clarifies Autoskills does not prove library APIs', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
-    assert.ok(agentsMd.includes('Autoskills'), 'must mention Autoskills')
+  test('docs plan clarifies Autoskills does not prove library APIs', () => {
+    const planDoc = readFileSync(join(import.meta.dirname, '../../docs/documentation-research-policy-plan.md'), 'utf8')
+    assert.ok(planDoc.includes('Autoskills'), 'must mention Autoskills')
     assert.ok(
-      agentsMd.includes('does not prove') || agentsMd.includes('not documentation') || agentsMd.includes('discovery'),
+      planDoc.includes('does not prove') || planDoc.includes('not documentation') || planDoc.includes('discovery'),
       'must state Autoskills does not prove library APIs',
     )
   })
@@ -302,72 +302,72 @@ describe('research-policy — generation parity across providers', () => {
   })
 })
 
-// ─── research-policy — AGENTS.md contains full policy ──────────────
+// ─── research-policy — docs contain full policy ──────────────
 
-describe('research-policy — AGENTS.md contains full policy', () => {
-  test('AGENTS.md has terminology section', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
-    assert.ok(agentsMd.includes('Context7'), 'must define Context7')
-    assert.ok(agentsMd.includes('Mintlify Index'), 'must define Mintlify Index')
-    assert.ok(agentsMd.includes('Web search'), 'must define Web search')
-    assert.ok(agentsMd.includes('Graphify'), 'must mention Graphify')
-    assert.ok(agentsMd.includes('Autoskills'), 'must mention Autoskills')
+describe('research-policy — docs contain full policy', () => {
+  test('docs plan has terminology section', () => {
+    const planDoc = readFileSync(join(import.meta.dirname, '../../docs/documentation-research-policy-plan.md'), 'utf8')
+    assert.ok(planDoc.includes('Context7'), 'must define Context7')
+    assert.ok(planDoc.includes('Mintlify Index'), 'must define Mintlify Index')
+    assert.ok(planDoc.includes('Web search'), 'must define Web search')
+    assert.ok(planDoc.includes('Graphify'), 'must mention Graphify')
+    assert.ok(planDoc.includes('Autoskills'), 'must mention Autoskills')
   })
 
-  test('AGENTS.md has trigger policy', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
-    assert.ok(agentsMd.includes('Trigger Policy') || agentsMd.includes('trigger policy'), 'must have trigger policy section')
-    assert.ok(agentsMd.includes('research, search, verify, compare'), 'must list research triggers')
+  test('docs index has trigger policy', () => {
+    const indexDoc = readFileSync(join(import.meta.dirname, '../../docs/index.md'), 'utf8')
+    assert.ok(indexDoc.includes('Trigger Policy') || indexDoc.includes('trigger policy'), 'must have trigger policy section')
+    assert.ok(indexDoc.includes('research, search, verify, compare'), 'must list research triggers')
   })
 
-  test('AGENTS.md has source order', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
-    assert.ok(agentsMd.includes('Source Order') || agentsMd.includes('source order'), 'must have source order section')
-    assert.ok(agentsMd.includes('Current project evidence'), 'source order starts with project evidence')
-    assert.ok(agentsMd.includes('Context7'), 'source order includes Context7')
-    assert.ok(agentsMd.includes('Mintlify Index'), 'source order includes Mintlify Index')
+  test('docs index has source order', () => {
+    const indexDoc = readFileSync(join(import.meta.dirname, '../../docs/index.md'), 'utf8')
+    assert.ok(indexDoc.includes('Source Order') || indexDoc.includes('source order'), 'must have source order section')
+    assert.ok(indexDoc.includes('Current project evidence'), 'source order starts with project evidence')
+    assert.ok(indexDoc.includes('Context7'), 'source order includes Context7')
+    assert.ok(indexDoc.includes('Mintlify Index'), 'source order includes Mintlify Index')
   })
 
-  test('AGENTS.md has dependency-impact conclusion template', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
+  test('docs index has dependency-impact conclusion template', () => {
+    const indexDoc = readFileSync(join(import.meta.dirname, '../../docs/index.md'), 'utf8')
     assert.ok(
-      agentsMd.includes('Dependency-Impact Conclusion') || agentsMd.includes('Dependency-impact Conclusion') || agentsMd.includes('dependency-impact conclusion'),
+      indexDoc.includes('Dependency-Impact Conclusion') || indexDoc.includes('Dependency-impact Conclusion') || indexDoc.includes('dependency-impact conclusion'),
       'must have dependency-impact section',
     )
-    assert.ok(agentsMd.includes('Installed version(s)'), 'template must list installed version(s)')
-    assert.ok(agentsMd.includes('Compatibility'), 'template must list compatibility')
-    assert.ok(agentsMd.includes('Upgrade required'), 'template must list upgrade required')
-    assert.ok(agentsMd.includes('New dependency required'), 'template must list new dependency required')
-    assert.ok(agentsMd.includes('Proposed version or package'), 'template must list proposed version')
-    assert.ok(agentsMd.includes('Evidence'), 'template must list evidence')
+    assert.ok(indexDoc.includes('Installed version(s)'), 'template must list installed version(s)')
+    assert.ok(indexDoc.includes('Compatibility'), 'template must list compatibility')
+    assert.ok(indexDoc.includes('Upgrade required'), 'template must list upgrade required')
+    assert.ok(indexDoc.includes('New dependency required'), 'template must list new dependency required')
+    assert.ok(indexDoc.includes('Proposed version or package'), 'template must list proposed version')
+    assert.ok(indexDoc.includes('Evidence'), 'template must list evidence')
   })
 
-  test('AGENTS.md has agent responsibilities summary', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
-    assert.ok(agentsMd.includes('Lead'), 'must have Lead responsibilities')
-    assert.ok(agentsMd.includes('Explorer'), 'must have Explorer responsibilities')
-    assert.ok(agentsMd.includes('Consultant'), 'must have Consultant responsibilities')
-    assert.ok(agentsMd.includes('Builder'), 'must have Builder responsibilities')
-    assert.ok(agentsMd.includes('Reviewer'), 'must have Reviewer responsibilities')
+  test('docs plan has agent responsibilities summary', () => {
+    const planDoc = readFileSync(join(import.meta.dirname, '../../docs/documentation-research-policy-plan.md'), 'utf8')
+    assert.ok(planDoc.includes('Lead'), 'must have Lead responsibilities')
+    assert.ok(planDoc.includes('Explorer'), 'must have Explorer responsibilities')
+    assert.ok(planDoc.includes('Consultant'), 'must have Consultant responsibilities')
+    assert.ok(planDoc.includes('Builder'), 'must have Builder responsibilities')
+    assert.ok(planDoc.includes('Reviewer'), 'must have Reviewer responsibilities')
   })
 
-  test('AGENTS.md has tool availability and fallback', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
+  test('docs plan has tool availability and fallback', () => {
+    const planDoc = readFileSync(join(import.meta.dirname, '../../docs/documentation-research-policy-plan.md'), 'utf8')
     assert.ok(
-      agentsMd.includes('Tool Availability') || agentsMd.includes('tool availability') || agentsMd.includes('fallback'),
+      planDoc.includes('Tool Availability') || planDoc.includes('tool availability') || planDoc.includes('fallback'),
       'must have tool availability section',
     )
-    assert.ok(agentsMd.includes('Never invent'), 'must prohibit inventing tool calls')
+    assert.ok(planDoc.includes('Never invent'), 'must prohibit inventing tool calls')
   })
 
-  test('AGENTS.md has context and cost control', () => {
-    const agentsMd = readFileSync(join(import.meta.dirname, '../../AGENTS.md'), 'utf8')
+  test('docs plan has context and cost control', () => {
+    const planDoc = readFileSync(join(import.meta.dirname, '../../docs/documentation-research-policy-plan.md'), 'utf8')
     assert.ok(
-      agentsMd.includes('Context and Cost Control') || agentsMd.includes('context and cost control'),
+      planDoc.includes('Context and cost control') || planDoc.includes('context and cost control'),
       'must have cost control section',
     )
-    assert.ok(agentsMd.includes('resolve one library once'), 'must mention resolving one library once')
-    assert.ok(agentsMd.includes('one concept'), 'must mention one concept per request')
+    assert.ok(planDoc.includes('resolve one library once'), 'must mention resolving one library once')
+    assert.ok(planDoc.includes('one concept'), 'must mention one concept per request')
   })
 })
 
