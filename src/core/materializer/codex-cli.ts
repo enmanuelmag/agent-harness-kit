@@ -38,7 +38,8 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
  *  tested directly with an explicit map, without mocking `@clack/prompts`. */
 export function codexAgentFiles(
   config: HarnessConfig,
-  modelsByRole?: ScaffoldOptions['codexAgentModels']
+  modelsByRole?: ScaffoldOptions['codexAgentModels'],
+  _capabilityHints = ''
 ): AgentFileEntry[] {
   const projectName = config.project.name
   return [

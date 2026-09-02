@@ -292,6 +292,47 @@ ahk migrate --to claude-code     # Switch provider configurations (also: opencod
 3. **Status Reporting**: Leverage dashboard for reporting workflow status
 4. **Rollback Safety**: Ensure all changes are reversible through the task system
 
+
+## Documentation Research Policy
+
+When working with external dependencies (libraries, frameworks, SDKs, APIs, CLIs, cloud services, LLM providers), always follow version-aware research practices.
+
+### Trigger Policy
+
+Initiate external documentation research when:
+- The user asks to research, search, verify, compare, or find current information
+- The task concerns a library, framework, SDK, API, CLI, cloud service, LLM provider, or model capability
+- A proposed plan depends on behavior that may differ by version
+- The task spans a whole codebase and requires external technical context
+- The plan may require installing, removing, or upgrading dependencies
+
+Do NOT invoke external research for isolated business-logic debugging, mechanical refactors, or questions answered completely by current project code and tests.
+
+### Source Order
+
+1. Current project evidence (manifest, lockfile, generated contracts, imports, configuration, tests)
+2. Context7 with the exact library and relevant version
+3. Mintlify Index for publisher-maintained technical documentation
+4. Official documentation, repositories, specifications, and release notes via web search
+5. Secondary sources only when primary sources don't answer — label as secondary
+
+### Dependency-Impact Conclusion
+
+Every dependency-related plan must include:
+
+```text
+Dependency impact
+- Installed version(s): ...
+- Required capability: ...
+- Compatibility: supported | unsupported | uncertain
+- Upgrade required: yes | no
+- New dependency required: yes | no
+- Proposed version or package: ... | none
+- Evidence: local files plus documentation sources
+```
+
+For the full policy, see [AGENTS.md](../AGENTS.md#documentation-research-policy).
+
 ## Security Considerations
 
 1. **File System Isolation**: Agents can only access designated paths

@@ -9,6 +9,7 @@ import {
   mergeClaudeSettingsJson,
   mergeClaudeSettingsLocalJson,
 } from './mcp-merge'
+import { buildCapabilityHints } from './provider-research-capabilities'
 import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
 import {
   agentBuilder,
@@ -44,28 +45,30 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
  *  list itself and hand it to `writeAgentFiles`. */
 export function claudeAgentFiles(
   config: HarnessConfig,
-  modelsByRole?: ScaffoldOptions['claudeAgentModels']
+  modelsByRole?: ScaffoldOptions['claudeAgentModels'],
+  capabilityHints = ''
 ): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }), 'lead', { model: modelsByRole?.lead }) },
-    { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }), 'explorer', { model: modelsByRole?.explorer }) },
-    { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }), 'consultant', { model: modelsByRole?.consultant }) },
-    { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }), 'builder', { model: modelsByRole?.builder }) },
-    { relPath: '.claude/agents/reviewer.md', content: translateFrontmatterForClaudeCode(agentReviewer({ projectName }), 'reviewer', { model: modelsByRole?.reviewer }) },
+    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }, capabilityHints), 'lead', { model: modelsByRole?.lead }) },
+    { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }, capabilityHints), 'explorer', { model: modelsByRole?.explorer }) },
+    { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }, capabilityHints), 'consultant', { model: modelsByRole?.consultant }) },
+    { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }, capabilityHints), 'builder', { model: modelsByRole?.builder }) },
+    { relPath: '.claude/agents/reviewer.md', content: translateFrontmatterForClaudeCode(agentReviewer({ projectName }, capabilityHints), 'reviewer', { model: modelsByRole?.reviewer }) },
   ]
 }
 
 export class ClaudeCodeMaterializer implements Materializer {
   async scaffold(config: HarnessConfig, opts: ScaffoldOptions): Promise<void> {
     const { cwd, claudeAgentModels } = opts
+    const capabilityHints = buildCapabilityHints('claude-code')
 
     // AGENTS.md and CLAUDE.md — fresh project, write unconditionally, but STAMP
     // the provenance marker so the first `ahk build` recognizes these as our own
     // output and keeps propagating config changes (a markerless file would be
     // treated as human-edited and frozen from day one).
-    write(cwd, 'AGENTS.md', stampGenerated(agentsMd(config)))
-    write(cwd, 'CLAUDE.md', stampGenerated(claudeMd(config)))
+    write(cwd, 'AGENTS.md', stampGenerated(agentsMd(config, capabilityHints)))
+    write(cwd, 'CLAUDE.md', stampGenerated(claudeMd(config, capabilityHints)))
 
     // health.sh — only create if it doesn't exist
     if (!existsSync(join(cwd, 'health.sh'))) {
@@ -92,7 +95,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     }
 
     // .claude/agents/ — user-owned: create when missing, never overwrite
-    writeAgentFiles(cwd, claudeAgentFiles(config, claudeAgentModels))
+    writeAgentFiles(cwd, claudeAgentFiles(config, claudeAgentModels, capabilityHints))
 
     // .mcp.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
@@ -108,6 +111,8 @@ export class ClaudeCodeMaterializer implements Materializer {
   }
 
   async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
+    const capabilityHints = buildCapabilityHints('claude-code')
+
     // AGENTS.md and CLAUDE.md are DERIVED FROM CONFIG. Reconcile against the
     // provenance marker: untouched files propagate config changes automatically,
     // hand-edited files are preserved (and reported), --force regenerates them
@@ -115,8 +120,8 @@ export class ClaudeCodeMaterializer implements Materializer {
     const derived = reconcileGeneratedFiles(
       cwd,
       [
-        { relPath: 'AGENTS.md', content: agentsMd(config) },
-        { relPath: 'CLAUDE.md', content: claudeMd(config) },
+        { relPath: 'AGENTS.md', content: agentsMd(config, capabilityHints) },
+        { relPath: 'CLAUDE.md', content: claudeMd(config, capabilityHints) },
       ],
       { force: opts.force, backupRoot: join(cwd, config.storage.dir, 'backups') },
     )
@@ -124,10 +129,10 @@ export class ClaudeCodeMaterializer implements Materializer {
     // Agent files are USER-OWNED. Without --force they are created when
     // missing and never touched again; --force regenerates them, backing up
     // the previous content first. `opts.claudeAgentModels` is only ever set
-    // when the caller (currently `ahk build --force`, see build.ts) collected
+    // when the caller (currently `ahk build --force`, see build.ts) collects
     // fresh per-role models via `promptClaudeAgentModels` — a plain build
     // never sets it, so this is `undefined` (no model line) exactly as before.
-    const agents = writeAgentFiles(cwd, claudeAgentFiles(config, opts.claudeAgentModels), {
+    const agents = writeAgentFiles(cwd, claudeAgentFiles(config, opts.claudeAgentModels, capabilityHints), {
       force: opts.force,
       backupRoot: join(cwd, config.storage.dir, 'backups'),
     })

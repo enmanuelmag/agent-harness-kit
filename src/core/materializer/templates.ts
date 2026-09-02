@@ -55,13 +55,17 @@ exit 1
 
 // ─── AGENTS.md template ───────────────────────────────────────────────────────
 
-export function agentsMd(config: HarnessConfig): string {
+export function agentsMd(config: HarnessConfig, capabilityHints = ''): string {
   const { name, description, docsPath } = config.project
   const port = config.tools.mcp.port
 
+  const capabilityBlock = capabilityHints
+    ? `## Available Research Tools\n\n${capabilityHints}\n\n`
+    : ''
+
   return `# AGENTS.md — ${name}
 
-> **Read this file first.** It is the navigation map for every AI agent working in this repository.
+${capabilityBlock}> **Read this file first.** It is the navigation map for every AI agent working in this repository.
 
 ## Project
 
@@ -142,13 +146,17 @@ If orchestrating: Agent definition files in your provider's agents directory
 
 // ─── CLAUDE.md template (Claude Code provider) ───────────────────────────────
 
-export function claudeMd(config: HarnessConfig): string {
+export function claudeMd(config: HarnessConfig, capabilityHints = ''): string {
   const { name, description, docsPath } = config.project
   const port = config.tools.mcp.port
 
+  const capabilityBlock = capabilityHints
+    ? `## Available Research Tools\n\n${capabilityHints}\n\n`
+    : ''
+
   return `# CLAUDE.md — ${name}
 
-> **Read this file first.** It is the navigation map for every AI agent working in this repository.
+${capabilityBlock}> **Read this file first.** It is the navigation map for every AI agent working in this repository.
 
 ## Project
 
@@ -430,24 +438,37 @@ module.exports = config
 
 // ─── Agent definition templates (loaded from agent-templates/*.md) ─────────────
 
-export function agentLead(vars: { projectName: string }): string {
-  return loadAgentTemplate('lead', vars)
+/**
+ * Inject provider-specific research capability hints into an agent template
+ * body. The hints are inserted after the main `# Agent Name` heading so they
+ * appear early in the instructions but after the role declaration.
+ */
+function injectCapabilityHints(md: string, capabilityHints: string): string {
+  if (!capabilityHints) return md
+  // Find the main H1 heading line and insert after it (and any blank line following).
+  const headingMatch = md.match(/^(#\s+.*?\n\n)/m)
+  if (!headingMatch) return md
+  return `${headingMatch[1]}## Available Research Tools\n\n${capabilityHints}\n\n${md.slice(headingMatch[1].length)}`
 }
 
-export function agentExplorer(vars: { projectName: string }): string {
-  return loadAgentTemplate('explorer', vars)
+export function agentLead(opts: { projectName: string }, capabilityHints = ''): string {
+  return injectCapabilityHints(loadAgentTemplate('lead', opts), capabilityHints)
 }
 
-export function agentBuilder(vars: { projectName: string }): string {
-  return loadAgentTemplate('builder', vars)
+export function agentExplorer(opts: { projectName: string }, capabilityHints = ''): string {
+  return injectCapabilityHints(loadAgentTemplate('explorer', opts), capabilityHints)
 }
 
-export function agentConsultant(vars: { projectName: string }): string {
-  return loadAgentTemplate('consultant', vars)
+export function agentBuilder(opts: { projectName: string }, capabilityHints = ''): string {
+  return injectCapabilityHints(loadAgentTemplate('builder', opts), capabilityHints)
 }
 
-export function agentReviewer(vars: { projectName: string }): string {
-  return loadAgentTemplate('reviewer', vars)
+export function agentConsultant(opts: { projectName: string }, capabilityHints = ''): string {
+  return injectCapabilityHints(loadAgentTemplate('consultant', opts), capabilityHints)
+}
+
+export function agentReviewer(opts: { projectName: string }, capabilityHints = ''): string {
+  return injectCapabilityHints(loadAgentTemplate('reviewer', opts), capabilityHints)
 }
 
 // Note: agentLead/agentExplorer/agentConsultant/agentBuilder/agentReviewer above produce the
