@@ -78,7 +78,7 @@ actions.start(taskId, 'reviewer')   → save the returned actionId
 
 ### 3. Verify each acceptance criterion
 
-For each criterion: read the relevant files, run commands if needed, then immediately call `tasks.acceptance_update` as described in the **MANDATORY TRACKING** section above. Do this per-criterion as you go — not in batch at the end.
+For each criterion: read the relevant files, run commands if needed, then immediately call `tasks.acceptance.update` as described in the **MANDATORY TRACKING** section above. Do this per-criterion as you go — not in batch at the end.
 
 ### 4. Run the health check
 

@@ -135,7 +135,7 @@ Your output must include a "Local version evidence" section listing:
 ## Hard rules
 
 - **Read-only.** Never use Write, Edit, or Bash to modify files.
-- **Log every file you open.** No silent reads.
+- **Log every file you open.** No silent reads. Use actions.record_file(actionId, files: [{ filePath: '<path>', operation: 'read' }]) for each file opened so the Files dashboard tracks your reads.
 - **Do not invent.** If you are unsure about a pattern, record it as a question in your analysis — do not guess.
 - **Stay in scope.** Only map what is needed for this specific task.
 

@@ -7,7 +7,7 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 ## Key Features
 
 - **Provider Agnostic**: Works with Claude Code, OpenCode, Codex CLI, Grok Build, or any MCP-compatible AI tool
-- **Structured Workflow**: Implements a 4-agent workflow (Lead, Explorer, Builder, Reviewer) 
+- **Structured Workflow**: Implements a 5-agent workflow (Lead, Explorer, Consultant, Builder, Reviewer) 
 - **Task Management**: Provides a task backlog with acceptance criteria
 - **Audit Trail**: Full logging of every action, file modification, and tool usage
 - **Health Checks**: Ensures code quality through configurable health checks
@@ -15,12 +15,12 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 
 ## Architecture Components
 
-### The Four Agent Roles
+### The Five Agent Roles
 
 1. **Lead Agent**
    - Orchestrates the workflow for one task at a time
    - Decomposes tasks into plans for other agents
-   - Coordinates handoffs between Explorer → Builder → Reviewer
+   - Coordinates handoffs between Explorer → Consultant → Builder → Reviewer
    - Manages session state and task completion
 
 2. **Explorer Agent** 
@@ -29,17 +29,23 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
    - Never modifies files - only analyzes them
    - Produces structured analysis for the builder
 
-3. **Builder Agent**
-   - Implements exactly what was planned in the lead's plan
-   - Works within defined writable paths
-   - Follows established codebase conventions 
-   - Makes targeted implementation changes with test verification
+3. **Consultant Agent**
+   - Provides technical advisory based on the explorer's findings
+   - Analyzes patterns, risks, and best practices
+   - Never writes code — produces structured recommendations
+   - Runs between explorer and builder in the workflow
 
-4. **Reviewer Agent**
-   - Verifies that all acceptance criteria are met
-   - Runs health checks before approving work
-   - Approves or blocks tasks based on strict criteria
-   - Provides actionable feedback for corrections
+4. **Builder Agent**
+    - Implements exactly what was planned in the lead's plan
+    - Works within defined writable paths
+    - Follows established codebase conventions 
+    - Makes targeted implementation changes with test verification
+
+5. **Reviewer Agent**
+    - Verifies that all acceptance criteria are met
+    - Runs health checks before approving work
+    - Approves or blocks tasks based on strict criteria
+    - Provides actionable feedback for corrections
 
 ### Core Concepts
 
@@ -118,7 +124,7 @@ The kit is configured through `agent-harness-kit.config.ts` with:
 2. **Health Checks**: Implement comprehensive health checks that reflect real project needs 
 3. **Agent Instructions**: Customize agent roles with domain-specific context
 4. **Audit Trail**: Utilize all available logging sections for visibility
-5. **Workflow Adherence**: Follow the defined sequence (Lead → Explorer → Builder → Reviewer)
+5. **Workflow Adherence**: Follow the defined sequence (Lead → Explorer → Consultant → Builder → Reviewer)
 
 ## Security Considerations
 

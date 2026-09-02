@@ -437,7 +437,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
     assert.ok(parsed.permissions.allow.includes('mcp__agent-harness-kit__actions_start'))
     assert.ok(Array.isArray(parsed.enabledMcpjsonServers))
     assert.ok(parsed.enabledMcpjsonServers.includes('agent-harness-kit'))
-    assert.equal(parsed.permissions.allow.length, 19)
+    assert.equal(parsed.permissions.allow.length, 25)
     teardown()
   })
 
@@ -475,7 +475,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.someOtherKey)
     assert.ok(Array.isArray(parsed.permissions.allow))
-    assert.ok(parsed.permissions.allow.length === 19)
+    assert.ok(parsed.permissions.allow.length === 25)
     teardown()
   })
 })

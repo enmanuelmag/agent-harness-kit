@@ -101,7 +101,7 @@ Agent starts working
   └── actions.write()     → logs sections: result, files, blockers…
   └── actions.complete()  → closes the action
 
-Lead → Explorer → Builder → Reviewer
+Lead → Explorer → Consultant → Builder → Reviewer
   └── each role has its own agent definition with clear responsibilities
   └── the harness DB records the full history
 ```

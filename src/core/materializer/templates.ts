@@ -97,7 +97,12 @@ actions.write        actionId section text                  → record a section
 actions.record_tool  actionId calls[]                        → batch-log tool calls to the Tools dashboard (array, min 1)
 actions.record_file  actionId files[]                        → batch-log file touches to the Files dashboard (array, min 1)
 actions.complete     actionId summary                       → close the action
-actions.get          taskId                                 → full action history for a task
+actions.list         taskId [agent] [status] [limit] [cursor] → compact newest-first action index with pagination
+actions.get_by_id    actionId                               → single action with section index (no content)
+actions.sections_list actionId [types] [limit] [cursor]      → compact section index with type filtering
+actions.sections_get sectionId [length] [offset]             → ranged section content reader
+actions.handoff.get    taskId [recipient]                     → newest completed canonical handoff
+actions.handoff.write  actionId recipient ...                 → recipient-directed bounded handoff
 tasks.add            title [slug] [description] [acceptance] → create a new task from natural language
 tasks.get            [status]                               → list tasks (pending | in_progress | done | blocked)
 tasks.claim          id                                     → atomically claim a pending task
@@ -115,13 +120,13 @@ docs.search          query                                  → search ${docsPat
    - tasks.get('pending') → pick lowest id
 
 2. WORK  (lead → explorer → consultant → builder → reviewer)
-   - Each agent calls actions.start(taskId, agentName) → numeric actionId
-   - Accumulate tool calls / file touches as you work; flush periodically (every few calls or at a phase boundary) via actions.record_tool(actionId, calls: [...]) and actions.record_file(actionId, files: [...]) — both are batch-only, even a single entry goes through as a one-element array
-   - Closes with actions.complete(actionId, summary)
+    - Each agent calls actions.start(taskId, agentName) → numeric actionId
+    - Accumulate tool calls / file touches as you work; flush periodically (every few calls or at a phase boundary) via actions.record_tool(actionId, calls: [...]) and actions.record_file(actionId, files: [...]) — both are batch-only, even a single entry goes through as a one-element array
+    - Closes with actions.complete(actionId, summary)
 
 3. CLOSE
-   - tasks.update(taskId, 'done')
-   - Run health.sh (if changes were made) → must be green before closing
+    - tasks.update(taskId, 'done')
+    - Run health.sh (if changes were made) → must be green before closing
 \`\`\`
 
 ## Agent roles
@@ -188,7 +193,12 @@ actions.write        actionId section text                  → record a section
 actions.record_tool  actionId calls[]                        → batch-log tool calls to the Tools dashboard (array, min 1)
 actions.record_file  actionId files[]                        → batch-log file touches to the Files dashboard (array, min 1)
 actions.complete     actionId summary                       → close the action
-actions.get          taskId                                 → full action history for a task
+actions.list         taskId [agent] [status] [limit] [cursor] → compact newest-first action index with pagination
+actions.get_by_id    actionId                               → single action with section index (no content)
+actions.sections_list actionId [types] [limit] [cursor]      → compact section index with type filtering
+actions.sections_get sectionId [length] [offset]             → ranged section content reader
+actions.handoff.get    taskId [recipient]                     → newest completed canonical handoff
+actions.handoff.write  actionId recipient ...                 → recipient-directed bounded handoff
 tasks.add            title [slug] [description] [acceptance] → create a new task from natural language
 tasks.get            [status]                               → list tasks (pending | in_progress | done | blocked)
 tasks.claim          id                                     → atomically claim a pending task
@@ -207,13 +217,13 @@ docs.search          query                                  → search ${docsPat
    - No pending tasks? → ask user, infer fields, call tasks.add, then tasks.claim
 
 2. WORK  (lead → explorer → consultant → builder → reviewer)
-   - Each agent calls actions.start(taskId, agentName) → numeric actionId
-   - Accumulate tool calls / file touches as you work; flush periodically (every few calls or at a phase boundary) via actions.record_tool(actionId, calls: [...]) and actions.record_file(actionId, files: [...]) — both are batch-only, even a single entry goes through as a one-element array
-   - Closes with actions.complete(actionId, summary)
+    - Each agent calls actions.start(taskId, agentName) → numeric actionId
+    - Accumulate tool calls / file touches as you work; flush periodically (every few calls or at a phase boundary) via actions.record_tool(actionId, calls: [...]) and actions.record_file(actionId, files: [...]) — both are batch-only, even a single entry goes through as a one-element array
+    - Closes with actions.complete(actionId, summary)
 
 3. CLOSE
-   - tasks.update(taskId, 'done')
-   - Run health.sh (if changes were made) → must be green before closing
+    - tasks.update(taskId, 'done')
+    - Run health.sh (if changes were made) → must be green before closing
 \`\`\`
 
 ## Agent roles
