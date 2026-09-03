@@ -16,7 +16,13 @@ import type { GlobalStorageConfig, LocalStorageConfig, StorageConfig } from '@/t
 const baseFields = {
   dir: '.harness',
   tasks: { adapter: 'local' as const },
-  sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
+  sections: {
+    toolsUsed: true,
+    filesModified: true,
+    result: true,
+    blockers: true,
+    nextSteps: false,
+  },
   projectId: 'compile-time-check-project',
 }
 
@@ -56,7 +62,11 @@ void illegalShapes
 
 /** Legal shapes — must compile WITHOUT any `@ts-expect-error`. Returned so
  *  the runtime test below can assert on their shape too. */
-function validShapes(): { local: LocalStorageConfig; localWithSqlitePath: LocalStorageConfig; global: GlobalStorageConfig } {
+function validShapes(): {
+  local: LocalStorageConfig
+  localWithSqlitePath: LocalStorageConfig
+  global: GlobalStorageConfig
+} {
   const local: LocalStorageConfig = {
     ...baseFields,
     scope: 'local',
@@ -93,6 +103,9 @@ describe('StorageConfig discriminated union — compile-time narrowing (task #56
     assert.equal(markdownPathIfLocal(local), '.harness/current.md')
     assert.equal(markdownPathIfLocal(global), undefined)
     assert.equal(localWithSqlitePath.sqlitePath, '.harness/custom.db')
-    assert.ok(!('path' in global.markdownFallback), 'GlobalStorageConfig.markdownFallback must never carry a path field')
+    assert.ok(
+      !('path' in global.markdownFallback),
+      'GlobalStorageConfig.markdownFallback must never carry a path field'
+    )
   })
 })

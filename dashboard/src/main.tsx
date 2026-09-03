@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRouter,RouterProvider } from '@tanstack/react-router'
+import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -34,7 +34,9 @@ ws.onmessage = (e: MessageEvent) => {
   try {
     const msg = JSON.parse(e.data as string) as { type: string }
     if (msg.type === 'update') void queryClient.invalidateQueries()
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 const rootEl = document.getElementById('root')!
@@ -43,5 +45,5 @@ createRoot(rootEl).render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 )

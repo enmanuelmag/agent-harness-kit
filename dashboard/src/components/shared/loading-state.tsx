@@ -5,7 +5,10 @@ export function LoadingState() {
 export function LoadingTableRow({ cols }: { cols: number }) {
   return (
     <tr>
-      <td colSpan={cols} className="px-3 py-4 text-center font-mono text-xs text-[var(--color-text-faint)]">
+      <td
+        colSpan={cols}
+        className="px-3 py-4 text-center font-mono text-xs text-[var(--color-text-faint)]"
+      >
         Loading…
       </td>
     </tr>

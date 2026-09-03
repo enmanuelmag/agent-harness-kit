@@ -1,7 +1,7 @@
 interface Props {
-  title: string;
-  subtitle?: string;
-  right?: React.ReactNode;
+  title: string
+  subtitle?: string
+  right?: React.ReactNode
 }
 
 export function PageHeader({ title, subtitle, right }: Props) {
@@ -11,11 +11,9 @@ export function PageHeader({ title, subtitle, right }: Props) {
         <h1 className="font-mono font-semibold text-base text-[var(--color-text-primary)]">
           {title}
         </h1>
-        {subtitle && (
-          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{subtitle}</p>}
       </div>
       {right != null && right != undefined && <div>{right}</div>}
     </div>
-  );
+  )
 }

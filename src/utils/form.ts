@@ -1,10 +1,9 @@
 import * as p from '@clack/prompts'
 import * as v from 'valibot'
 
-
 export const cliFormWithRetry = async <T>(
   formFn: () => Promise<T>,
-  schema: v.GenericSchema,
+  schema: v.GenericSchema
 ): Promise<T> => {
   while (true) {
     const res = await formFn()

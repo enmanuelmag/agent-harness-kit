@@ -79,7 +79,12 @@ export function applyConfigDefaults(params: {
   const storage: HarnessConfig['storage'] =
     scope === 'global'
       ? { ...baseStorage, markdownFallback: { enabled: true }, scope: 'global', projectId }
-      : { ...baseStorage, markdownFallback: { enabled: true, path: '.harness/current.md' }, scope: 'local', projectId }
+      : {
+          ...baseStorage,
+          markdownFallback: { enabled: true, path: '.harness/current.md' },
+          scope: 'local',
+          projectId,
+        }
 
   return {
     provider: params.provider,
@@ -112,7 +117,6 @@ export function applyConfigDefaults(params: {
 function stripAnsi(str: string): string {
   return str.replace(/\x1B\[[0-9;]*m/g, '')
 }
-
 
 /** Draw a bordered box matching printUpdateMessage() style */
 export function drawBox(lines: string[]): void {

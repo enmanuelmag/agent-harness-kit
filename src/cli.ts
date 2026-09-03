@@ -60,7 +60,10 @@ program
   .command('init')
   .description('Scaffold a harness interactively in the current directory')
   .option('--name <name>', 'Project name (skip prompt)')
-  .option('--provider <provider>', 'AI provider: claude-code | opencode | codex-cli | grok-cli (skip prompt)')
+  .option(
+    '--provider <provider>',
+    'AI provider: claude-code | opencode | codex-cli | grok-cli (skip prompt)'
+  )
   .option('--docs <path>', 'Docs folder path (skip prompt)')
   .option('--tasks <adapter>', 'Task adapter: local | jira | linear (skip prompt)')
   .option('--storage-scope <scope>', 'Storage scope: local | global (skip prompt)')
@@ -73,11 +76,14 @@ program
   .command('build')
   .description('Regenerate AGENTS.md and provider files from agent-harness-kit.config.ts')
   .option('--watch', 'Rebuild on config changes')
-  .option('--sync', 'Sync tools: frontmatter in existing .claude/agents/*.md to match current permission constants')
+  .option(
+    '--sync',
+    'Sync tools: frontmatter in existing .claude/agents/*.md to match current permission constants'
+  )
   .option(
     '--force',
     'Regenerate agent files that already exist, DESTROYING your customizations (a backup is written first). ' +
-      'Without this flag, build only creates agent files that are missing and never modifies existing ones.',
+      'Without this flag, build only creates agent files that are missing and never modifies existing ones.'
   )
   .action(async (opts) => {
     await runBuild(cwd, opts)
@@ -177,7 +183,9 @@ program
 // argv rewrite just before `program.parse()` below.
 const migrate = program
   .command('migrate')
-  .description('Migrate provider files to a different provider, or migrate harness storage (see subcommands)')
+  .description(
+    'Migrate provider files to a different provider, or migrate harness storage (see subcommands)'
+  )
 
 migrate
   .command('provider')
@@ -190,7 +198,7 @@ migrate
 migrate
   .command('storage')
   .description(
-    'Migrate harness DB storage between local/global scope or sqlite/postgres/mysql, based on agent-harness-kit.config.ts vs the real current state',
+    'Migrate harness DB storage between local/global scope or sqlite/postgres/mysql, based on agent-harness-kit.config.ts vs the real current state'
   )
   .option('--force', 'Required to overwrite a non-empty destination (a backup is written first)')
   .option('--dry-run', 'Preview what would migrate without applying any changes')
@@ -214,13 +222,15 @@ program
     await runExport(cwd, opts)
   })
 
-
 // ─── reset ────────────────────────────────────────────────────────────────────
 program
   .command('reset')
   .description('Reset/clear harness data (DB, feature list, agent files)')
   .option('--force', 'Skip confirmation prompts')
-  .option('--provider <claude-code|opencode|codex-cli|grok-cli>', 'Reset agent MD files for specified provider')
+  .option(
+    '--provider <claude-code|opencode|codex-cli|grok-cli>',
+    'Reset agent MD files for specified provider'
+  )
   .action(async (opts) => {
     await runReset(cwd, opts)
   })
@@ -236,7 +246,9 @@ program
 // ─── models ───────────────────────────────────────────────────────────────────
 program
   .command('models')
-  .description('Re-prompt per-role Claude Code models and regenerate .claude/agents/*.md (claude-code projects only)')
+  .description(
+    'Re-prompt per-role Claude Code models and regenerate .claude/agents/*.md (claude-code projects only)'
+  )
   .action(async () => {
     await runModels(cwd)
   })

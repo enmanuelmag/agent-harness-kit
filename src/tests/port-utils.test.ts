@@ -56,7 +56,9 @@ async function ipv6WildcardAvailable(): Promise<boolean> {
 }
 
 const HAS_IPV6 = await ipv6WildcardAvailable()
-const skipNoIpv6 = HAS_IPV6 ? false : 'requires IPv6 wildcard binding (::), unavailable on this host'
+const skipNoIpv6 = HAS_IPV6
+  ? false
+  : 'requires IPv6 wildcard binding (::), unavailable on this host'
 
 /**
  * Bind using the REAL @hono/node-server serve(), configured exactly as
@@ -84,16 +86,20 @@ async function closeAll(): Promise<void> {
 describe('isPortFree — probe must agree with the real bind', () => {
   afterEach(closeAll)
 
-  test('reports a port occupied on the IPv6 wildcard as NOT free', { skip: skipNoIpv6 }, async () => {
-    const occupied = await occupy(0, '::')
-    const port = portOf(occupied)
+  test(
+    'reports a port occupied on the IPv6 wildcard as NOT free',
+    { skip: skipNoIpv6 },
+    async () => {
+      const occupied = await occupy(0, '::')
+      const port = portOf(occupied)
 
-    // This is the user-reported scenario: a dashboard is already running (hono
-    // binds the wildcard), and a second `ahk dashboard` is started on the same
-    // port. Against the pre-fix code, which probed '127.0.0.1', this returned
-    // true — the fallback never fired and serve() then died on EADDRINUSE.
-    assert.equal(await isPortFree(port), false)
-  })
+      // This is the user-reported scenario: a dashboard is already running (hono
+      // binds the wildcard), and a second `ahk dashboard` is started on the same
+      // port. Against the pre-fix code, which probed '127.0.0.1', this returned
+      // true — the fallback never fired and serve() then died on EADDRINUSE.
+      assert.equal(await isPortFree(port), false)
+    }
+  )
 
   test('reports a genuinely unused port as free', async () => {
     const probe = await occupy(0, DASHBOARD_BIND_HOST ?? '::')
@@ -124,19 +130,23 @@ describe('isPortFree — probe must agree with the real bind', () => {
   // not something this suite can assert.
   for (const host of ['::', '::1', '127.0.0.1', '0.0.0.0']) {
     const needsIpv6 = host.includes(':')
-    test(`probe matches a real hono bind when the port is occupied on ${host}`, { skip: needsIpv6 ? skipNoIpv6 : false }, async () => {
-      const occupied = await occupy(0, host)
-      const port = portOf(occupied)
+    test(
+      `probe matches a real hono bind when the port is occupied on ${host}`,
+      { skip: needsIpv6 ? skipNoIpv6 : false },
+      async () => {
+        const occupied = await occupy(0, host)
+        const port = portOf(occupied)
 
-      const probeSaysFree = await isPortFree(port)
-      const bindSucceeds = await honoBindSucceeds(port)
+        const probeSaysFree = await isPortFree(port)
+        const bindSucceeds = await honoBindSucceeds(port)
 
-      assert.equal(
-        probeSaysFree,
-        bindSucceeds,
-        `probe said ${probeSaysFree ? 'free' : 'busy'} but a real hono bind ${bindSucceeds ? 'succeeded' : 'failed'} (occupier on ${host})`
-      )
-    })
+        assert.equal(
+          probeSaysFree,
+          bindSucceeds,
+          `probe said ${probeSaysFree ? 'free' : 'busy'} but a real hono bind ${bindSucceeds ? 'succeeded' : 'failed'} (occupier on ${host})`
+        )
+      }
+    )
   }
 })
 
@@ -205,36 +215,48 @@ describe('findFreePort — fallback', () => {
 
     const resolved = await findFreePort(start)
 
-    assert.equal(resolved, start + 1, 'must fall back, and by exactly one port (numeric arithmetic)')
+    assert.equal(
+      resolved,
+      start + 1,
+      'must fall back, and by exactly one port (numeric arithmetic)'
+    )
     assert.notEqual(resolved, start)
   })
 
-  test('several consecutive occupied ports resolve to a later free port', { skip: skipNoIpv6 }, async () => {
-    const first = await occupy(0, '::')
-    const start = portOf(first)
-    await occupy(start + 1, '::')
-    await occupy(start + 2, '::')
+  test(
+    'several consecutive occupied ports resolve to a later free port',
+    { skip: skipNoIpv6 },
+    async () => {
+      const first = await occupy(0, '::')
+      const start = portOf(first)
+      await occupy(start + 1, '::')
+      await occupy(start + 2, '::')
 
-    const resolved = await findFreePort(start)
+      const resolved = await findFreePort(start)
 
-    assert.equal(resolved, start + 3)
-  })
+      assert.equal(resolved, start + 3)
+    }
+  )
 
-  test('all attempts occupied throws an error naming the range tried', { skip: skipNoIpv6 }, async () => {
-    const first = await occupy(0, '::')
-    const start = portOf(first)
-    await occupy(start + 1, '::')
-    await occupy(start + 2, '::')
+  test(
+    'all attempts occupied throws an error naming the range tried',
+    { skip: skipNoIpv6 },
+    async () => {
+      const first = await occupy(0, '::')
+      const start = portOf(first)
+      await occupy(start + 1, '::')
+      await occupy(start + 2, '::')
 
-    await assert.rejects(
-      () => findFreePort(start, { maxAttempts: 3 }),
-      (err: Error) => {
-        assert.match(err.message, /after 3 attempts/)
-        assert.match(err.message, new RegExp(`${start}-${start + 2}`))
-        return true
-      }
-    )
-  })
+      await assert.rejects(
+        () => findFreePort(start, { maxAttempts: 3 }),
+        (err: Error) => {
+          assert.match(err.message, /after 3 attempts/)
+          assert.match(err.message, new RegExp(`${start}-${start + 2}`))
+          return true
+        }
+      )
+    }
+  )
 
   test('honors an explicit probe host', async () => {
     const occupied = await occupy(0, '127.0.0.1')

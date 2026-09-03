@@ -55,7 +55,12 @@ export async function reconcileFeatureList(
 ): Promise<{ parseFailed: boolean }> {
   const featureListPath = join(installDir, storageDir, 'feature_list.json')
 
-  let existingSeeds: { slug: string; title: string; description?: string; acceptance?: string[] }[] = []
+  let existingSeeds: {
+    slug: string
+    title: string
+    description?: string
+    acceptance?: string[]
+  }[] = []
   let parseFailed = false
   if (existsSync(featureListPath)) {
     try {
@@ -153,7 +158,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
 
   // ─── Provider ─────────────────────────────────────────────────────────────
   let provider: Provider
-  if (flags.provider && ['claude-code', 'opencode', 'codex-cli', 'grok-cli'].includes(flags.provider)) {
+  if (
+    flags.provider &&
+    ['claude-code', 'opencode', 'codex-cli', 'grok-cli'].includes(flags.provider)
+  ) {
     provider = flags.provider as Provider
   } else {
     const val = await p.select({
@@ -354,12 +362,22 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     await db.writeStorageState(installDir)
 
     // Scaffold provider-specific files
-    await materializer.scaffold(config, { cwd: installDir, firstTask, claudeAgentModels, codexAgentModels })
+    await materializer.scaffold(config, {
+      cwd: installDir,
+      firstTask,
+      claudeAgentModels,
+      codexAgentModels,
+    })
 
     // Reconcile .harness/feature_list.json — the "human-editable task seed
     // list". Owned by init (not the scaffold), and MERGED rather than
     // overwritten. See reconcileFeatureList for the full contract.
-    const { parseFailed } = await reconcileFeatureList(db, installDir, config.storage.dir, firstTask)
+    const { parseFailed } = await reconcileFeatureList(
+      db,
+      installDir,
+      config.storage.dir,
+      firstTask
+    )
     if (parseFailed) {
       featureListParseFailedPath = join(config.storage.dir, 'feature_list.json')
     }

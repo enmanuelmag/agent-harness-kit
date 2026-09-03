@@ -29,7 +29,8 @@ const TOOLS = [
         taskId: { type: 'number', description: 'The task ID from tasks.get' },
         agent: {
           type: 'string',
-          description: 'Agent name: lead | explorer | consultant | builder | reviewer | custom:<name>',
+          description:
+            'Agent name: lead | explorer | consultant | builder | reviewer | custom:<name>',
         },
       },
       required: ['taskId', 'agent'],
@@ -51,7 +52,7 @@ const TOOLS = [
         content: {
           type: 'string',
           description:
-            "Content for this section. No length limit; avoid padding — it costs shared context for other agents.",
+            'Content for this section. No length limit; avoid padding — it costs shared context for other agents.',
         },
       },
       required: ['actionId', 'sectionType', 'content'],
@@ -71,7 +72,8 @@ const TOOLS = [
   },
   {
     name: 'actions.get',
-    description: 'Full task action history, including every action and section. Potentially large; use only for audit or diagnosis.',
+    description:
+      'Full task action history, including every action and section. Potentially large; use only for audit or diagnosis.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -82,67 +84,115 @@ const TOOLS = [
   },
   {
     name: 'actions.list',
-    description: 'Compact newest-first action index. Use to discover actions before reading a specific action or section.',
+    description:
+      'Compact newest-first action index. Use to discover actions before reading a specific action or section.',
     inputSchema: {
-      type: 'object', properties: {
+      type: 'object',
+      properties: {
         taskId: { type: 'number', description: 'Task ID' },
         agent: { type: 'string', description: 'Optional agent filter' },
-        status: { type: 'string', enum: ['in_progress', 'completed', 'blocked'], description: 'Optional action status filter' },
+        status: {
+          type: 'string',
+          enum: ['in_progress', 'completed', 'blocked'],
+          description: 'Optional action status filter',
+        },
         cursor: { type: 'string', description: 'Opaque cursor returned as nextCursor' },
         limit: { type: 'number', description: 'Maximum items (1-100; default 20)' },
-      }, required: ['taskId'],
+      },
+      required: ['taskId'],
     },
   },
   {
     name: 'actions.get_by_id',
-    description: 'Get one action and a compact index of its sections; section contents are not included.',
-    inputSchema: { type: 'object', properties: { actionId: { type: 'number', description: 'Action ID' } }, required: ['actionId'] },
+    description:
+      'Get one action and a compact index of its sections; section contents are not included.',
+    inputSchema: {
+      type: 'object',
+      properties: { actionId: { type: 'number', description: 'Action ID' } },
+      required: ['actionId'],
+    },
   },
   {
     name: 'actions.sections.list',
-    description: 'Compact newest-first section index for one action. Filter by section types without loading content.',
+    description:
+      'Compact newest-first section index for one action. Filter by section types without loading content.',
     inputSchema: {
-      type: 'object', properties: {
+      type: 'object',
+      properties: {
         actionId: { type: 'number', description: 'Action ID' },
-        types: { type: 'array', items: { type: 'string' }, description: 'Optional section-type filter' },
+        types: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional section-type filter',
+        },
         cursor: { type: 'string', description: 'Opaque cursor returned as nextCursor' },
         limit: { type: 'number', description: 'Maximum items (1-100; default 20)' },
-      }, required: ['actionId'],
+      },
+      required: ['actionId'],
     },
   },
   {
     name: 'actions.sections.get',
-    description: 'Read one section content with an explicit character range. This is the only generic action reader that returns long text.',
+    description:
+      'Read one section content with an explicit character range. This is the only generic action reader that returns long text.',
     inputSchema: {
-      type: 'object', properties: {
+      type: 'object',
+      properties: {
         sectionId: { type: 'number', description: 'Section ID' },
         offset: { type: 'number', description: 'Zero-based character offset (default 0)' },
         length: { type: 'number', description: 'Characters to return (1-12000; default 8000)' },
-      }, required: ['sectionId'],
+      },
+      required: ['sectionId'],
     },
   },
   {
     name: 'actions.handoff.write',
-    description: 'Write a validated, recipient-directed, bounded handoff for a completed action to resume work without loading the full history.',
+    description:
+      'Write a validated, recipient-directed, bounded handoff for a completed action to resume work without loading the full history.',
     inputSchema: {
-      type: 'object', properties: {
+      type: 'object',
+      properties: {
         actionId: { type: 'number', description: 'Producer action ID' },
-        recipient: { type: 'string', enum: ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] },
-        goal: { type: 'string' }, completed: { type: 'array', items: { type: 'string' } },
-        decisions: { type: 'array', items: { type: 'string' } }, files: { type: 'array', items: { type: 'string' } },
-        verification: { type: 'array', items: { type: 'string' } }, blockers: { type: 'array', items: { type: 'string' } },
+        recipient: {
+          type: 'string',
+          enum: ['lead', 'explorer', 'consultant', 'builder', 'reviewer'],
+        },
+        goal: { type: 'string' },
+        completed: { type: 'array', items: { type: 'string' } },
+        decisions: { type: 'array', items: { type: 'string' } },
+        files: { type: 'array', items: { type: 'string' } },
+        verification: { type: 'array', items: { type: 'string' } },
+        blockers: { type: 'array', items: { type: 'string' } },
         nextStep: { type: 'string' },
-      }, required: ['actionId', 'recipient', 'goal', 'completed', 'decisions', 'files', 'verification', 'blockers', 'nextStep'],
+      },
+      required: [
+        'actionId',
+        'recipient',
+        'goal',
+        'completed',
+        'decisions',
+        'files',
+        'verification',
+        'blockers',
+        'nextStep',
+      ],
     },
   },
   {
     name: 'actions.handoff.get',
-    description: 'Get the newest completed canonical handoff addressed to a recipient. Returns HANDOFF_NOT_FOUND instead of falling back to history.',
+    description:
+      'Get the newest completed canonical handoff addressed to a recipient. Returns HANDOFF_NOT_FOUND instead of falling back to history.',
     inputSchema: {
-      type: 'object', properties: {
+      type: 'object',
+      properties: {
         taskId: { type: 'number', description: 'Task ID' },
-        recipient: { type: 'string', enum: ['lead', 'explorer', 'consultant', 'builder', 'reviewer'], description: 'Recipient role; defaults to builder' },
-      }, required: ['taskId'],
+        recipient: {
+          type: 'string',
+          enum: ['lead', 'explorer', 'consultant', 'builder', 'reviewer'],
+          description: 'Recipient role; defaults to builder',
+        },
+      },
+      required: ['taskId'],
     },
   },
   {
@@ -217,7 +267,10 @@ const TOOLS = [
           items: {
             type: 'object',
             properties: {
-              filePath: { type: 'string', description: 'Absolute or repo-relative path of the file' },
+              filePath: {
+                type: 'string',
+                description: 'Absolute or repo-relative path of the file',
+              },
               operation: {
                 type: 'string',
                 enum: ['read', 'created', 'modified', 'deleted'],
@@ -437,7 +490,8 @@ export async function dispatch(
     case 'actions.write': {
       const actionId = num(args, 'actionId')
       const sectionType = str(args, 'sectionType')
-      if (sectionType === 'handoff') throw new Error('handoff sections must be written with actions.handoff.write')
+      if (sectionType === 'handoff')
+        throw new Error('handoff sections must be written with actions.handoff.write')
       const content = str(args, 'content')
       await db.writeSection(actionId, sectionType, content)
       return ok(JSON.stringify({ recorded: true }))
@@ -478,9 +532,28 @@ export async function dispatch(
     case 'actions.list': {
       const taskId = num(args, 'taskId')
       const limit = boundedInt(args, 'limit', 20, 1, 100)
-      const rows = await db.listActionsForTask(taskId, { agent: optionalAgent(args, 'agent'), status: optionalActionStatus(args, 'status'), cursor: decodeActionCursor(optionalStr(args, 'cursor')), limit })
+      const rows = await db.listActionsForTask(taskId, {
+        agent: optionalAgent(args, 'agent'),
+        status: optionalActionStatus(args, 'status'),
+        cursor: decodeActionCursor(optionalStr(args, 'cursor')),
+        limit,
+      })
       const last = rows.at(-1)
-      return ok(JSON.stringify({ items: rows.map((row) => ({ id: row.id, agent: row.agent, status: row.status, createdAt: row.created_at, completedAt: row.completed_at, summaryPreview: preview(row.summary), sectionCount: Number(row.section_count) })), nextCursor: rows.length === limit && last ? encodeActionCursor(last.created_at, last.id) : null }))
+      return ok(
+        JSON.stringify({
+          items: rows.map((row) => ({
+            id: row.id,
+            agent: row.agent,
+            status: row.status,
+            createdAt: row.created_at,
+            completedAt: row.completed_at,
+            summaryPreview: preview(row.summary),
+            sectionCount: Number(row.section_count),
+          })),
+          nextCursor:
+            rows.length === limit && last ? encodeActionCursor(last.created_at, last.id) : null,
+        })
+      )
     }
 
     case 'actions.get_by_id': {
@@ -488,15 +561,35 @@ export async function dispatch(
       const action = await db.getAction(actionId)
       if (!action) return ok(JSON.stringify({ error: 'ACTION_NOT_FOUND', actionId }), true)
       const sections = await db.listActionSections(actionId, { limit: 100 })
-      return ok(JSON.stringify({ id: action.id, taskId: action.task_id, agent: action.agent, status: action.status, summary: action.summary, createdAt: action.created_at, completedAt: action.completed_at, sections: sections.map(sectionIndex) }))
+      return ok(
+        JSON.stringify({
+          id: action.id,
+          taskId: action.task_id,
+          agent: action.agent,
+          status: action.status,
+          summary: action.summary,
+          createdAt: action.created_at,
+          completedAt: action.completed_at,
+          sections: sections.map(sectionIndex),
+        })
+      )
     }
 
     case 'actions.sections.list': {
       const actionId = num(args, 'actionId')
       const limit = boundedInt(args, 'limit', 20, 1, 100)
-      const rows = await db.listActionSections(actionId, { types: optionalStringArray(args, 'types'), cursor: decodeSectionCursor(optionalStr(args, 'cursor')), limit })
+      const rows = await db.listActionSections(actionId, {
+        types: optionalStringArray(args, 'types'),
+        cursor: decodeSectionCursor(optionalStr(args, 'cursor')),
+        limit,
+      })
       const last = rows.at(-1)
-      return ok(JSON.stringify({ items: rows.map(sectionIndex), nextCursor: rows.length === limit && last ? encodeSectionCursor(last.id) : null }))
+      return ok(
+        JSON.stringify({
+          items: rows.map(sectionIndex),
+          nextCursor: rows.length === limit && last ? encodeSectionCursor(last.id) : null,
+        })
+      )
     }
 
     case 'actions.sections.get': {
@@ -507,7 +600,15 @@ export async function dispatch(
       if (!section) return ok(JSON.stringify({ error: 'SECTION_NOT_FOUND', sectionId }), true)
       const content = section.content.slice(offset, offset + length)
       const nextOffset = offset + content.length
-      return ok(JSON.stringify({ sectionId: section.id, type: section.section_type, content, truncated: nextOffset < section.content.length, nextOffset: nextOffset < section.content.length ? nextOffset : null }))
+      return ok(
+        JSON.stringify({
+          sectionId: section.id,
+          type: section.section_type,
+          content,
+          truncated: nextOffset < section.content.length,
+          nextOffset: nextOffset < section.content.length ? nextOffset : null,
+        })
+      )
     }
 
     case 'actions.handoff.write': {
@@ -515,7 +616,8 @@ export async function dispatch(
       const recipient = recipientRole(args['recipient'])
       const handoff = handoffFromArgs(args)
       const serialized = JSON.stringify({ version: 1, recipient, handoff })
-      if (Buffer.byteLength(serialized, 'utf8') > 12_000) throw new Error('handoff must not exceed 12000 UTF-8 bytes')
+      if (Buffer.byteLength(serialized, 'utf8') > 12_000)
+        throw new Error('handoff must not exceed 12000 UTF-8 bytes')
       await db.writeSection(actionId, 'handoff', serialized)
       return ok(JSON.stringify({ recorded: true, recipient }))
     }
@@ -526,7 +628,17 @@ export async function dispatch(
       for (const candidate of await db.getCompletedHandoffSections(taskId)) {
         const decoded = decodeHandoff(candidate.content)
         if (decoded?.recipient !== recipient) continue
-        return ok(JSON.stringify({ found: true, taskId, sourceActionId: candidate.action_id, sourceAgent: candidate.agent, recipient, createdAt: candidate.created_at, handoff: decoded.handoff }))
+        return ok(
+          JSON.stringify({
+            found: true,
+            taskId,
+            sourceActionId: candidate.action_id,
+            sourceAgent: candidate.agent,
+            recipient,
+            createdAt: candidate.created_at,
+            handoff: decoded.handoff,
+          })
+        )
       }
       return ok(JSON.stringify({ found: false, reason: 'HANDOFF_NOT_FOUND' }))
     }
@@ -741,7 +853,11 @@ export async function dispatch(
     case 'ahk.doctor': {
       const status = await getDoctorStatus(cwd)
       const result = {
-        lib: { current: status.lib.current, latest: status.lib.latest, outdated: status.lib.outdated },
+        lib: {
+          current: status.lib.current,
+          latest: status.lib.latest,
+          outdated: status.lib.outdated,
+        },
         // Agents are existence-checked only — there is no `outdated` bucket.
         // Hand-edited agent definitions are supported and must not be flagged.
         agents: {
@@ -834,30 +950,154 @@ function str(args: Record<string, unknown>, key: string): string {
 }
 
 function num(args: Record<string, unknown>, key: string): number {
-  const v = args[key]
-  if (typeof v !== 'number') throw new Error(`${key} must be a number`)
+  const v = Number(args[key])
+  if (typeof v !== 'number' || Number.isNaN(v)) throw new Error(`${key} must be a number`)
   return v
 }
 
-function optionalStr(args: Record<string, unknown>, key: string): string | undefined { const value = args[key]; if (value === undefined) return undefined; if (typeof value !== 'string') throw new Error(`${key} must be a string`); return value }
-function boundedInt(args: Record<string, unknown>, key: string, fallback: number, min: number, max: number): number { const value = args[key]; if (value === undefined) return fallback; if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) throw new Error(`${key} must be an integer between ${min} and ${max}`); return value }
-function optionalStringArray(args: Record<string, unknown>, key: string): string[] | undefined { const value = args[key]; if (value === undefined) return undefined; if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.length === 0)) throw new Error(`${key} must be an array of non-empty strings`); return value }
+function optionalStr(args: Record<string, unknown>, key: string): string | undefined {
+  const value = args[key]
+  if (value === undefined) return undefined
+  if (typeof value !== 'string') throw new Error(`${key} must be a string`)
+  return value
+}
+function boundedInt(
+  args: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const value = args[key]
+  if (value === undefined) return fallback
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max)
+    throw new Error(`${key} must be an integer between ${min} and ${max}`)
+  return value
+}
+function optionalStringArray(args: Record<string, unknown>, key: string): string[] | undefined {
+  const value = args[key]
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.length === 0))
+    throw new Error(`${key} must be an array of non-empty strings`)
+  return value
+}
 
 const RECIPIENTS = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 type HandoffRecipient = (typeof RECIPIENTS)[number]
-interface Handoff { goal: string; completed: string[]; decisions: string[]; files: string[]; verification: string[]; blockers: string[]; nextStep: string }
-function recipientRole(value: unknown): HandoffRecipient { if (typeof value !== 'string' || !RECIPIENTS.includes(value as HandoffRecipient)) throw new Error(`recipient must be one of: ${RECIPIENTS.join(', ')}`); return value as HandoffRecipient }
-function requiredStringArray(args: Record<string, unknown>, key: string): string[] { if (!(key in args)) throw new Error(`${key} is required`); return optionalStringArray(args, key) ?? [] }
-function handoffFromArgs(args: Record<string, unknown>): Handoff { const goal = str(args, 'goal'); const nextStep = str(args, 'nextStep'); if (!goal.trim() || !nextStep.trim()) throw new Error('goal and nextStep must be non-empty strings'); return { goal, completed: requiredStringArray(args, 'completed'), decisions: requiredStringArray(args, 'decisions'), files: requiredStringArray(args, 'files'), verification: requiredStringArray(args, 'verification'), blockers: requiredStringArray(args, 'blockers'), nextStep } }
-function decodeHandoff(content: string): { recipient: HandoffRecipient; handoff: Handoff } | null { try { const value = JSON.parse(content) as { version?: unknown; recipient?: unknown; handoff?: Record<string, unknown> }; if (value.version !== 1 || !value.handoff) return null; return { recipient: recipientRole(value.recipient), handoff: handoffFromArgs(value.handoff) } } catch { return null } }
-function optionalAgent(args: Record<string, unknown>, key: string): AgentName | undefined { const value = optionalStr(args, key); if (value === undefined) return undefined; if (!['lead', 'explorer', 'consultant', 'builder', 'reviewer'].includes(value) && !value.startsWith('custom:')) throw new Error('agent must be a known role or custom:<name>'); return value as AgentName }
-function optionalActionStatus(args: Record<string, unknown>, key: string): ActionStatus | undefined { const value = optionalStr(args, key); if (value === undefined) return undefined; if (!['in_progress', 'completed', 'blocked'].includes(value)) throw new Error('status must be in_progress, completed, or blocked'); return value as ActionStatus }
-function encodeActionCursor(createdAt: string, id: number): string { return Buffer.from(JSON.stringify({ createdAt, id })).toString('base64url') }
-function decodeActionCursor(cursor: string | undefined): { createdAt: string; id: number } | undefined { if (!cursor) return undefined; try { const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { createdAt?: unknown; id?: unknown }; if (typeof value.createdAt !== 'string' || typeof value.id !== 'number' || !Number.isInteger(value.id)) throw new Error(); return { createdAt: value.createdAt, id: value.id } } catch { throw new Error('cursor is invalid') } }
-function encodeSectionCursor(id: number): string { return Buffer.from(String(id)).toString('base64url') }
-function decodeSectionCursor(cursor: string | undefined): number | undefined { if (!cursor) return undefined; const id = Number(Buffer.from(cursor, 'base64url').toString('utf8')); if (!Number.isInteger(id) || id < 1) throw new Error('cursor is invalid'); return id }
-function preview(summary: string | null): string | null { return summary ? summary.slice(0, 240) : null }
-function sectionIndex(section: { id: number; section_type: string; chars: number; created_at: string }) { return { id: section.id, type: section.section_type, chars: Number(section.chars), createdAt: section.created_at } }
+interface Handoff {
+  goal: string
+  completed: string[]
+  decisions: string[]
+  files: string[]
+  verification: string[]
+  blockers: string[]
+  nextStep: string
+}
+function recipientRole(value: unknown): HandoffRecipient {
+  if (typeof value !== 'string' || !RECIPIENTS.includes(value as HandoffRecipient))
+    throw new Error(`recipient must be one of: ${RECIPIENTS.join(', ')}`)
+  return value as HandoffRecipient
+}
+function requiredStringArray(args: Record<string, unknown>, key: string): string[] {
+  if (!(key in args)) throw new Error(`${key} is required`)
+  return optionalStringArray(args, key) ?? []
+}
+function handoffFromArgs(args: Record<string, unknown>): Handoff {
+  const goal = str(args, 'goal')
+  const nextStep = str(args, 'nextStep')
+  if (!goal.trim() || !nextStep.trim())
+    throw new Error('goal and nextStep must be non-empty strings')
+  return {
+    goal,
+    completed: requiredStringArray(args, 'completed'),
+    decisions: requiredStringArray(args, 'decisions'),
+    files: requiredStringArray(args, 'files'),
+    verification: requiredStringArray(args, 'verification'),
+    blockers: requiredStringArray(args, 'blockers'),
+    nextStep,
+  }
+}
+function decodeHandoff(content: string): { recipient: HandoffRecipient; handoff: Handoff } | null {
+  try {
+    const value = JSON.parse(content) as {
+      version?: unknown
+      recipient?: unknown
+      handoff?: Record<string, unknown>
+    }
+    if (value.version !== 1 || !value.handoff) return null
+    return { recipient: recipientRole(value.recipient), handoff: handoffFromArgs(value.handoff) }
+  } catch {
+    return null
+  }
+}
+function optionalAgent(args: Record<string, unknown>, key: string): AgentName | undefined {
+  const value = optionalStr(args, key)
+  if (value === undefined) return undefined
+  if (
+    !['lead', 'explorer', 'consultant', 'builder', 'reviewer'].includes(value) &&
+    !value.startsWith('custom:')
+  )
+    throw new Error('agent must be a known role or custom:<name>')
+  return value as AgentName
+}
+function optionalActionStatus(
+  args: Record<string, unknown>,
+  key: string
+): ActionStatus | undefined {
+  const value = optionalStr(args, key)
+  if (value === undefined) return undefined
+  if (!['in_progress', 'completed', 'blocked'].includes(value))
+    throw new Error('status must be in_progress, completed, or blocked')
+  return value as ActionStatus
+}
+function encodeActionCursor(createdAt: string, id: number): string {
+  return Buffer.from(JSON.stringify({ createdAt, id })).toString('base64url')
+}
+function decodeActionCursor(
+  cursor: string | undefined
+): { createdAt: string; id: number } | undefined {
+  if (!cursor) return undefined
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      createdAt?: unknown
+      id?: unknown
+    }
+    if (
+      typeof value.createdAt !== 'string' ||
+      typeof value.id !== 'number' ||
+      !Number.isInteger(value.id)
+    )
+      throw new Error()
+    return { createdAt: value.createdAt, id: value.id }
+  } catch {
+    throw new Error('cursor is invalid')
+  }
+}
+function encodeSectionCursor(id: number): string {
+  return Buffer.from(String(id)).toString('base64url')
+}
+function decodeSectionCursor(cursor: string | undefined): number | undefined {
+  if (!cursor) return undefined
+  const id = Number(Buffer.from(cursor, 'base64url').toString('utf8'))
+  if (!Number.isInteger(id) || id < 1) throw new Error('cursor is invalid')
+  return id
+}
+function preview(summary: string | null): string | null {
+  return summary ? summary.slice(0, 240) : null
+}
+function sectionIndex(section: {
+  id: number
+  section_type: string
+  chars: number
+  created_at: string
+}) {
+  return {
+    id: section.id,
+    type: section.section_type,
+    chars: Number(section.chars),
+    createdAt: section.created_at,
+  }
+}
 
 /** Validates that `args[key]` is a non-empty array of plain objects, as
  *  required by the batch-only shapes of actions.record_file/record_tool

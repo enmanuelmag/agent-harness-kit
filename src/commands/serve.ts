@@ -23,7 +23,9 @@ export async function runServe(cwd: string, opts: ServeOptions): Promise<void> {
       .filter(([, r]) => !r.ok)
       .map(([name]) => name)
       .join(', ')
-    process.stderr.write(`[agent-harness-kit] Agent definition files missing: ${affected}. Run: ahk build\n`)
+    process.stderr.write(
+      `[agent-harness-kit] Agent definition files missing: ${affected}. Run: ahk build\n`
+    )
   }
 
   await startMcpServer(config, cwd)

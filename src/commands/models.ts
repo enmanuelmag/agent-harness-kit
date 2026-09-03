@@ -54,7 +54,9 @@ export async function runModels(cwd: string): Promise<void> {
     if (ctx.reason === 'no-config') {
       // Mirrors runDoctor's no-config-found handling in doctor.ts.
       console.log('')
-      console.log(`  ${pc.cyan('config'.padEnd(16))}${pc.yellow('[!]')} no agent-harness-kit.config found`)
+      console.log(
+        `  ${pc.cyan('config'.padEnd(16))}${pc.yellow('[!]')} no agent-harness-kit.config found`
+      )
       console.log(`  ${''.padEnd(16)}    ${pc.dim('run: ahk init')}`)
       console.log('')
       return
@@ -78,7 +80,9 @@ export async function runModels(cwd: string): Promise<void> {
 
   console.log('')
   if (agents.overwritten.length > 0) {
-    console.log(pc.green(`✓ Regenerated ${agents.overwritten.length} agent file(s) with updated models:`))
+    console.log(
+      pc.green(`✓ Regenerated ${agents.overwritten.length} agent file(s) with updated models:`)
+    )
     for (const file of agents.overwritten) console.log(pc.green(`  ✓ ${file}`))
     if (agents.backupDir) {
       console.log(pc.dim(`  Previous content backed up → ${agents.backupDir}`))

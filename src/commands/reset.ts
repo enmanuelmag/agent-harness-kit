@@ -97,7 +97,8 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
   }
 
   const storageDir = config.storage.dir || '.harness'
-  const dbPath = config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
+  const dbPath =
+    config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
   const featureListPath = resolve(cwd, storageDir, 'feature_list.json')
 
   let resetDb = false
@@ -112,7 +113,11 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
       resetDb = true
     } else {
       if (config.database.type !== 'sqlite') {
-        console.log(pc.yellow(`  Skipping DB reset — database type "${config.database.type}" is not managed by this command.`))
+        console.log(
+          pc.yellow(
+            `  Skipping DB reset — database type "${config.database.type}" is not managed by this command.`
+          )
+        )
         resetDb = false
       } else {
         const confirm = await p.confirm({
@@ -127,7 +132,11 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
       }
     }
   } else if (!dbPath) {
-    console.log(pc.dim(`  Skipping DB reset — remote ${config.database.type} database is not managed by this command.`))
+    console.log(
+      pc.dim(
+        `  Skipping DB reset — remote ${config.database.type} database is not managed by this command.`
+      )
+    )
   }
 
   // Reset feature_list.json?

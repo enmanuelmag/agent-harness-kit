@@ -62,7 +62,7 @@ describe('detectConfigExtension — package installed locally (existing detectio
     writeFileSync(join(dir, 'tsconfig.json'), '{}')
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: 'x', devDependencies: { '@cardor/agent-harness-kit': '^1.0.0' } }),
+      JSON.stringify({ name: 'x', devDependencies: { '@cardor/agent-harness-kit': '^1.0.0' } })
     )
     assert.equal(detectConfigExtension(dir), 'json')
     cleanTmp()
@@ -106,7 +106,7 @@ describe('detectConfigExtension — package NOT installed locally', () => {
     writeFileSync(join(dir, 'tsconfig.json'), '{}')
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: 'x', dependencies: { '@cardor/agent-harness-kit': '^1.0.0' } }),
+      JSON.stringify({ name: 'x', dependencies: { '@cardor/agent-harness-kit': '^1.0.0' } })
     )
     assert.equal(detectConfigExtension(dir), 'ts')
     cleanTmp()
@@ -178,9 +178,12 @@ describe('applyConfigDefaults — storage scope', () => {
     assert.equal(config.storage.scope, 'global')
     assert.ok(
       !('path' in config.storage.markdownFallback),
-      'GlobalStorageConfig.markdownFallback must not declare a path field',
+      'GlobalStorageConfig.markdownFallback must not declare a path field'
     )
-    assert.ok(!('sqlitePath' in config.storage), 'GlobalStorageConfig must not declare a sqlitePath field')
+    assert.ok(
+      !('sqlitePath' in config.storage),
+      'GlobalStorageConfig must not declare a sqlitePath field'
+    )
     assert.ok(!('path' in config.database), 'database.type=sqlite must never carry a path field')
   })
 })

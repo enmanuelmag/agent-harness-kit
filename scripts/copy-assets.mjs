@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 // copy-assets.mjs — copies non-TS assets from src/ to dist/ after tsc build
-import { cpSync,existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 
 // ─── Agent templates ──────────────────────────────────────────────────────────
@@ -14,7 +22,11 @@ for (const file of readdirSync(SRC)) {
   const content = readFileSync(join(SRC, file))
 
   // Try to remove first (handles locked/0-byte files from stale builds)
-  try { unlinkSync(dest) } catch { /* file didn't exist or can't unlink — try write anyway */ }
+  try {
+    unlinkSync(dest)
+  } catch {
+    /* file didn't exist or can't unlink — try write anyway */
+  }
 
   try {
     writeFileSync(dest, content)
@@ -38,5 +50,7 @@ if (existsSync(DASHBOARD_SRC)) {
   cpSync(DASHBOARD_SRC, DASHBOARD_DEST, { recursive: true })
   console.log('copied: dashboard-dist/')
 } else {
-  console.warn('warning: src/dashboard-dist not found — run "npm run build:ui" to build the dashboard SPA')
+  console.warn(
+    'warning: src/dashboard-dist not found — run "npm run build:ui" to build the dashboard SPA'
+  )
 }

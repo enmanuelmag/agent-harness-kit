@@ -106,8 +106,12 @@ export class MySQLDriver implements DBDriver {
       }
       // Migration: add updated_at column (safe to run multiple times)
       try {
-        await conn.execute(`ALTER TABLE tasks ADD COLUMN updated_at VARCHAR(30) NOT NULL DEFAULT CURRENT_TIMESTAMP`)
-        await conn.execute(`UPDATE tasks SET updated_at = COALESCE(completed_at, started_at, created_at) WHERE updated_at IS NULL OR updated_at = ''`)
+        await conn.execute(
+          `ALTER TABLE tasks ADD COLUMN updated_at VARCHAR(30) NOT NULL DEFAULT CURRENT_TIMESTAMP`
+        )
+        await conn.execute(
+          `UPDATE tasks SET updated_at = COALESCE(completed_at, started_at, created_at) WHERE updated_at IS NULL OR updated_at = ''`
+        )
       } catch {
         // Column already exists — ignore
       }
@@ -171,7 +175,7 @@ export class MySQLDriver implements DBDriver {
 }
 
 class MySQLTxDriver implements DBDriver {
-  constructor(private conn: mysql.PoolConnection) { }
+  constructor(private conn: mysql.PoolConnection) {}
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
     const [rows] = await this.conn.execute(sql, params as ExecuteValues)
@@ -200,9 +204,9 @@ class MySQLTxDriver implements DBDriver {
     return fn(this)
   }
 
-  async ensureSchema(): Promise<void> { }
+  async ensureSchema(): Promise<void> {}
   async reconnect(): Promise<void> {
     /* no-op — connection pool handles freshness */
   }
-  async close(): Promise<void> { }
+  async close(): Promise<void> {}
 }

@@ -125,7 +125,9 @@ function TaskDetailPage() {
             <h3 className="font-mono text-sm text-[var(--color-text-primary)] mb-4">Edit Task</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-[var(--color-text-muted)] font-mono block mb-1">Title</label>
+                <label className="text-xs text-[var(--color-text-muted)] font-mono block mb-1">
+                  Title
+                </label>
                 <input
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
@@ -133,7 +135,9 @@ function TaskDetailPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-[var(--color-text-muted)] font-mono block mb-1">Description</label>
+                <label className="text-xs text-[var(--color-text-muted)] font-mono block mb-1">
+                  Description
+                </label>
                 <textarea
                   value={editDescription ?? ''}
                   onChange={(e) => setEditDescription(e.target.value)}
@@ -142,7 +146,9 @@ function TaskDetailPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-[var(--color-text-muted)] font-mono">Acceptance Criteria</span>
+                  <span className="text-xs text-[var(--color-text-muted)] font-mono">
+                    Acceptance Criteria
+                  </span>
                   <button
                     onClick={addAcField}
                     className="text-xs font-mono text-green-500 hover:text-green-400"
@@ -244,7 +250,9 @@ function TaskDetailPage() {
                     >
                       {a.met ? '✓' : '○'}
                     </span>
-                    <span className={`text-xs ${a.met ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}`}>
+                    <span
+                      className={`text-xs ${a.met ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}`}
+                    >
                       {a.criterion}
                     </span>
                   </div>
@@ -257,7 +265,9 @@ function TaskDetailPage() {
           {task.description && (
             <div className="col-span-2">
               <SectionTitle>Description</SectionTitle>
-              <p className="text-sm text-[var(--color-text-secondary)] mt-2 leading-relaxed">{task.description}</p>
+              <p className="text-sm text-[var(--color-text-secondary)] mt-2 leading-relaxed">
+                {task.description}
+              </p>
             </div>
           )}
         </div>
@@ -304,7 +314,9 @@ function TaskDetailPage() {
                       <td className="px-3 py-2">
                         <AgentBadge agent={action.agent} size="xs" />
                       </td>
-                      <td className="px-3 py-2 text-xs text-[var(--color-text-faint)]">{f.notes ?? '—'}</td>
+                      <td className="px-3 py-2 text-xs text-[var(--color-text-faint)]">
+                        {f.notes ?? '—'}
+                      </td>
                     </tr>
                   ))
                 )}

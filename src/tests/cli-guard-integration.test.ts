@@ -12,7 +12,12 @@ const CLI_PATH = join(import.meta.dirname, '../../dist/cli.js')
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-cli-guard-integration')
 
 function runCli(args: string[], cwd: string, timeout?: number) {
-  return spawnSync('node', [CLI_PATH, ...args], { cwd, encoding: 'utf8', timeout, killSignal: 'SIGKILL' })
+  return spawnSync('node', [CLI_PATH, ...args], {
+    cwd,
+    encoding: 'utf8',
+    timeout,
+    killSignal: 'SIGKILL',
+  })
 }
 
 // Minimal valid config so `status`/`doctor` succeed on their own merits —
@@ -61,7 +66,11 @@ describe('CLI local-install guard (integration)', { skip: !existsSync(CLI_PATH) 
     writeMinimalConfig(dir)
     for (const args of [['status'], ['doctor'], ['--help']]) {
       const result = runCli(args, dir)
-      assert.equal(result.status, 0, `expected exit 0 for ${JSON.stringify(args)}, got ${result.status}`)
+      assert.equal(
+        result.status,
+        0,
+        `expected exit 0 for ${JSON.stringify(args)}, got ${result.status}`
+      )
     }
     rmSync(TMP_BASE, { recursive: true, force: true })
   })
@@ -119,7 +128,11 @@ describe('CLI --port validation (integration)', { skip: !existsSync(CLI_PATH) },
       // unrelated reason (e.g. a privileged port cannot bind); the timeout kills
       // any started server. Either way there must be NO parse/validation error.
       const result = runCli(['dashboard', '-p', good, '--no-open'], dir, 4000)
-      assert.doesNotMatch(result.stderr ?? '', INVALID_ARG, `-p ${good} should not be a parse error`)
+      assert.doesNotMatch(
+        result.stderr ?? '',
+        INVALID_ARG,
+        `-p ${good} should not be a parse error`
+      )
       assert.doesNotMatch(result.stderr ?? '', RANGE_HINT, `-p ${good} should not be a range error`)
     }
     rmSync(TMP_BASE, { recursive: true, force: true })

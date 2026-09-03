@@ -61,7 +61,9 @@ export function isLocalInstallSatisfied(cwd: string): boolean {
  */
 export function hasRealLocalInstall(cwd: string): boolean {
   const [scope, name] = pkg.name.split('/')
-  const localPath = pkg.name.startsWith('@') ? join(cwd, 'node_modules', scope, name) : join(cwd, 'node_modules', pkg.name)
+  const localPath = pkg.name.startsWith('@')
+    ? join(cwd, 'node_modules', scope, name)
+    : join(cwd, 'node_modules', pkg.name)
 
   if (existsSync(localPath)) return true
 
@@ -105,5 +107,9 @@ export function printLocalInstallWarning(): void {
   console.error(pc.dim('  version keeps behavior consistent across your team and CI, instead of'))
   console.error(pc.dim('  drifting with whatever version is installed globally on each machine.'))
   console.error(pc.dim(`  Run: npm install --save-dev ${pkg.name}`))
-  console.error(pc.dim('  (or the equivalent for your package manager: pnpm add -D, yarn add --dev, bun add -d)'))
+  console.error(
+    pc.dim(
+      '  (or the equivalent for your package manager: pnpm add -D, yarn add --dev, bun add -d)'
+    )
+  )
 }

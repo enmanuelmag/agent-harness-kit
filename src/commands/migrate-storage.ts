@@ -44,12 +44,19 @@ function fail(msg: string): never {
  *  in scope='global' there's no field to read a custom path from, so this
  *  always falls back to `DEFAULT_MARKDOWN_PATH` in that case. */
 function defaultMarkdownPathForConfig(config: HarnessConfig): string {
-  return config.storage.scope === 'local' ? config.storage.markdownFallback.path : DEFAULT_MARKDOWN_PATH
+  return config.storage.scope === 'local'
+    ? config.storage.markdownFallback.path
+    : DEFAULT_MARKDOWN_PATH
 }
 
 /** Physical location of a project's harness `current.md`, following the same
  *  scope convention `HarnessDB.regenerateCurrentMd()` uses. */
-function currentMdPathForScope(scope: 'local' | 'global', config: HarnessConfig, cwd: string, homeDir: string): string {
+function currentMdPathForScope(
+  scope: 'local' | 'global',
+  config: HarnessConfig,
+  cwd: string,
+  homeDir: string
+): string {
   return scope === 'global'
     ? join(resolveGlobalStorageDir(config, homeDir), 'current.md')
     : resolve(cwd, defaultMarkdownPathForConfig(config))
@@ -79,16 +86,23 @@ function defaultSqlitePathForConfig(config: HarnessConfig): string {
  *  exportJson()) to a local JSON file BEFORE any destructive `--force`
  *  overwrite. Aborts the whole command (throws) if the backup can't be
  *  written — fail-safe, per task #47 consultant advisory point 2. */
-async function backupDestination(cwd: string, storageDir: string, data: FullExport): Promise<string> {
+async function backupDestination(
+  cwd: string,
+  storageDir: string,
+  data: FullExport
+): Promise<string> {
   const backupsDir = resolve(cwd, storageDir, 'backups')
-  const path = join(backupsDir, `pre-migrate-${new Date().toISOString().replace(/[:.]/g, '-')}.json`)
+  const path = join(
+    backupsDir,
+    `pre-migrate-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  )
   try {
     mkdirSync(backupsDir, { recursive: true })
     writeFileSync(path, JSON.stringify(data, null, 2) + '\n', 'utf8')
   } catch (err) {
     throw new Error(
       `Could not write destination backup to ${path} (${err instanceof Error ? err.message : String(err)}). ` +
-        `Aborting migration WITHOUT touching the destination — nothing was overwritten.`,
+        `Aborting migration WITHOUT touching the destination — nothing was overwritten.`
     )
   }
   return path
@@ -113,7 +127,7 @@ function copySqliteFile(srcPath: string, destPath: string): void {
 export async function runMigrateStorage(
   cwd: string,
   opts: MigrateStorageOptions,
-  homeDir: string = homedir(),
+  homeDir: string = homedir()
 ): Promise<void> {
   const config = await loadConfig(cwd)
   const storageDir = config.storage.dir
@@ -139,7 +153,7 @@ export async function runMigrateStorage(
         `storage-state.json is missing and BOTH candidate locations have data — ` +
           `local (${localPath}): ${localCount} task(s); global (${globalPath}): ${globalCount} task(s). ` +
           `Refusing to guess which one is authoritative. Resolve manually (inspect both databases) ` +
-          `or delete the one that should be discarded, then re-run this command.`,
+          `or delete the one that should be discarded, then re-run this command.`
       )
     }
 
@@ -152,7 +166,11 @@ export async function runMigrateStorage(
       } finally {
         await db.close()
       }
-      log(pc.dim('storage-state.json was missing; no data found at either candidate location. Nothing to migrate — state recorded.'))
+      log(
+        pc.dim(
+          'storage-state.json was missing; no data found at either candidate location. Nothing to migrate — state recorded.'
+        )
+      )
       return
     }
 
@@ -164,8 +182,8 @@ export async function runMigrateStorage(
     log(
       pc.yellow(
         `storage-state.json was missing. Detected real data at ${realScope} sqlite location ` +
-          `(${realScope === 'local' ? localPath : globalPath}) — using it as the migration source.`,
-      ),
+          `(${realScope === 'local' ? localPath : globalPath}) — using it as the migration source.`
+      )
     )
   } else {
     realScope = state.scope
@@ -177,7 +195,11 @@ export async function runMigrateStorage(
 
   // ── Case 1: everything matches — nothing to migrate ──────────────────────
   if (realScope === desiredScope && realDbType === desiredDbType) {
-    log(pc.green(`✓ Storage already matches config (scope=${desiredScope}, database=${desiredDbType}) — nothing to migrate.`))
+    log(
+      pc.green(
+        `✓ Storage already matches config (scope=${desiredScope}, database=${desiredDbType}) — nothing to migrate.`
+      )
+    )
     return
   }
 
@@ -189,7 +211,7 @@ export async function runMigrateStorage(
     fail(
       `Cannot auto-locate the previous ${realDbType} database — storage-state.json does not retain connection ` +
         `credentials for security. Manually run "ahk export --json" while still connected to the old database ` +
-        `(with the old config), then adjust agent-harness-kit.config.ts and re-import. This direction is out of scope for "ahk migrate storage".`,
+        `(with the old config), then adjust agent-harness-kit.config.ts and re-import. This direction is out of scope for "ahk migrate storage".`
     )
   }
 
@@ -227,7 +249,7 @@ async function migrateScopeOnly(
   homeDir: string,
   fromScope: 'local' | 'global',
   toScope: 'local' | 'global',
-  opts: MigrateStorageOptions,
+  opts: MigrateStorageOptions
 ): Promise<void> {
   const sqlitePath = defaultSqlitePathForConfig(config)
   const srcDb = resolveSqlitePathForScope(fromScope, sqlitePath, cwd, config, homeDir)
@@ -253,7 +275,7 @@ async function migrateScopeOnly(
     if (!destEmpty && !opts.force) {
       fail(
         `Destination (${toScope}, ${destDb}) already has data. Re-run with --force to overwrite it ` +
-          `(a backup of the destination will be written first).`,
+          `(a backup of the destination will be written first).`
       )
     }
     if (!destEmpty && opts.force) {
@@ -281,7 +303,11 @@ async function migrateScopeOnly(
   }
 
   if (opts.dryRun) {
-    log(pc.dim(`[dry-run] Would copy ${srcDb} → ${destDb} (scope ${fromScope} → ${toScope}), and move current.md.`))
+    log(
+      pc.dim(
+        `[dry-run] Would copy ${srcDb} → ${destDb} (scope ${fromScope} → ${toScope}), and move current.md.`
+      )
+    )
     return
   }
 
@@ -318,12 +344,14 @@ async function migrateAcrossDbType(
   config: HarnessConfig,
   homeDir: string,
   sourceScope: 'local' | 'global',
-  opts: MigrateStorageOptions,
+  opts: MigrateStorageOptions
 ): Promise<void> {
   const sqlitePath = defaultSqlitePathForConfig(config)
   const srcPath = resolveSqlitePathForScope(sourceScope, sqlitePath, cwd, config, homeDir)
   if (!existsSync(srcPath)) {
-    fail(`Source sqlite database not found at ${srcPath} (expected ${sourceScope} scope) — nothing to migrate.`)
+    fail(
+      `Source sqlite database not found at ${srcPath} (expected ${sourceScope} scope) — nothing to migrate.`
+    )
   }
 
   const { SQLiteDriver } = await import('@/core/drivers/sqlite')
@@ -349,7 +377,9 @@ async function migrateAcrossDbType(
   try {
     destDb = await openDB(config, cwd, homeDir)
   } catch (err) {
-    fail(`Could not connect to destination (${config.database.type}): ${err instanceof Error ? err.message : String(err)}. Verify database configuration.`)
+    fail(
+      `Could not connect to destination (${config.database.type}): ${err instanceof Error ? err.message : String(err)}. Verify database configuration.`
+    )
   }
 
   try {
@@ -366,7 +396,7 @@ async function migrateAcrossDbType(
                 `have data that DIVERGE — this is not a first-time migration. Refusing to auto-merge. ` +
                 `Review both manually, or re-run with --force to overwrite the destination (a JSON backup will be written first).`
             : `Destination (${config.database.type}) already has data (${destCounts.tasks} task(s)). ` +
-                `Re-run with --force to overwrite it (a backup of the destination will be written first).`,
+                `Re-run with --force to overwrite it (a backup of the destination will be written first).`
         )
       }
     }
@@ -375,8 +405,8 @@ async function migrateAcrossDbType(
       log(
         pc.dim(
           `[dry-run] Would migrate ${sourceCounts.tasks} task(s) from sqlite (${sourceScope}, ${srcPath}) ` +
-            `to ${config.database.type}${destEmpty ? '' : ' (destination has data — would back up first, then overwrite)'}.`,
-        ),
+            `to ${config.database.type}${destEmpty ? '' : ' (destination has data — would back up first, then overwrite)'}.`
+        )
       )
       return
     }
@@ -397,11 +427,15 @@ async function migrateAcrossDbType(
     log(
       pc.green(
         `✓ Migrated ${sourceData.tasks.length} task(s), ${sourceData.actions.length} action(s) ` +
-          `from sqlite (${sourceScope}) → ${config.database.type}.`,
-      ),
+          `from sqlite (${sourceScope}) → ${config.database.type}.`
+      )
     )
     if (backupPath) log(pc.dim(`  Destination backup: ${backupPath}`))
-    log(pc.yellow(`  Note: the original sqlite file at ${srcPath} was NOT deleted — remove it manually once you've verified the migration.`))
+    log(
+      pc.yellow(
+        `  Note: the original sqlite file at ${srcPath} was NOT deleted — remove it manually once you've verified the migration.`
+      )
+    )
   } finally {
     await destDb.close()
   }

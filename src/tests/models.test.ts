@@ -60,7 +60,7 @@ function writeRealConfig(dir: string, provider: Provider): void {
       provider,
       project: { name: 'demo-app', description: 'demo' },
     })}\n`,
-    'utf8',
+    'utf8'
   )
 }
 
@@ -73,9 +73,21 @@ describe('claudeAgentFiles — direct export used by ahk models', () => {
 
     assert.match(byPath['.claude/agents/explorer.md'], /^model: opus$/m)
     assert.match(byPath['.claude/agents/reviewer.md'], /^model: haiku$/m)
-    assert.doesNotMatch(byPath['.claude/agents/lead.md'], /^model:/m, 'lead was left unset — no model line')
-    assert.doesNotMatch(byPath['.claude/agents/builder.md'], /^model:/m, 'builder was left unset — no model line')
-    assert.doesNotMatch(byPath['.claude/agents/consultant.md'], /^model:/m, 'consultant was left unset — no model line')
+    assert.doesNotMatch(
+      byPath['.claude/agents/lead.md'],
+      /^model:/m,
+      'lead was left unset — no model line'
+    )
+    assert.doesNotMatch(
+      byPath['.claude/agents/builder.md'],
+      /^model:/m,
+      'builder was left unset — no model line'
+    )
+    assert.doesNotMatch(
+      byPath['.claude/agents/consultant.md'],
+      /^model:/m,
+      'consultant was left unset — no model line'
+    )
   })
 
   test('no models arg → no model line for any role (same as before extraction)', () => {
@@ -104,7 +116,7 @@ describe('build() — claudeAgentModels option (backs `ahk build --force`)', () 
     assert.doesNotMatch(
       readFileSync(join(cwd, '.claude/agents/lead.md'), 'utf8'),
       /^model:/m,
-      'lead was left unset — no model line',
+      'lead was left unset — no model line'
     )
   })
 

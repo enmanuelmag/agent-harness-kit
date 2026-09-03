@@ -11,7 +11,13 @@ import {
   mergeClaudeSettingsLocalJson,
 } from './mcp-merge'
 import { buildCapabilityHints } from './provider-research-capabilities'
-import { appendGitignore, reconcileGeneratedFiles, stampGenerated, writeAgentFiles, writeSkills } from './scaffold-utils'
+import {
+  appendGitignore,
+  reconcileGeneratedFiles,
+  stampGenerated,
+  writeAgentFiles,
+  writeSkills,
+} from './scaffold-utils'
 import {
   agentBuilder,
   agentConsultant,
@@ -51,11 +57,50 @@ export function claudeAgentFiles(
 ): AgentFileEntry[] {
   const projectName = config.project.name
   return [
-    { relPath: '.claude/agents/lead.md', content: translateFrontmatterForClaudeCode(agentLead({ projectName }, capabilityHints, renderDelegationGuidance('claude-code', 'lead')), 'lead', { model: modelsByRole?.lead }) },
-    { relPath: '.claude/agents/explorer.md', content: translateFrontmatterForClaudeCode(agentExplorer({ projectName }, capabilityHints), 'explorer', { model: modelsByRole?.explorer }) },
-    { relPath: '.claude/agents/consultant.md', content: translateFrontmatterForClaudeCode(agentConsultant({ projectName }, capabilityHints), 'consultant', { model: modelsByRole?.consultant }) },
-    { relPath: '.claude/agents/builder.md', content: translateFrontmatterForClaudeCode(agentBuilder({ projectName }, capabilityHints), 'builder', { model: modelsByRole?.builder }) },
-    { relPath: '.claude/agents/reviewer.md', content: translateFrontmatterForClaudeCode(agentReviewer({ projectName }, capabilityHints), 'reviewer', { model: modelsByRole?.reviewer }) },
+    {
+      relPath: '.claude/agents/lead.md',
+      content: translateFrontmatterForClaudeCode(
+        agentLead(
+          { projectName },
+          capabilityHints,
+          renderDelegationGuidance('claude-code', 'lead')
+        ),
+        'lead',
+        { model: modelsByRole?.lead }
+      ),
+    },
+    {
+      relPath: '.claude/agents/explorer.md',
+      content: translateFrontmatterForClaudeCode(
+        agentExplorer({ projectName }, capabilityHints),
+        'explorer',
+        { model: modelsByRole?.explorer }
+      ),
+    },
+    {
+      relPath: '.claude/agents/consultant.md',
+      content: translateFrontmatterForClaudeCode(
+        agentConsultant({ projectName }, capabilityHints),
+        'consultant',
+        { model: modelsByRole?.consultant }
+      ),
+    },
+    {
+      relPath: '.claude/agents/builder.md',
+      content: translateFrontmatterForClaudeCode(
+        agentBuilder({ projectName }, capabilityHints),
+        'builder',
+        { model: modelsByRole?.builder }
+      ),
+    },
+    {
+      relPath: '.claude/agents/reviewer.md',
+      content: translateFrontmatterForClaudeCode(
+        agentReviewer({ projectName }, capabilityHints),
+        'reviewer',
+        { model: modelsByRole?.reviewer }
+      ),
+    },
   ]
 }
 
@@ -87,7 +132,10 @@ export class ClaudeCodeMaterializer implements Materializer {
     // under ~/.harness/dbs/<projectId>/ (see resolveGlobalStorageDir in
     // db.ts), not in the project tree, and `markdownFallback.path` doesn't
     // exist on GlobalStorageConfig at all. Skip for that scope.
-    if (config.storage.scope === 'local' && !existsSync(join(cwd, config.storage.markdownFallback.path))) {
+    if (
+      config.storage.scope === 'local' &&
+      !existsSync(join(cwd, config.storage.markdownFallback.path))
+    ) {
       write(
         cwd,
         config.storage.markdownFallback.path,
@@ -100,7 +148,12 @@ export class ClaudeCodeMaterializer implements Materializer {
 
     // .mcp.json — MERGE, never overwrite whole file. Detect the project's
     // package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
+    mergeClaudeMcpJson(
+      join(cwd, '.mcp.json'),
+      config.tools.mcp.port,
+      cwd,
+      detectPackageManager(cwd)
+    )
     // .claude/settings.json — set `agent: "lead"` (the official Claude Code default-agent field)
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     // .claude/settings.local.json — merge MCP tool permissions
@@ -108,10 +161,18 @@ export class ClaudeCodeMaterializer implements Materializer {
 
     // .gitignore additions
     appendGitignore(cwd)
-    writeSkills(cwd, '.claude/skills', renderDelegationGuidance('claude-code', 'coordination-skill'))
+    writeSkills(
+      cwd,
+      '.claude/skills',
+      renderDelegationGuidance('claude-code', 'coordination-skill')
+    )
   }
 
-  async build(config: HarnessConfig, cwd: string, opts: BuildMaterializerOptions = {}): Promise<BuildReport> {
+  async build(
+    config: HarnessConfig,
+    cwd: string,
+    opts: BuildMaterializerOptions = {}
+  ): Promise<BuildReport> {
     const capabilityHints = buildCapabilityHints('claude-code')
 
     // AGENTS.md and CLAUDE.md are DERIVED FROM CONFIG. Reconcile against the
@@ -124,7 +185,7 @@ export class ClaudeCodeMaterializer implements Materializer {
         { relPath: 'AGENTS.md', content: agentsMd(config, capabilityHints) },
         { relPath: 'CLAUDE.md', content: claudeMd(config, capabilityHints) },
       ],
-      { force: opts.force, backupRoot: join(cwd, config.storage.dir, 'backups') },
+      { force: opts.force, backupRoot: join(cwd, config.storage.dir, 'backups') }
     )
 
     // Agent files are USER-OWNED. Without --force they are created when
@@ -133,19 +194,32 @@ export class ClaudeCodeMaterializer implements Materializer {
     // when the caller (currently `ahk build --force`, see build.ts) collects
     // fresh per-role models via `promptClaudeAgentModels` — a plain build
     // never sets it, so this is `undefined` (no model line) exactly as before.
-    const agents = writeAgentFiles(cwd, claudeAgentFiles(config, opts.claudeAgentModels, capabilityHints), {
-      force: opts.force,
-      backupRoot: join(cwd, config.storage.dir, 'backups'),
-    })
+    const agents = writeAgentFiles(
+      cwd,
+      claudeAgentFiles(config, opts.claudeAgentModels, capabilityHints),
+      {
+        force: opts.force,
+        backupRoot: join(cwd, config.storage.dir, 'backups'),
+      }
+    )
 
     // MCP config: always merge. Re-detecting the package manager on every
     // build means a stale/hardcoded command self-corrects the next time the
     // user runs `ahk build`, even if they switched package managers after
     // the initial `ahk init` — no separate migration flag needed.
-    mergeClaudeMcpJson(join(cwd, '.mcp.json'), config.tools.mcp.port, cwd, detectPackageManager(cwd))
+    mergeClaudeMcpJson(
+      join(cwd, '.mcp.json'),
+      config.tools.mcp.port,
+      cwd,
+      detectPackageManager(cwd)
+    )
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
-    writeSkills(cwd, '.claude/skills', renderDelegationGuidance('claude-code', 'coordination-skill'))
+    writeSkills(
+      cwd,
+      '.claude/skills',
+      renderDelegationGuidance('claude-code', 'coordination-skill')
+    )
 
     return { agents, derived }
   }

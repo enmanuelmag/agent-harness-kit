@@ -70,8 +70,7 @@ function printSkillsSection(skills: SkillStatus[]): void {
   }
 
   for (const skill of issues) {
-    const detail =
-      skill.status === 'missing' ? `${skill.name} missing` : `${skill.name} outdated`
+    const detail = skill.status === 'missing' ? `${skill.name} missing` : `${skill.name} outdated`
     warn('harness skills', detail, 'run: ahk build')
   }
 }

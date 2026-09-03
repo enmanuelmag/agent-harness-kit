@@ -20,20 +20,20 @@ export { AgentStatRow, RecentFileRow, RecentToolRow, TimelineRow, TopFileRow }
 const AGENT_ORDER = ['lead', 'explorer', 'builder', 'reviewer']
 
 export class StatsRepository {
-  constructor(private driver: DBDriver) { }
+  constructor(private driver: DBDriver) {}
 
   async getCounts(): Promise<DBCounts> {
     const [{ total: totalActions }] = await this.driver.query<CountRow>(
-      `SELECT COUNT(*) as total FROM actions`,
+      `SELECT COUNT(*) as total FROM actions`
     )
     const [{ total: totalFiles }] = await this.driver.query<CountRow>(
-      `SELECT COUNT(*) as total FROM action_files`,
+      `SELECT COUNT(*) as total FROM action_files`
     )
     const [{ total: uniqueTools }] = await this.driver.query<CountRow>(
-      `SELECT COUNT(DISTINCT tool_name) as total FROM action_tools`,
+      `SELECT COUNT(DISTINCT tool_name) as total FROM action_tools`
     )
     const [{ total: activeAgents }] = await this.driver.query<CountRow>(
-      `SELECT COUNT(DISTINCT agent) as total FROM actions WHERE status = 'in_progress'`,
+      `SELECT COUNT(DISTINCT agent) as total FROM actions WHERE status = 'in_progress'`
     )
     return { totalActions, totalFiles, uniqueTools, activeAgents }
   }
@@ -46,7 +46,7 @@ export class StatsRepository {
        JOIN tasks t ON a.task_id = t.id
        ORDER BY at.called_at DESC
        LIMIT ?`,
-      [limit],
+      [limit]
     )
   }
 
@@ -63,7 +63,7 @@ export class StatsRepository {
        GROUP BY file_path
        ORDER BY total DESC
        LIMIT ?`,
-      [limit],
+      [limit]
     )
   }
 
@@ -76,7 +76,7 @@ export class StatsRepository {
        JOIN tasks t ON a.task_id = t.id
        ORDER BY a.created_at DESC
        LIMIT ?`,
-      [limit],
+      [limit]
     )
   }
 
@@ -92,7 +92,7 @@ export class StatsRepository {
        FROM actions a
        LEFT JOIN action_files af ON af.action_id = a.id
        GROUP BY a.agent
-       ORDER BY actions_total DESC`,
+       ORDER BY actions_total DESC`
     )
     return rows.sort((a, b) => {
       const ai = AGENT_ORDER.indexOf(a.agent)
@@ -111,7 +111,7 @@ export class StatsRepository {
        JOIN tasks t ON a.task_id = t.id
        ORDER BY a.created_at DESC
        LIMIT ?`,
-      [limit],
+      [limit]
     )
   }
 }

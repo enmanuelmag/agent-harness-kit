@@ -39,7 +39,7 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
       }
     })
     // Keep process alive
-    await new Promise(() => { })
+    await new Promise(() => {})
   }
 }
 
@@ -79,7 +79,11 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
 
   try {
     const materializer = getMaterializer(config.provider)
-    const report = await materializer.build(config, cwd, { force, claudeAgentModels, codexAgentModels })
+    const report = await materializer.build(config, cwd, {
+      force,
+      claudeAgentModels,
+      codexAgentModels,
+    })
     spinner.stop(pc.green('Build complete'))
 
     // ── Config-derived files (AGENTS.md, and CLAUDE.md for claude-code) ──
@@ -93,14 +97,16 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
       p.log.success(upToDate.join(', '))
     }
     if (d.propagated.length > 0) {
-      p.log.info(`Propagated config changes to ${d.propagated.length} generated file(s):\n  ${d.propagated.join('\n  ')}`)
+      p.log.info(
+        `Propagated config changes to ${d.propagated.length} generated file(s):\n  ${d.propagated.join('\n  ')}`
+      )
     }
     if (d.overwritten.length > 0) {
       p.log.warn(
         pc.yellow(
           `--force REGENERATED ${d.overwritten.length} hand-edited generated file(s), discarding your edits:\n  ` +
-            d.overwritten.join('\n  '),
-        ),
+            d.overwritten.join('\n  ')
+        )
       )
       if (d.backupDir) {
         p.log.info(pc.yellow(`  Previous content backed up → ${d.backupDir}`))
@@ -114,8 +120,8 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
           `Left ${d.preserved.length} hand-edited generated file(s) UNTOUCHED — your edits are safe:\n  ` +
             d.preserved.join('\n  ') +
             `\n  These no longer match the current config. Re-run with --force to regenerate them\n  ` +
-            `(this DESTROYS your edits; a backup is written first).`,
-        ),
+            `(this DESTROYS your edits; a backup is written first).`
+        )
       )
     }
 
@@ -134,8 +140,8 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
       p.log.warn(
         pc.yellow(
           `--force REGENERATED ${overwritten.length} existing agent file(s), discarding any customizations:\n  ` +
-            overwritten.join('\n  '),
-        ),
+            overwritten.join('\n  ')
+        )
       )
       if (backupDir) {
         p.log.info(pc.yellow(`  Previous content backed up → ${backupDir}`))
@@ -148,7 +154,7 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
       p.log.info(
         `Left ${preserved.length} existing agent file(s) untouched — agent files are yours to edit.\n  ` +
           `Re-run with --force to regenerate them from the packaged templates (this DESTROYS your edits;\n  ` +
-          `a backup is written first).`,
+          `a backup is written first).`
       )
     }
   } catch (err) {

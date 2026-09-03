@@ -158,7 +158,8 @@ export interface TaskAcceptanceRow {
   met: number
 }
 
-export type AgentName = 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer' | `custom:${string}`
+export type AgentName =
+  'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer' | `custom:${string}`
 
 export type ActionStatus = 'in_progress' | 'completed' | 'blocked'
 
@@ -261,7 +262,9 @@ export interface ScaffoldOptions {
    *  but declared on the shared `ScaffoldOptions` type since `Materializer`
    *  exposes one `scaffold(config, opts)` signature across all providers;
    *  OpenCode's and Codex CLI's materializers simply never read this field. */
-  claudeAgentModels?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>>
+  claudeAgentModels?: Partial<
+    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>
+  >
   /** Codex CLI only: per-role model + reasoning-effort choice collected by
    *  `ahk init`'s provider-conditional prompt (`promptCodexAgentModels`).
    *  Consumed exclusively by `CodexCliMaterializer.scaffold()` to inject
@@ -272,5 +275,7 @@ export interface ScaffoldOptions {
    *  `claudeAgentModels` above; Claude Code's and OpenCode's materializers
    *  simply never read this field, exactly as claude-code.ts's materializer
    *  never reads `claudeAgentModels`'s Codex counterpart. */
-  codexAgentModels?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', CodexAgentModelChoice>>
+  codexAgentModels?: Partial<
+    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', CodexAgentModelChoice>
+  >
 }

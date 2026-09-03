@@ -8,7 +8,14 @@ import { getDoctorStatus } from '@/core/doctor'
 import { grokToolsAllowlist } from '@/core/materializer/agent-restrictions'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { getMaterializer } from '@/core/materializer/index'
-import { ensureTomlTopLevelKey, mergeClaudeMcpJson, mergeClaudeSettingsLocalJson, mergeCodexConfigToml, mergeGrokConfigToml, mergeOpencodeJson } from '@/core/materializer/mcp-merge'
+import {
+  ensureTomlTopLevelKey,
+  mergeClaudeMcpJson,
+  mergeClaudeSettingsLocalJson,
+  mergeCodexConfigToml,
+  mergeGrokConfigToml,
+  mergeOpencodeJson,
+} from '@/core/materializer/mcp-merge'
 import { writeSkills } from '@/core/materializer/scaffold-utils'
 import {
   __configObjectForTests,
@@ -40,8 +47,12 @@ import type { CodexAgentModelChoice, Provider } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-templates')
 
-function setup() { mkdirSync(TMP, { recursive: true }) }
-function teardown() { rmSync(TMP, { recursive: true, force: true }) }
+function setup() {
+  mkdirSync(TMP, { recursive: true })
+}
+function teardown() {
+  rmSync(TMP, { recursive: true, force: true })
+}
 
 // The merger suites below assert the package-manager-mediated command shape,
 // which only applies when the package is installed locally in the project
@@ -135,7 +146,7 @@ describe('mergeOpencodeJson', () => {
   test('preserves existing mcp entries', () => {
     setupLocalInstall()
     const path = join(TMP, 'opencode2.json')
-    const initial = { mcp: { 'other': { type: 'local', command: ['bar'] } } }
+    const initial = { mcp: { other: { type: 'local', command: ['bar'] } } }
     writeFileSync(path, JSON.stringify(initial))
     mergeOpencodeJson(path, 3456, TMP)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
@@ -239,7 +250,7 @@ describe('mergeCodexConfigToml', () => {
     teardown()
   })
 
-  test("a user-edited model default is preserved across re-runs — merge never overwrites it", () => {
+  test('a user-edited model default is preserved across re-runs — merge never overwrites it', () => {
     setupLocalInstall()
     const path = join(TMP, 'config-model-preserved.toml')
     mergeCodexConfigToml(path, 3456, TMP)
@@ -353,7 +364,10 @@ describe('mergeGrokConfigToml', () => {
   test('preserves other existing TOML sections when merging', () => {
     setupLocalInstall()
     const path = join(TMP, 'config-preserve.toml')
-    writeFileSync(path, '[mcp_servers.other_tool]\ncommand = "foo"\n\n[some_top_level]\nfoo = "bar"\n')
+    writeFileSync(
+      path,
+      '[mcp_servers.other_tool]\ncommand = "foo"\n\n[some_top_level]\nfoo = "bar"\n'
+    )
     mergeGrokConfigToml(path, 3456, TMP)
     const content = readFileSync(path, 'utf8')
     assert.match(content, /\[mcp_servers\.other_tool\]/)
@@ -523,7 +537,10 @@ describe('translateFrontmatterForOpenCode — permission translation', () => {
   })
 
   test('never emits Claude Code style mcp__ patterns (OpenCode uses <server>_<tool>)', () => {
-    const result = translateFrontmatterForOpenCode(`---\nname: reviewer\n---\n\n# Body\n`, 'reviewer')
+    const result = translateFrontmatterForOpenCode(
+      `---\nname: reviewer\n---\n\n# Body\n`,
+      'reviewer'
+    )
     assert.doesNotMatch(result, /mcp__/)
   })
 
@@ -549,7 +566,11 @@ describe('translateFrontmatterForGrok — tools allowlist translation', () => {
     const allowlist = grokToolsAllowlist('explorer')
     assert.match(result, /^tools:\n(?:  - [^\n]+\n)+/m)
     for (const tool of allowlist) {
-      assert.match(result, new RegExp(`^  - ${tool}$`, 'm'), `${tool} missing from emitted allowlist`)
+      assert.match(
+        result,
+        new RegExp(`^  - ${tool}$`, 'm'),
+        `${tool} missing from emitted allowlist`
+      )
     }
   })
 
@@ -647,7 +668,10 @@ describe('configTs', () => {
 
   test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
     const out = configTs({ ...base, scope: 'local' })
-    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/)
+    assert.match(
+      out,
+      /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/
+    )
     assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
   })
 
@@ -757,7 +781,10 @@ describe('configCjs', () => {
 
   test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
     const out = configCjs({ ...base, scope: 'local' })
-    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/)
+    assert.match(
+      out,
+      /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/
+    )
   })
 
   test('description with apostrophe produces valid JS', () => {
@@ -899,7 +926,7 @@ describe('configJson', () => {
       assert.deepEqual(
         JSON.parse(configJson(params)),
         evalTsConfig(configTs(params)),
-        `JSON and TS config shapes diverged for scope=${scope}`,
+        `JSON and TS config shapes diverged for scope=${scope}`
       )
     }
   })
@@ -920,7 +947,7 @@ describe('configJson — loaded by loadConfig()', () => {
     try {
       const out = configJson({
         name: 'my-app',
-        description: "it's a \"quoted\" app",
+        description: 'it\'s a "quoted" app',
         provider: 'claude-code',
         docsPath: './docs',
         tasksAdapter: 'local',
@@ -963,7 +990,7 @@ describe('configJson — loaded by loadConfig()', () => {
             markdownFallback: { enabled: true, path: '.harness/current.md' },
           },
         }),
-        'utf8',
+        'utf8'
       )
       const { loadConfig } = await import('@/core/config')
       const config = await loadConfig(dir)
@@ -974,7 +1001,9 @@ describe('configJson — loaded by loadConfig()', () => {
       // asserted as absent at runtime on the untyped shape.
       assert.ok(!('path' in (config.database as unknown as Record<string, unknown>)))
       assert.ok(!('sqlitePath' in (config.storage as unknown as Record<string, unknown>)))
-      assert.ok(!('path' in (config.storage.markdownFallback as unknown as Record<string, unknown>)))
+      assert.ok(
+        !('path' in (config.storage.markdownFallback as unknown as Record<string, unknown>))
+      )
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -986,7 +1015,10 @@ describe('configJson — loaded by loadConfig()', () => {
     try {
       writeFileSync(join(dir, 'agent-harness-kit.config.json'), '{ "project": ', 'utf8')
       const { loadConfig } = await import('@/core/config')
-      await assert.rejects(() => loadConfig(dir), /agent-harness-kit\.config\.json is not valid JSON/)
+      await assert.rejects(
+        () => loadConfig(dir),
+        /agent-harness-kit\.config\.json is not valid JSON/
+      )
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -1011,7 +1043,7 @@ describe('configJson — loaded by loadConfig()', () => {
           scope: 'local',
           projectId: 'mjs-id',
         }),
-        'utf8',
+        'utf8'
       )
       writeFileSync(
         join(dir, 'agent-harness-kit.config.json'),
@@ -1025,7 +1057,7 @@ describe('configJson — loaded by loadConfig()', () => {
           scope: 'local',
           projectId: 'json-id',
         }),
-        'utf8',
+        'utf8'
       )
       const { findConfigFile, loadConfig } = await import('@/core/config')
       assert.match(findConfigFile(dir) ?? '', /agent-harness-kit\.config\.mjs$/)
@@ -1124,8 +1156,14 @@ describe('agent*Toml — per-role model + effort injection', () => {
   }
 
   test('no cross-role contamination — choosing sol/high for builder must not affect explorer', () => {
-    const builderResult = agentBuilderToml({ projectName: 'demo' }, { model: 'gpt-5.6-sol', effort: 'high' })
-    const explorerResult = agentExplorerToml({ projectName: 'demo' }, { model: 'gpt-5.6-sol', effort: 'high' })
+    const builderResult = agentBuilderToml(
+      { projectName: 'demo' },
+      { model: 'gpt-5.6-sol', effort: 'high' }
+    )
+    const explorerResult = agentExplorerToml(
+      { projectName: 'demo' },
+      { model: 'gpt-5.6-sol', effort: 'high' }
+    )
     assert.match(builderResult, /^model = "gpt-5\.6-sol"$/m)
     assert.match(explorerResult, /^model = "gpt-5\.6-sol"$/m)
     const reviewerNoOpts = agentReviewerToml({ projectName: 'demo' })
@@ -1135,16 +1173,19 @@ describe('agent*Toml — per-role model + effort injection', () => {
   test('sandbox_mode is unaffected by model/effort injection', () => {
     assert.match(
       agentExplorerToml({ projectName: 'demo' }, { model: 'gpt-5.6-luna', effort: 'low' }),
-      /sandbox_mode = "danger-full-access"/,
+      /sandbox_mode = "danger-full-access"/
     )
     assert.match(
       agentBuilderToml({ projectName: 'demo' }, { model: 'gpt-5.6-luna', effort: 'low' }),
-      /sandbox_mode = "danger-full-access"/,
+      /sandbox_mode = "danger-full-access"/
     )
   })
 
   test('default.toml (lead shim) also accepts opts, mirroring agentLeadToml', () => {
-    const result = agentLeadAsDefaultToml({ projectName: 'demo' }, { model: 'gpt-5.5', effort: 'minimal' })
+    const result = agentLeadAsDefaultToml(
+      { projectName: 'demo' },
+      { model: 'gpt-5.5', effort: 'minimal' }
+    )
     assert.match(result, /^model = "gpt-5\.5"$/m)
     assert.match(result, /^model_reasoning_effort = "minimal"$/m)
   })
@@ -1172,10 +1213,26 @@ describe('codexAgentFiles — direct export, per-role model+effort map', () => {
     assert.match(byPath['.codex/agents/explorer.toml'], /^model_reasoning_effort = "high"$/m)
     assert.match(byPath['.codex/agents/reviewer.toml'], /^model = "gpt-5\.4-mini"$/m)
     assert.doesNotMatch(byPath['.codex/agents/reviewer.toml'], /model_reasoning_effort/)
-    assert.doesNotMatch(byPath['.codex/agents/lead.toml'], /model\s*=/, 'lead was left unset — no model line')
-    assert.doesNotMatch(byPath['.codex/agents/builder.toml'], /model\s*=/, 'builder was left unset — no model line')
-    assert.doesNotMatch(byPath['.codex/agents/consultant.toml'], /model\s*=/, 'consultant was left unset — no model line')
-    assert.doesNotMatch(byPath['.codex/agents/default.toml'], /model\s*=/, 'default (lead shim) mirrors lead, left unset')
+    assert.doesNotMatch(
+      byPath['.codex/agents/lead.toml'],
+      /model\s*=/,
+      'lead was left unset — no model line'
+    )
+    assert.doesNotMatch(
+      byPath['.codex/agents/builder.toml'],
+      /model\s*=/,
+      'builder was left unset — no model line'
+    )
+    assert.doesNotMatch(
+      byPath['.codex/agents/consultant.toml'],
+      /model\s*=/,
+      'consultant was left unset — no model line'
+    )
+    assert.doesNotMatch(
+      byPath['.codex/agents/default.toml'],
+      /model\s*=/,
+      'default (lead shim) mirrors lead, left unset'
+    )
   })
 
   test('no modelsByRole arg → no model line for any role (same as before extraction)', () => {
@@ -1215,7 +1272,10 @@ describe('translateFrontmatterForClaudeCode — no model line by default', () =>
   })
 
   test("opts.model 'inherit' → no model: line is injected", () => {
-    assert.doesNotMatch(translateFrontmatterForClaudeCode(input, 'explorer', { model: 'inherit' }), /^model:/m)
+    assert.doesNotMatch(
+      translateFrontmatterForClaudeCode(input, 'explorer', { model: 'inherit' }),
+      /^model:/m
+    )
   })
 
   test('a user-authored model: line is preserved, not stripped or rewritten', () => {
@@ -1249,13 +1309,20 @@ describe('translateFrontmatterForClaudeCode — per-role model injection', () =>
     }
 
     test(`${role} with opts.model 'inherit' → no model: line`, () => {
-      assert.doesNotMatch(translateFrontmatterForClaudeCode(fm(role), role, { model: 'inherit' }), /^model:/m)
+      assert.doesNotMatch(
+        translateFrontmatterForClaudeCode(fm(role), role, { model: 'inherit' }),
+        /^model:/m
+      )
     })
   }
 
   test('no cross-role contamination — choosing opus for builder must not affect explorer', () => {
-    const builderResult = translateFrontmatterForClaudeCode(fm('builder'), 'builder', { model: 'opus' })
-    const explorerResult = translateFrontmatterForClaudeCode(fm('explorer'), 'explorer', { model: 'opus' })
+    const builderResult = translateFrontmatterForClaudeCode(fm('builder'), 'builder', {
+      model: 'opus',
+    })
+    const explorerResult = translateFrontmatterForClaudeCode(fm('explorer'), 'explorer', {
+      model: 'opus',
+    })
     assert.match(builderResult, /^model: opus$/m)
     assert.match(explorerResult, /^model: opus$/m)
     // Calling for one role with a model set must never inject into another
@@ -1296,7 +1363,11 @@ describe('translateFrontmatterForClaudeCode — denylist translation', () => {
     for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const) {
       const result = translateFrontmatterForClaudeCode(fm(role), role)
       assert.doesNotMatch(result, /^tools:/m, `${role} must not pin an allowlist`)
-      assert.doesNotMatch(result, /mcp__agent-harness-kit__/, `${role} must not enumerate MCP tools`)
+      assert.doesNotMatch(
+        result,
+        /mcp__agent-harness-kit__/,
+        `${role} must not enumerate MCP tools`
+      )
       assert.doesNotMatch(result, /^\s+- Task$/m, `${role} must not enumerate Task`)
     }
   })
@@ -1554,7 +1625,10 @@ describe('configTs — no `agents` key', () => {
 
 describe('agent prompt text — no path placeholders (task #59)', () => {
   test('builder startup uses the bounded handoff protocol, not full history', () => {
-    for (const prompt of [agentBuilder({ projectName: 'demo' }), agentBuilderToml({ projectName: 'demo' })]) {
+    for (const prompt of [
+      agentBuilder({ projectName: 'demo' }),
+      agentBuilderToml({ projectName: 'demo' }),
+    ]) {
       assert.match(prompt, /actions\.handoff\.get\(taskId, recipient: 'builder'\)/)
       assert.doesNotMatch(prompt, /Read ALL previous actions/)
       assert.match(prompt, /Reserve `actions\.get\(taskId\)` for audit or diagnosis only/)
@@ -1602,7 +1676,11 @@ describe('record_tool/record_file tracking guidance — batch-only, no per-call 
   // is actually described, not just that the old text is gone.
   function assertDescribesBatching(text: string, label: string): void {
     for (const needle of staleNeedles) {
-      assert.doesNotMatch(text, needle, `${label} still contains stale per-call phrasing: ${needle}`)
+      assert.doesNotMatch(
+        text,
+        needle,
+        `${label} still contains stale per-call phrasing: ${needle}`
+      )
     }
     assert.match(text, /calls:\s*\[/, `${label} should show the calls[] array shape`)
     assert.match(text, /batch/i, `${label} should describe batching`)
@@ -1650,8 +1728,12 @@ describe('ahk-test — skill materialization across all providers', () => {
   const TMP_SKILL = join(import.meta.dirname, '../../.tmp-skill-materialize')
   const CANONICAL_SRC = join(import.meta.dirname, '../core/materializer/skills/ahk-test/SKILL.md')
 
-  function setup(): void { mkdirSync(TMP_SKILL, { recursive: true }) }
-  function teardown(): void { rmSync(TMP_SKILL, { recursive: true, force: true }) }
+  function setup(): void {
+    mkdirSync(TMP_SKILL, { recursive: true })
+  }
+  function teardown(): void {
+    rmSync(TMP_SKILL, { recursive: true, force: true })
+  }
 
   // writeSkills is the generic pipeline used by both scaffold() and build() for all four providers.
   // Testing it once per provider confirms every materializer copies the skill correctly.
@@ -1697,7 +1779,7 @@ describe('ahk-test — skill materialization across all providers', () => {
         writeSkills(TMP_SKILL, skillsSubdir)
       }
       const contents = providers.map(([, sd]) =>
-        readFileSync(join(TMP_SKILL, sd, 'ahk-test', 'SKILL.md'), 'utf8'),
+        readFileSync(join(TMP_SKILL, sd, 'ahk-test', 'SKILL.md'), 'utf8')
       )
       for (let i = 1; i < contents.length; i++) {
         assert.equal(contents[0], contents[i], `content should be identical across all providers`)
@@ -1723,7 +1805,7 @@ describe('ahk-test — doctor states', () => {
 
   async function buildProject(
     dir: string,
-    provider: 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' = 'claude-code',
+    provider: 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' = 'claude-code'
   ): Promise<void> {
     const config = applyConfigDefaults({
       name: 'demo-app',
@@ -1893,20 +1975,23 @@ describe('ahk-test — content assertions on essential contract phrases', () => 
 
   test('prohibits MCP calls — no tasks.*, no actions.*', () => {
     assert.ok(content.includes('NO MCP calls'), 'must prohibit MCP calls')
-    assert.ok(content.includes("no tasks.*"), 'must reference no tasks.*')
-    assert.ok(content.includes("no actions.*"), 'must reference no actions.*')
+    assert.ok(content.includes('no tasks.*'), 'must reference no tasks.*')
+    assert.ok(content.includes('no actions.*'), 'must reference no actions.*')
   })
 
   test('production files are READ-ONLY', () => {
     assert.ok(
       content.includes('Production files are READ-ONLY'),
-      'must state production files are read-only',
+      'must state production files are read-only'
     )
   })
 
   test('test matrix columns are defined', () => {
     assert.ok(content.includes('Behavior'), 'matrix must have Behavior column')
-    assert.ok(content.includes('Expected observable result'), 'matrix must have Expected result column')
+    assert.ok(
+      content.includes('Expected observable result'),
+      'matrix must have Expected result column'
+    )
     assert.ok(content.includes('Test level'), 'matrix must have Test level column')
     assert.ok(content.includes('Source of expectation'), 'matrix must have Source column')
   })
@@ -1914,19 +1999,19 @@ describe('ahk-test — content assertions on essential contract phrases', () => 
   test('ambiguity gate before Builder writes', () => {
     assert.ok(
       content.includes('Stop and ask the user before any write'),
-      'must stop before writing on ambiguity',
+      'must stop before writing on ambiguity'
     )
   })
 
   test('Builder restricted to __tests__/ directory', () => {
-    assert.ok(
-      content.includes('__tests__/'),
-      'Builder must place tests inside __tests__/',
-    )
+    assert.ok(content.includes('__tests__/'), 'Builder must place tests inside __tests__/')
   })
 
   test('prohibitions listed', () => {
-    assert.ok(content.includes('Do not delete, weaken, skip'), 'must prohibit weakening existing tests')
+    assert.ok(
+      content.includes('Do not delete, weaken, skip'),
+      'must prohibit weakening existing tests'
+    )
     assert.ok(content.includes('.only'), 'must prohibit .only')
     assert.ok(content.includes('.skip'), 'must prohibit .skip')
   })
@@ -1947,8 +2032,12 @@ describe('ahk-test — content assertions on essential contract phrases', () => 
 describe('ahk-test — regression: four existing skills still present and matching', () => {
   const TMP_REG = join(import.meta.dirname, '../../.tmp-skill-regression')
 
-  function setup(): void { mkdirSync(TMP_REG, { recursive: true }) }
-  function teardown(): void { rmSync(TMP_REG, { recursive: true, force: true }) }
+  function setup(): void {
+    mkdirSync(TMP_REG, { recursive: true })
+  }
+  function teardown(): void {
+    rmSync(TMP_REG, { recursive: true, force: true })
+  }
 
   const ALL_SKILLS = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test']
 
@@ -1975,8 +2064,14 @@ describe('ahk-test — regression: four existing skills still present and matchi
       setup()
       try {
         writeSkills(TMP_REG, '.claude/skills')
-        const materialized = readFileSync(join(TMP_REG, '.claude/skills', skillName, 'SKILL.md'), 'utf8')
-        const canonical = readFileSync(join(import.meta.dirname, `../core/materializer/skills/${skillName}/SKILL.md`), 'utf8')
+        const materialized = readFileSync(
+          join(TMP_REG, '.claude/skills', skillName, 'SKILL.md'),
+          'utf8'
+        )
+        const canonical = readFileSync(
+          join(import.meta.dirname, `../core/materializer/skills/${skillName}/SKILL.md`),
+          'utf8'
+        )
         assert.equal(materialized, canonical, `${skillName} must match canonical source`)
       } finally {
         teardown()
@@ -2011,7 +2106,9 @@ describe('research-policy — content assertions on essential phrases', () => {
 
   test('builder template contains dependency handling section', () => {
     const builder = agentBuilder({ projectName: 'demo' })
-    assert.ok(builder.includes('Handle dependency changes') || builder.includes('dependency changes'))
+    assert.ok(
+      builder.includes('Handle dependency changes') || builder.includes('dependency changes')
+    )
   })
 
   test('reviewer template contains dependency block criteria', () => {
@@ -2028,19 +2125,37 @@ describe('research-policy — content assertions on essential phrases', () => {
     assert.ok(lead.includes('Mintlify Index'), 'lead must mention Mintlify Index')
 
     const explorer = agentExplorer({ projectName: 'demo' })
-    assert.ok(explorer.includes('Version and Dependency Mapping'), 'explorer must have version mapping')
+    assert.ok(
+      explorer.includes('Version and Dependency Mapping'),
+      'explorer must have version mapping'
+    )
     assert.ok(explorer.includes('installed versions'), 'explorer must mention installed versions')
 
     const consultant = agentConsultant({ projectName: 'demo' })
-    assert.ok(consultant.includes('Dependency-Bound Research Protocol'), 'consultant must have protocol')
+    assert.ok(
+      consultant.includes('Dependency-Bound Research Protocol'),
+      'consultant must have protocol'
+    )
     assert.ok(consultant.includes('Source Order'), 'consultant must have source order')
-    assert.ok(consultant.includes('Dependency-Impact Conclusion'), 'consultant must have impact conclusion')
+    assert.ok(
+      consultant.includes('Dependency-Impact Conclusion'),
+      'consultant must have impact conclusion'
+    )
 
     const builder = agentBuilder({ projectName: 'demo' })
-    assert.ok(builder.includes('Handle dependency changes') || builder.includes('dependency changes'), 'builder must have dependency handling')
+    assert.ok(
+      builder.includes('Handle dependency changes') || builder.includes('dependency changes'),
+      'builder must have dependency handling'
+    )
 
     const reviewer = agentReviewer({ projectName: 'demo' })
-    assert.ok(reviewer.includes('Dependency-related') || reviewer.includes('dependency-impact'), 'reviewer must have dependency blocks')
-    assert.ok(reviewer.includes('dependency-impact') || reviewer.includes('Dependency impact'), 'reviewer must check dependency-impact')
+    assert.ok(
+      reviewer.includes('Dependency-related') || reviewer.includes('dependency-impact'),
+      'reviewer must have dependency blocks'
+    )
+    assert.ok(
+      reviewer.includes('dependency-impact') || reviewer.includes('Dependency impact'),
+      'reviewer must check dependency-impact'
+    )
   })
 })

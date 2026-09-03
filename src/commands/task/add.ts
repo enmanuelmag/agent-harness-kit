@@ -10,26 +10,27 @@ import { cliFormWithRetry } from '@/utils/form'
 export async function runTaskAdd(cwd: string): Promise<void> {
   p.intro(pc.bold('agent-harness-kit — add task'))
 
-  const title = await cliFormWithRetry(
-    async () => {
-      const val = await p.text({ message: 'Task title' })
-      if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
-      return (val as string).trim()
-    },
-    taskTitleSchema,
-  )
+  const title = await cliFormWithRetry(async () => {
+    const val = await p.text({ message: 'Task title' })
+    if (p.isCancel(val)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
+    return (val as string).trim()
+  }, taskTitleSchema)
 
-  const description = await cliFormWithRetry(
-    async () => {
-      const val = await p.text({
-        message: 'Description (what and why)',
-        placeholder: 'Describe the task in more detail, including any relevant context or instructions for the agents.',
-      })
-      if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
-      return (val as string).trim()
-    },
-    taskDescriptionSchema,
-  )
+  const description = await cliFormWithRetry(async () => {
+    const val = await p.text({
+      message: 'Description (what and why)',
+      placeholder:
+        'Describe the task in more detail, including any relevant context or instructions for the agents.',
+    })
+    if (p.isCancel(val)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
+    return (val as string).trim()
+  }, taskDescriptionSchema)
 
   const acceptance: string[] = []
   p.log.info('Acceptance criteria — one per line, empty line to finish')
@@ -47,7 +48,12 @@ export async function runTaskAdd(cwd: string): Promise<void> {
     const db = await openDB(config, cwd)
 
     const slug = slugify(title)
-    const task = await db.addTask({ slug, title, description: description || undefined, acceptance })
+    const task = await db.addTask({
+      slug,
+      title,
+      description: description || undefined,
+      acceptance,
+    })
     await db.writeFeatureList(cwd)
     await db.close()
 
@@ -60,4 +66,3 @@ export async function runTaskAdd(cwd: string): Promise<void> {
     process.exit(1)
   }
 }
-

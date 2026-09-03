@@ -63,7 +63,7 @@ export interface WriteAgentFilesResult {
 export function writeAgentFiles(
   cwd: string,
   entries: AgentFileEntry[],
-  opts: WriteAgentFilesOptions = {},
+  opts: WriteAgentFilesOptions = {}
 ): WriteAgentFilesResult {
   const result: WriteAgentFilesResult = { created: [], overwritten: [], preserved: [] }
 
@@ -74,7 +74,7 @@ export function writeAgentFiles(
     if (!opts.backupRoot) {
       throw new Error(
         'writeAgentFiles: force is set and existing agent files would be overwritten, ' +
-          'but no backupRoot was provided. Refusing to overwrite without a backup.',
+          'but no backupRoot was provided. Refusing to overwrite without a backup.'
       )
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -89,7 +89,7 @@ export function writeAgentFiles(
       throw new Error(
         `Could not back up existing agent files to ${backupDir} ` +
           `(${err instanceof Error ? err.message : String(err)}). ` +
-          `Aborting WITHOUT overwriting anything — no agent file was modified.`,
+          `Aborting WITHOUT overwriting anything — no agent file was modified.`
       )
     }
     result.backupDir = backupDir
@@ -207,7 +207,7 @@ interface ReconcileOptions {
 export function reconcileGeneratedFiles(
   cwd: string,
   entries: AgentFileEntry[],
-  opts: ReconcileOptions = {},
+  opts: ReconcileOptions = {}
 ): ReconcileResult {
   const result: ReconcileResult = {
     created: [],
@@ -263,7 +263,7 @@ export function reconcileGeneratedFiles(
     if (!opts.backupRoot) {
       throw new Error(
         'reconcileGeneratedFiles: force is set and hand-edited generated files would be ' +
-          'overwritten, but no backupRoot was provided. Refusing to overwrite without a backup.',
+          'overwritten, but no backupRoot was provided. Refusing to overwrite without a backup.'
       )
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -278,7 +278,7 @@ export function reconcileGeneratedFiles(
       throw new Error(
         `Could not back up existing generated files to ${backupDir} ` +
           `(${err instanceof Error ? err.message : String(err)}). ` +
-          `Aborting WITHOUT overwriting anything — no file was modified.`,
+          `Aborting WITHOUT overwriting anything — no file was modified.`
       )
     }
     result.backupDir = backupDir

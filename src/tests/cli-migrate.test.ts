@@ -21,72 +21,80 @@ function runCli(args: string[], cwd: string) {
  *  commands run without needing a node_modules install. */
 function setupProject(dir: string): void {
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@cardor/agent-harness-kit' }, null, 2), 'utf8')
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({ name: '@cardor/agent-harness-kit' }, null, 2),
+    'utf8'
+  )
   writeFileSync(
     join(dir, 'agent-harness-kit.config.ts'),
     `export default {\n  project: { name: 'test', description: 'test', docsPath: './docs' },\n  provider: 'claude-code',\n}\n`,
-    'utf8',
+    'utf8'
   )
 }
 
-describe('ahk migrate — provider subcommand + backward-compatible alias (integration)', { skip: !existsSync(CLI_PATH) }, () => {
-  afterEach(() => rmSync(TMP_BASE, { recursive: true, force: true }))
+describe(
+  'ahk migrate — provider subcommand + backward-compatible alias (integration)',
+  { skip: !existsSync(CLI_PATH) },
+  () => {
+    afterEach(() => rmSync(TMP_BASE, { recursive: true, force: true }))
 
-  test('`migrate --to <same-provider>` (legacy alias) reports nothing-to-migrate', () => {
-    const dir = join(TMP_BASE, 'alias-noop')
-    setupProject(dir)
-    const result = runCli(['migrate', '--to', 'claude-code'], dir)
-    assert.equal(result.status, 0)
-    assert.match(result.stdout, /nothing to migrate/i)
-  })
+    test('`migrate --to <same-provider>` (legacy alias) reports nothing-to-migrate', () => {
+      const dir = join(TMP_BASE, 'alias-noop')
+      setupProject(dir)
+      const result = runCli(['migrate', '--to', 'claude-code'], dir)
+      assert.equal(result.status, 0)
+      assert.match(result.stdout, /nothing to migrate/i)
+    })
 
-  test('`migrate provider --to <same-provider>` (explicit subcommand) reports the same nothing-to-migrate', () => {
-    const dir = join(TMP_BASE, 'provider-noop')
-    setupProject(dir)
-    const result = runCli(['migrate', 'provider', '--to', 'claude-code'], dir)
-    assert.equal(result.status, 0)
-    assert.match(result.stdout, /nothing to migrate/i)
-  })
+    test('`migrate provider --to <same-provider>` (explicit subcommand) reports the same nothing-to-migrate', () => {
+      const dir = join(TMP_BASE, 'provider-noop')
+      setupProject(dir)
+      const result = runCli(['migrate', 'provider', '--to', 'claude-code'], dir)
+      assert.equal(result.status, 0)
+      assert.match(result.stdout, /nothing to migrate/i)
+    })
 
-  test('`migrate` (parent) and `migrate provider` (subcommand) both list in --help', () => {
-    const dir = join(TMP_BASE, 'help')
-    setupProject(dir)
-    const result = runCli(['migrate', '--help'], dir)
-    assert.equal(result.status, 0)
-    assert.match(result.stdout, /provider \[options\]/)
-    assert.match(result.stdout, /storage \[options\]/)
-  })
+    test('`migrate` (parent) and `migrate provider` (subcommand) both list in --help', () => {
+      const dir = join(TMP_BASE, 'help')
+      setupProject(dir)
+      const result = runCli(['migrate', '--help'], dir)
+      assert.equal(result.status, 0)
+      assert.match(result.stdout, /provider \[options\]/)
+      assert.match(result.stdout, /storage \[options\]/)
+    })
 
-  test('`migrate storage --help` documents --force and --dry-run', () => {
-    const dir = join(TMP_BASE, 'storage-help')
-    setupProject(dir)
-    const result = runCli(['migrate', 'storage', '--help'], dir)
-    assert.equal(result.status, 0)
-    assert.match(result.stdout, /--force/)
-    assert.match(result.stdout, /--dry-run/)
-  })
+    test('`migrate storage --help` documents --force and --dry-run', () => {
+      const dir = join(TMP_BASE, 'storage-help')
+      setupProject(dir)
+      const result = runCli(['migrate', 'storage', '--help'], dir)
+      assert.equal(result.status, 0)
+      assert.match(result.stdout, /--force/)
+      assert.match(result.stdout, /--dry-run/)
+    })
 
-  test('`migrate storage` on a fresh project (no prior data) records storage-state and exits 0', () => {
-    const dir = join(TMP_BASE, 'storage-fresh')
-    setupProject(dir)
-    const result = runCli(['migrate', 'storage'], dir)
-    assert.equal(result.status, 0, result.stderr)
-    assert.ok(existsSync(join(dir, '.harness', 'storage-state.json')))
-  })
+    test('`migrate storage` on a fresh project (no prior data) records storage-state and exits 0', () => {
+      const dir = join(TMP_BASE, 'storage-fresh')
+      setupProject(dir)
+      const result = runCli(['migrate', 'storage'], dir)
+      assert.equal(result.status, 0, result.stderr)
+      assert.ok(existsSync(join(dir, '.harness', 'storage-state.json')))
+    })
 
-  // Task #84: `runMigrate` now unconditionally calls both
-  // `promptClaudeAgentModels` and `promptCodexAgentModels` before building the
-  // target provider's files. Both self-guard on the provider argument, so
-  // migrating to a target that is neither 'claude-code' nor 'codex-cli' never
-  // reaches an interactive p.select — safe to drive through this spawned,
-  // non-TTY CLI test. This exercises the new prompt-wiring's happy path
-  // without needing to drive p.select itself (out of scope, same rule as
-  // task #81).
-  test('`migrate --to opencode` from a claude-code project completes without prompting (self-guarded)', () => {
-    const dir = join(TMP_BASE, 'migrate-opencode-no-prompt')
-    setupProject(dir)
-    const result = runCli(['migrate', '--to', 'opencode'], dir)
-    assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /Migrated to opencode/)
-  })
-})
+    // Task #84: `runMigrate` now unconditionally calls both
+    // `promptClaudeAgentModels` and `promptCodexAgentModels` before building the
+    // target provider's files. Both self-guard on the provider argument, so
+    // migrating to a target that is neither 'claude-code' nor 'codex-cli' never
+    // reaches an interactive p.select — safe to drive through this spawned,
+    // non-TTY CLI test. This exercises the new prompt-wiring's happy path
+    // without needing to drive p.select itself (out of scope, same rule as
+    // task #81).
+    test('`migrate --to opencode` from a claude-code project completes without prompting (self-guarded)', () => {
+      const dir = join(TMP_BASE, 'migrate-opencode-no-prompt')
+      setupProject(dir)
+      const result = runCli(['migrate', '--to', 'opencode'], dir)
+      assert.equal(result.status, 0, result.stderr)
+      assert.match(result.stdout, /Migrated to opencode/)
+    })
+  }
+)

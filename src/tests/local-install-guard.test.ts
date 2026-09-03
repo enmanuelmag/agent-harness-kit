@@ -3,7 +3,11 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
-import { hasRealLocalInstall, isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
+import {
+  hasRealLocalInstall,
+  isLocalInstallSatisfied,
+  printLocalInstallWarning,
+} from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
 
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-local-install-guard')

@@ -28,21 +28,21 @@ export class ActionRepository {
   async create(taskId: number, agent: AgentName, now: string): Promise<number> {
     return this.driver.insert(
       `INSERT INTO actions (task_id, agent, status, created_at) VALUES (?, ?, 'in_progress', ?)`,
-      [taskId, agent, now],
+      [taskId, agent, now]
     )
   }
 
   async complete(actionId: number, summary: string, now: string): Promise<void> {
     await this.driver.exec(
       `UPDATE actions SET status = 'completed', completed_at = ?, summary = ? WHERE id = ?`,
-      [now, summary, actionId],
+      [now, summary, actionId]
     )
   }
 
   async closeOrphaned(taskId: number, now: string): Promise<number> {
     return this.driver.exec(
       `UPDATE actions SET status = 'completed', completed_at = ?, summary = 'Auto-closed: task marked done' WHERE task_id = ? AND status = 'in_progress'`,
-      [now, taskId],
+      [now, taskId]
     )
   }
 
@@ -53,7 +53,7 @@ export class ActionRepository {
   async getForTask(taskId: number): Promise<ActionRow[]> {
     return this.driver.query<ActionRow>(
       `SELECT * FROM actions WHERE task_id = ? ORDER BY created_at`,
-      [taskId],
+      [taskId]
     )
   }
 
@@ -66,7 +66,7 @@ export class ActionRepository {
       status?: ActionRow['status']
       cursor?: { createdAt: string; id: number }
       limit: number
-    },
+    }
   ): Promise<ActionListRow[]> {
     const where = ['a.task_id = ?']
     const params: unknown[] = [taskId]
@@ -89,7 +89,7 @@ export class ActionRepository {
        WHERE ${where.join(' AND ')}
        GROUP BY a.id, a.task_id, a.agent, a.status, a.created_at, a.completed_at, a.summary
        ORDER BY a.created_at DESC, a.id DESC LIMIT ?`,
-      params,
+      params
     )
   }
 
@@ -105,33 +105,40 @@ export class ActionRepository {
         sections: await this.getSections(action.id),
         files: await this.getFiles(action.id),
         tools: await this.getTools(action.id),
-      })),
+      }))
     )
   }
 
   // ─── Sections ─────────────────────────────────────────────────────────────
 
-  async addSection(actionId: number, sectionType: string, content: string, now: string): Promise<void> {
+  async addSection(
+    actionId: number,
+    sectionType: string,
+    content: string,
+    now: string
+  ): Promise<void> {
     await this.driver.exec(
       `INSERT INTO action_sections (action_id, section_type, content, created_at) VALUES (?, ?, ?, ?)`,
-      [actionId, sectionType, content, now],
+      [actionId, sectionType, content, now]
     )
   }
 
   async getSections(actionId: number): Promise<ActionSectionRow[]> {
     return this.driver.query<ActionSectionRow>(
       `SELECT * FROM action_sections WHERE action_id = ? ORDER BY created_at`,
-      [actionId],
+      [actionId]
     )
   }
 
   async getSectionById(sectionId: number): Promise<ActionSectionRow | null> {
-    return this.driver.queryOne<ActionSectionRow>(`SELECT * FROM action_sections WHERE id = ?`, [sectionId])
+    return this.driver.queryOne<ActionSectionRow>(`SELECT * FROM action_sections WHERE id = ?`, [
+      sectionId,
+    ])
   }
 
   async listSections(
     actionId: number,
-    options: { types?: string[]; cursor?: number; limit: number },
+    options: { types?: string[]; cursor?: number; limit: number }
   ): Promise<ActionSectionIndexRow[]> {
     const where = ['action_id = ?']
     const params: unknown[] = [actionId]
@@ -147,17 +154,19 @@ export class ActionRepository {
     return this.driver.query<ActionSectionIndexRow>(
       `SELECT id, action_id, section_type, LENGTH(content) AS chars, created_at
        FROM action_sections WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`,
-      params,
+      params
     )
   }
 
-  async getCompletedHandoffSections(taskId: number): Promise<Array<ActionSectionRow & Pick<ActionRow, 'agent' | 'completed_at'>>> {
+  async getCompletedHandoffSections(
+    taskId: number
+  ): Promise<Array<ActionSectionRow & Pick<ActionRow, 'agent' | 'completed_at'>>> {
     return this.driver.query(
       `SELECT s.*, a.agent, a.completed_at
        FROM action_sections s JOIN actions a ON a.id = s.action_id
        WHERE a.task_id = ? AND a.status = 'completed' AND s.section_type = 'handoff'
        ORDER BY s.created_at DESC, s.id DESC`,
-      [taskId],
+      [taskId]
     )
   }
 
@@ -171,25 +180,24 @@ export class ActionRepository {
     actionId: number,
     filePath: string,
     operation: ActionFileRow['operation'],
-    notes: string | null,
+    notes: string | null
   ): Promise<void> {
     await this.driver.exec(
       `INSERT INTO action_files (action_id, file_path, operation, notes) VALUES (?, ?, ?, ?)`,
-      [actionId, filePath, operation, notes],
+      [actionId, filePath, operation, notes]
     )
   }
 
   async getFiles(actionId: number): Promise<ActionFileRow[]> {
-    return this.driver.query<ActionFileRow>(
-      `SELECT * FROM action_files WHERE action_id = ?`,
-      [actionId],
-    )
+    return this.driver.query<ActionFileRow>(`SELECT * FROM action_files WHERE action_id = ?`, [
+      actionId,
+    ])
   }
 
   async getFilesForTask(taskId: number): Promise<(ActionFileRow & { agent: AgentName })[]> {
     return this.driver.query<ActionFileRow & { agent: AgentName }>(
       `SELECT af.*, a.agent FROM action_files af JOIN actions a ON af.action_id = a.id WHERE a.task_id = ? ORDER BY a.agent, af.operation`,
-      [taskId],
+      [taskId]
     )
   }
 
@@ -206,18 +214,18 @@ export class ActionRepository {
     toolName: string,
     argsJson: string | null,
     resultSummary: string | null,
-    now: string,
+    now: string
   ): Promise<void> {
     await this.driver.exec(
       `INSERT INTO action_tools (action_id, tool_name, args_json, result_summary, called_at) VALUES (?, ?, ?, ?, ?)`,
-      [actionId, toolName, argsJson, resultSummary, now],
+      [actionId, toolName, argsJson, resultSummary, now]
     )
   }
 
   async getTools(actionId: number): Promise<ActionToolRow[]> {
     return this.driver.query<ActionToolRow>(
       `SELECT * FROM action_tools WHERE action_id = ? ORDER BY called_at`,
-      [actionId],
+      [actionId]
     )
   }
 
@@ -230,7 +238,7 @@ export class ActionRepository {
   async getTopTools(limit: number): Promise<{ tool_name: string; uses: number }[]> {
     return this.driver.query<{ tool_name: string; uses: number }>(
       `SELECT tool_name, COUNT(*) as uses FROM action_tools GROUP BY tool_name ORDER BY uses DESC LIMIT ?`,
-      [limit],
+      [limit]
     )
   }
 }

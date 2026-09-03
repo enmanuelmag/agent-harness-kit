@@ -1,8 +1,16 @@
 // ─── Response types ───────────────────────────────────────────────────────────
 
-import type { AgentStat, RecentFile, RecentTool, StatsOverview, TaskDetail, TaskSummary, TimelineEntry, TopFile, TopTool } from "@/schema/api"
-
-
+import type {
+  AgentStat,
+  RecentFile,
+  RecentTool,
+  StatsOverview,
+  TaskDetail,
+  TaskSummary,
+  TimelineEntry,
+  TopFile,
+  TopTool,
+} from '@/schema/api'
 
 // ─── Fetch helpers ────────────────────────────────────────────────────────────
 
@@ -18,7 +26,8 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 export const api = {
   stats: () => get<StatsOverview>('/stats'),
   tasks: () => get<TaskSummary[]>('/tasks'),
-  allTasks: (includeArchived = false) => get<TaskSummary[]>('/tasks', { includeArchived: String(includeArchived) }),
+  allTasks: (includeArchived = false) =>
+    get<TaskSummary[]>('/tasks', { includeArchived: String(includeArchived) }),
   task: (id: number) => get<TaskDetail>(`/tasks/${id}`),
   topTools: (limit = 20) => get<TopTool[]>('/tools/top', { limit: String(limit) }),
   recentTools: (limit = 50) => get<RecentTool[]>('/tools/recent', { limit: String(limit) }),
@@ -26,12 +35,19 @@ export const api = {
   recentFiles: (limit = 50) => get<RecentFile[]>('/files/recent', { limit: String(limit) }),
   agentStats: () => get<AgentStat[]>('/agents/stats'),
   timeline: (limit = 50) => get<TimelineEntry[]>('/timeline', { limit: String(limit) }),
-  updateTask: (id: number, data: { title?: string; description?: string | null; acceptance?: string[] }) =>
-    fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json()),
+  updateTask: (
+    id: number,
+    data: { title?: string; description?: string | null; acceptance?: string[] }
+  ) =>
+    fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((r) => r.json()),
   archiveTask: (id: number) =>
-    fetch(`/api/tasks/${id}/archive`, { method: 'PATCH' }).then(r => r.json()),
+    fetch(`/api/tasks/${id}/archive`, { method: 'PATCH' }).then((r) => r.json()),
   unarchiveTask: (id: number) =>
-    fetch(`/api/tasks/${id}/unarchive`, { method: 'PATCH' }).then(r => r.json()),
+    fetch(`/api/tasks/${id}/unarchive`, { method: 'PATCH' }).then((r) => r.json()),
 }
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
@@ -53,8 +69,10 @@ export const qk = {
 
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 

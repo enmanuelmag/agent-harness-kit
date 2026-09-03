@@ -36,7 +36,9 @@ export function buildCapabilityHints(provider: Provider): string {
   if (caps.webSearch) {
     hints.push('- Web search available for current information outside documentation indexes')
   } else {
-    hints.push('- Web search NOT available — report proof boundary, do not describe remembered behavior as current')
+    hints.push(
+      '- Web search NOT available — report proof boundary, do not describe remembered behavior as current'
+    )
   }
 
   return hints.join('\n')

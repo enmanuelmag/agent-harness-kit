@@ -98,7 +98,9 @@ export class PostgresDriver implements DBDriver {
     // Migration: add updated_at column (safe to run multiple times)
     try {
       await this.sql.unsafe(`ALTER TABLE tasks ADD COLUMN updated_at TEXT NOT NULL DEFAULT NOW()`)
-      await this.sql.unsafe(`UPDATE tasks SET updated_at = COALESCE(completed_at, started_at, created_at) WHERE updated_at IS NULL OR updated_at = ''`)
+      await this.sql.unsafe(
+        `UPDATE tasks SET updated_at = COALESCE(completed_at, started_at, created_at) WHERE updated_at IS NULL OR updated_at = ''`
+      )
     } catch {
       // Column already exists — ignore
     }
@@ -108,7 +110,10 @@ export class PostgresDriver implements DBDriver {
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const rows = await this.sql.unsafe(toPositional(sql), params as postgres.ParameterOrJSON<never>[])
+    const rows = await this.sql.unsafe(
+      toPositional(sql),
+      params as postgres.ParameterOrJSON<never>[]
+    )
     return rows as unknown as T[]
   }
 
@@ -124,7 +129,10 @@ export class PostgresDriver implements DBDriver {
   }
 
   async exec(sql: string, params: unknown[] = []): Promise<number> {
-    const result = await this.sql.unsafe(toPositional(sql), params as postgres.ParameterOrJSON<never>[])
+    const result = await this.sql.unsafe(
+      toPositional(sql),
+      params as postgres.ParameterOrJSON<never>[]
+    )
     return result.count
   }
 
@@ -151,10 +159,13 @@ export class PostgresDriver implements DBDriver {
 }
 
 class PostgresTxDriver implements DBDriver {
-  constructor(private sql: postgres.TransactionSql) { }
+  constructor(private sql: postgres.TransactionSql) {}
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const rows = await this.sql.unsafe(toPositional(sql), params as postgres.ParameterOrJSON<never>[])
+    const rows = await this.sql.unsafe(
+      toPositional(sql),
+      params as postgres.ParameterOrJSON<never>[]
+    )
     return rows as unknown as T[]
   }
 
@@ -169,7 +180,10 @@ class PostgresTxDriver implements DBDriver {
   }
 
   async exec(sql: string, params: unknown[] = []): Promise<number> {
-    const result = await this.sql.unsafe(toPositional(sql), params as postgres.ParameterOrJSON<never>[])
+    const result = await this.sql.unsafe(
+      toPositional(sql),
+      params as postgres.ParameterOrJSON<never>[]
+    )
     return result.count
   }
 
@@ -181,9 +195,9 @@ class PostgresTxDriver implements DBDriver {
     return fn(this)
   }
 
-  async ensureSchema(): Promise<void> { }
+  async ensureSchema(): Promise<void> {}
   async reconnect(): Promise<void> {
     /* no-op — connection pool handles freshness */
   }
-  async close(): Promise<void> { }
+  async close(): Promise<void> {}
 }

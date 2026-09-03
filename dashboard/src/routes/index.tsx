@@ -1,28 +1,27 @@
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
-import { AgentBadge } from '@/components/shared/agent-badge';
-import { PageHeader } from '@/components/shared/page-header';
-import { StatusBadge } from '@/components/shared/status-badge';
-import { api, formatDate,qk } from '@/lib/api';
+import { AgentBadge } from '@/components/shared/agent-badge'
+import { PageHeader } from '@/components/shared/page-header'
+import { StatusBadge } from '@/components/shared/status-badge'
+import { api, formatDate, qk } from '@/lib/api'
 
-import type { TimelineEntry } from '@/schema/api';
+import type { TimelineEntry } from '@/schema/api'
 
 export const Route = createFileRoute('/')({
   component: Overview,
-});
+})
 
 function Overview() {
-  const stats = useQuery({ queryKey: qk.stats, queryFn: api.stats });
-  const tasks = useQuery({ queryKey: qk.tasks, queryFn: api.tasks });
+  const stats = useQuery({ queryKey: qk.stats, queryFn: api.stats })
+  const tasks = useQuery({ queryKey: qk.tasks, queryFn: api.tasks })
   const timeline = useQuery({
     queryKey: qk.timeline,
     queryFn: () => api.timeline(15),
-  });
+  })
 
-  const activeTasks =
-    tasks.data?.filter((t) => t.status === 'in_progress') ?? [];
-  const s = stats.data;
+  const activeTasks = tasks.data?.filter((t) => t.status === 'in_progress') ?? []
+  const s = stats.data
 
   return (
     <div>
@@ -100,9 +99,7 @@ function Overview() {
                           {t.slug}
                         </div>
                       </div>
-                      {t.assigned_to && (
-                        <AgentBadge agent={t.assigned_to} size="xs" />
-                      )}
+                      {t.assigned_to && <AgentBadge agent={t.assigned_to} size="xs" />}
                     </div>
                     {t.acceptance_total > 0 && (
                       <div className="mt-2">
@@ -138,16 +135,14 @@ function Overview() {
                 <TimelineRow key={entry.id} entry={entry} />
               ))}
               {timeline.data?.length === 0 && (
-                <p className="text-xs text-[var(--color-text-faint)] font-mono">
-                  No activity yet
-                </p>
+                <p className="text-xs text-[var(--color-text-faint)] font-mono">No activity yet</p>
               )}
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function TimelineRow({ entry }: { entry: TimelineEntry }) {
@@ -173,5 +168,5 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
         {formatDate(entry.created_at)}
       </span>
     </Link>
-  );
+  )
 }

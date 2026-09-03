@@ -5,7 +5,11 @@ import { describe, test } from 'node:test'
 
 import { isLocalInstallSatisfied } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
-import { isExecutableOnPath, printMissingGlobalBinaryWarning, resolveOnPath } from '@/core/path-probe'
+import {
+  isExecutableOnPath,
+  printMissingGlobalBinaryWarning,
+  resolveOnPath,
+} from '@/core/path-probe'
 
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-path-probe')
 
@@ -80,7 +84,11 @@ describe('resolveOnPath — win32', () => {
     const dir = makeTmp('win-cmd')
     writeFileSync(join(dir, 'ahk.cmd'), '')
     assert.equal(
-      resolveOnPath('ahk', { pathValue: dir, pathext: '.COM;.EXE;.BAT;.CMD;.PS1', platform: 'win32' }),
+      resolveOnPath('ahk', {
+        pathValue: dir,
+        pathext: '.COM;.EXE;.BAT;.CMD;.PS1',
+        platform: 'win32',
+      }),
       true
     )
     cleanTmp()
@@ -96,14 +104,20 @@ describe('resolveOnPath — win32', () => {
   test('handles a bare name with no extension present on PATH', () => {
     const dir = makeTmp('win-bare')
     writeFileSync(join(dir, 'ahk'), '')
-    assert.equal(resolveOnPath('ahk', { pathValue: dir, pathext: '.EXE;.CMD', platform: 'win32' }), true)
+    assert.equal(
+      resolveOnPath('ahk', { pathValue: dir, pathext: '.EXE;.CMD', platform: 'win32' }),
+      true
+    )
     cleanTmp()
   })
 
   test('falls back to a default PATHEXT list when PATHEXT is unset', () => {
     const dir = makeTmp('win-default-pathext')
     writeFileSync(join(dir, 'ahk.cmd'), '')
-    assert.equal(resolveOnPath('ahk', { pathValue: dir, pathext: undefined, platform: 'win32' }), true)
+    assert.equal(
+      resolveOnPath('ahk', { pathValue: dir, pathext: undefined, platform: 'win32' }),
+      true
+    )
     cleanTmp()
   })
 
@@ -111,7 +125,10 @@ describe('resolveOnPath — win32', () => {
     const empty = makeTmp('win-multi-empty')
     const real = makeTmp('win-multi-real')
     writeFileSync(join(real, 'ahk.cmd'), '')
-    assert.equal(resolveOnPath('ahk', { pathValue: `${empty};${real}`, pathext: '.CMD', platform: 'win32' }), true)
+    assert.equal(
+      resolveOnPath('ahk', { pathValue: `${empty};${real}`, pathext: '.CMD', platform: 'win32' }),
+      true
+    )
     cleanTmp()
   })
 })
@@ -126,14 +143,24 @@ describe('resolveOnPath — empty/undefined PATH', () => {
   test('returns false (no throw) when PATH contains only empty segments', () => {
     assert.doesNotThrow(() => resolveOnPath('ahk', { pathValue: ':::', platform: 'linux' }))
     assert.equal(resolveOnPath('ahk', { pathValue: ':::', platform: 'linux' }), false)
-    assert.equal(resolveOnPath('ahk', { pathValue: ';;;', platform: 'win32', pathext: '.CMD' }), false)
+    assert.equal(
+      resolveOnPath('ahk', { pathValue: ';;;', platform: 'win32', pathext: '.CMD' }),
+      false
+    )
   })
 
   test('does not throw when a PATH dir does not exist', () => {
     assert.doesNotThrow(() =>
-      resolveOnPath('ahk', { pathValue: join(TMP_BASE, 'does-not-exist'), platform: 'win32', pathext: '.CMD' })
+      resolveOnPath('ahk', {
+        pathValue: join(TMP_BASE, 'does-not-exist'),
+        platform: 'win32',
+        pathext: '.CMD',
+      })
     )
-    assert.equal(resolveOnPath('ahk', { pathValue: join(TMP_BASE, 'does-not-exist'), platform: 'linux' }), false)
+    assert.equal(
+      resolveOnPath('ahk', { pathValue: join(TMP_BASE, 'does-not-exist'), platform: 'linux' }),
+      false
+    )
   })
 })
 
@@ -190,7 +217,10 @@ describe('real process state (PATH / console.error / process.exit)', { concurren
     assert.ok(lines.length > 0, 'must emit at least one line')
     assert.ok(text.includes('PATH'), 'must mention PATH')
     assert.ok(text.includes(`npm i -g ${pkg.name}`), 'must name the global install command')
-    assert.ok(text.includes(`npm install --save-dev ${pkg.name}`), 'must name the local install command')
+    assert.ok(
+      text.includes(`npm install --save-dev ${pkg.name}`),
+      'must name the local install command'
+    )
   })
 
   test('printMissingGlobalBinaryWarning: never calls process.exit', () => {
@@ -202,7 +232,11 @@ describe('real process state (PATH / console.error / process.exit)', { concurren
     }) as typeof process.exit
     try {
       captureStderr(() => printMissingGlobalBinaryWarning())
-      assert.equal(exitCalled, false, 'printMissingGlobalBinaryWarning() must never call process.exit')
+      assert.equal(
+        exitCalled,
+        false,
+        'printMissingGlobalBinaryWarning() must never call process.exit'
+      )
     } finally {
       process.exit = originalExit
     }

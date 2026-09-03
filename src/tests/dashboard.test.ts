@@ -19,7 +19,13 @@ const baseConfig: HarnessConfig = {
   storage: {
     dir: '.harness',
     tasks: { adapter: 'local' },
-    sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
+    sections: {
+      toolsUsed: true,
+      filesModified: true,
+      result: true,
+      blockers: true,
+      nextSteps: false,
+    },
     markdownFallback: { enabled: false, path: '.harness/current.md' },
     scope: 'local',
     projectId: 'dashboard-scope-test-id',
@@ -57,7 +63,13 @@ describe('dashboard — sqlite watch path resolution', () => {
     }
     const sqlitePath = SQLITE_PATH
 
-    const dbPath = resolveSqlitePathForScope(localConfig.storage.scope, sqlitePath, projectDir, localConfig, FAKE_HOME)
+    const dbPath = resolveSqlitePathForScope(
+      localConfig.storage.scope,
+      sqlitePath,
+      projectDir,
+      localConfig,
+      FAKE_HOME
+    )
 
     assert.equal(dbPath, resolve(projectDir, sqlitePath))
   })
@@ -79,7 +91,13 @@ describe('dashboard — sqlite watch path resolution', () => {
     }
     const sqlitePath = SQLITE_PATH
 
-    const dbPath = resolveSqlitePathForScope(globalConfig.storage.scope, sqlitePath, projectDir, globalConfig, FAKE_HOME)
+    const dbPath = resolveSqlitePathForScope(
+      globalConfig.storage.scope,
+      sqlitePath,
+      projectDir,
+      globalConfig,
+      FAKE_HOME
+    )
 
     const expected = join(resolveGlobalStorageDir(globalConfig, FAKE_HOME), 'harness.db')
     assert.equal(dbPath, expected)

@@ -39,12 +39,26 @@ export interface FullExport {
  *  application-generated UUID/TEXT id, which is why it used to be excluded
  *  from this list) — see src/core/drivers/migrate-actions.ts for the
  *  one-time migration that upgrades a pre-existing DB in place. */
-const AUTOINCREMENT_TABLES = ['tasks', 'task_acceptance', 'actions', 'action_sections', 'action_files', 'action_tools'] as const
+const AUTOINCREMENT_TABLES = [
+  'tasks',
+  'task_acceptance',
+  'actions',
+  'action_sections',
+  'action_files',
+  'action_tools',
+] as const
 
 /** Full insertion order across all 6 tables, respecting FK constraints
  *  (parent before child): tasks -> task_acceptance -> actions ->
  *  action_sections/action_files/action_tools. */
-const TABLE_INSERT_ORDER = ['tasks', 'task_acceptance', 'actions', 'action_sections', 'action_files', 'action_tools'] as const
+const TABLE_INSERT_ORDER = [
+  'tasks',
+  'task_acceptance',
+  'actions',
+  'action_sections',
+  'action_files',
+  'action_tools',
+] as const
 
 /** Reverse of TABLE_INSERT_ORDER — used to TRUNCATE a non-empty destination
  *  safely (children before parents) when `--force` is used. */
@@ -70,7 +84,10 @@ export const DEFAULT_MARKDOWN_PATH = '.harness/current.md'
 /** Resolves the directory used for 'global' scope storage: ~/.harness/dbs/<projectId>/
  *  Uses os.homedir() (not $HOME env var) for portability. Callers are
  *  responsible for creating the directory (mkdirSync recursive) before use. */
-export function resolveGlobalStorageDir(config: HarnessConfig, homeDir: string = homedir()): string {
+export function resolveGlobalStorageDir(
+  config: HarnessConfig,
+  homeDir: string = homedir()
+): string {
   return join(homeDir, '.harness', 'dbs', config.storage.projectId)
 }
 
@@ -168,7 +185,10 @@ export class HarnessDB {
     return this.tasks.markAcceptanceMet(criterionId)
   }
 
-  async updateTask(id: number, params: { title?: string; description?: string | null; slug?: string }): Promise<TaskRow> {
+  async updateTask(
+    id: number,
+    params: { title?: string; description?: string | null; slug?: string }
+  ): Promise<TaskRow> {
     await this.tasks.update(id, params)
     await this.regenerateCurrentMd()
     return (await this.tasks.getById(id))!
@@ -241,7 +261,7 @@ export class HarnessDB {
       status?: ActionRow['status']
       cursor?: { createdAt: string; id: number }
       limit: number
-    },
+    }
   ) {
     return this.actions.listForTask(taskId, options)
   }
@@ -254,7 +274,10 @@ export class HarnessDB {
     return this.actions.getSectionById(sectionId)
   }
 
-  async listActionSections(actionId: number, options: { types?: string[]; cursor?: number; limit: number }) {
+  async listActionSections(
+    actionId: number,
+    options: { types?: string[]; cursor?: number; limit: number }
+  ) {
     return this.actions.listSections(actionId, options)
   }
 
@@ -270,7 +293,7 @@ export class HarnessDB {
    *  rolls back the whole batch. Returns the number of files recorded. */
   async recordFiles(
     actionId: number,
-    files: Array<{ filePath: string; operation: ActionFileRow['operation']; notes?: string }>,
+    files: Array<{ filePath: string; operation: ActionFileRow['operation']; notes?: string }>
   ): Promise<number> {
     return this.driver.transaction(async (tx) => {
       const txActions = new ActionRepository(tx)
@@ -287,13 +310,19 @@ export class HarnessDB {
    *  recorded. */
   async recordTools(
     actionId: number,
-    calls: Array<{ toolName: string; argsJson?: string; resultSummary?: string }>,
+    calls: Array<{ toolName: string; argsJson?: string; resultSummary?: string }>
   ): Promise<number> {
     const now = new Date().toISOString()
     return this.driver.transaction(async (tx) => {
       const txActions = new ActionRepository(tx)
       for (const c of calls) {
-        await txActions.addTool(actionId, c.toolName, c.argsJson ?? null, c.resultSummary ?? null, now)
+        await txActions.addTool(
+          actionId,
+          c.toolName,
+          c.argsJson ?? null,
+          c.resultSummary ?? null,
+          now
+        )
       }
       return calls.length
     })
@@ -403,7 +432,11 @@ export class HarnessDB {
   /** Imports a full export into THIS db's driver — see standalone
    *  `importFullExport()` for the transactional/rollback/sequence-reset
    *  guarantees. `dbType` must match `this.config.database.type`. */
-  async importFullExport(data: FullExport, dbType: 'sqlite' | 'postgres' | 'mysql', opts?: { truncateFirst: boolean }): Promise<void> {
+  async importFullExport(
+    data: FullExport,
+    dbType: 'sqlite' | 'postgres' | 'mysql',
+    opts?: { truncateFirst: boolean }
+  ): Promise<void> {
     return importFullExport(this.driver, data, dbType, opts)
   }
 
@@ -418,7 +451,7 @@ export class HarnessDB {
   // ─── feature_list.json sync ───────────────────────────────────────────────
 
   async syncFromFeatureList(
-    seeds: { slug: string; title: string; description?: string; acceptance?: string[] }[],
+    seeds: { slug: string; title: string; description?: string; acceptance?: string[] }[]
   ): Promise<{ added: number; skipped: number }> {
     let added = 0
     let skipped = 0
@@ -442,7 +475,7 @@ export class HarnessDB {
         description: t.description ?? undefined,
         acceptance: (await this.tasks.getAcceptance(t.id)).map((a) => a.criterion),
         status: t.status,
-      })),
+      }))
     )
     const path = join(resolve(cwd), this.config.storage.dir, 'feature_list.json')
     mkdirSync(dirname(path), { recursive: true })
@@ -471,7 +504,9 @@ export class HarnessDB {
 /** Row counts for all 6 tables, queried directly (never inferred). Used to
  *  decide whether a destination DB is "empty" before an sqlite↔remote
  *  migration. */
-export async function getRowCounts(driver: DBDriver): Promise<Record<(typeof TABLE_INSERT_ORDER)[number], number>> {
+export async function getRowCounts(
+  driver: DBDriver
+): Promise<Record<(typeof TABLE_INSERT_ORDER)[number], number>> {
   const counts = {} as Record<(typeof TABLE_INSERT_ORDER)[number], number>
   for (const table of TABLE_INSERT_ORDER) {
     const row = await driver.queryOne<{ n: number }>(`SELECT COUNT(*) as n FROM ${table}`)
@@ -506,7 +541,7 @@ async function truncateAllTables(tx: DBDriver): Promise<void> {
  *  greater than the current counter — no action needed there. */
 export async function resetAutoincrementSequences(
   tx: DBDriver,
-  dbType: 'sqlite' | 'postgres' | 'mysql',
+  dbType: 'sqlite' | 'postgres' | 'mysql'
 ): Promise<void> {
   if (dbType === 'mysql') return // AUTO_INCREMENT self-advances on explicit-id insert — verified in tests.
 
@@ -521,7 +556,7 @@ export async function resetAutoincrementSequences(
       // sqlite: sqlite_sequence only gets a row once a real AUTOINCREMENT
       // insert happens; explicit-id inserts bypass that, so upsert it.
       await tx.execRaw(
-        `INSERT INTO sqlite_sequence (name, seq) SELECT '${table}', ${max} WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = '${table}')`,
+        `INSERT INTO sqlite_sequence (name, seq) SELECT '${table}', ${max} WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = '${table}')`
       )
       await tx.execRaw(`UPDATE sqlite_sequence SET seq = ${max} WHERE name = '${table}'`)
     }
@@ -542,7 +577,7 @@ export async function importFullExport(
   destDriver: DBDriver,
   data: FullExport,
   destDbType: 'sqlite' | 'postgres' | 'mysql',
-  opts: { truncateFirst: boolean } = { truncateFirst: false },
+  opts: { truncateFirst: boolean } = { truncateFirst: false }
 ): Promise<void> {
   // Task #73: actions.id moved from a UUID/TEXT id to an autoincrement
   // INTEGER. An export produced by a pre-2.0 build still carries string
@@ -554,7 +589,7 @@ export async function importFullExport(
     throw new Error(
       'This export was produced by an older version of agent-harness-kit (actions used text/UUID ids, pre-2.0) and ' +
         'cannot be imported into a database using the current integer-id actions schema. Re-exporting from the old build ' +
-        'is the only way to fix this — importing this file as-is is not supported.',
+        'is the only way to fix this — importing this file as-is is not supported.'
     )
   }
 
@@ -578,42 +613,57 @@ export async function importFullExport(
           task.completed_at,
           task.archived_at,
           task.updated_at,
-        ],
+        ]
       )
     }
 
     for (const ta of data.taskAcceptance) {
       await tx.exec(
         `INSERT INTO task_acceptance (id, task_id, criterion, met) VALUES (?, ?, ?, ?)`,
-        [ta.id, ta.task_id, ta.criterion, ta.met],
+        [ta.id, ta.task_id, ta.criterion, ta.met]
       )
     }
 
     for (const action of data.actions) {
       await tx.exec(
         `INSERT INTO actions (id, task_id, agent, status, created_at, completed_at, summary) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [action.id, action.task_id, action.agent, action.status, action.created_at, action.completed_at, action.summary],
+        [
+          action.id,
+          action.task_id,
+          action.agent,
+          action.status,
+          action.created_at,
+          action.completed_at,
+          action.summary,
+        ]
       )
     }
 
     for (const section of data.sections) {
       await tx.exec(
         `INSERT INTO action_sections (id, action_id, section_type, content, created_at) VALUES (?, ?, ?, ?, ?)`,
-        [section.id, section.action_id, section.section_type, section.content, section.created_at],
+        [section.id, section.action_id, section.section_type, section.content, section.created_at]
       )
     }
 
     for (const file of data.actionFiles) {
       await tx.exec(
         `INSERT INTO action_files (id, action_id, file_path, operation, notes) VALUES (?, ?, ?, ?, ?)`,
-        [file.id, file.action_id, file.file_path, file.operation, file.notes],
+        [file.id, file.action_id, file.file_path, file.operation, file.notes]
       )
     }
 
     for (const tool of data.actionTools) {
       await tx.exec(
         `INSERT INTO action_tools (id, action_id, tool_name, args_json, result_summary, called_at) VALUES (?, ?, ?, ?, ?, ?)`,
-        [tool.id, tool.action_id, tool.tool_name, tool.args_json, tool.result_summary, tool.called_at],
+        [
+          tool.id,
+          tool.action_id,
+          tool.tool_name,
+          tool.args_json,
+          tool.result_summary,
+          tool.called_at,
+        ]
       )
     }
 
@@ -630,7 +680,7 @@ export function resolveSqlitePathForScope(
   sqlitePath: string,
   cwd: string,
   config: HarnessConfig,
-  homeDir: string,
+  homeDir: string
 ): string {
   return scope === 'global'
     ? join(resolveGlobalStorageDir(config, homeDir), 'harness.db')
@@ -644,8 +694,15 @@ export function resolveSqlitePathForScope(
  *  reading `config.database`/`config.storage.sqlitePath` directly — routing
  *  everything through here is what keeps new call sites from re-introducing
  *  the "reads a local-only field while scope=global" bug class (task #55/#56). */
-export function resolveSqlitePath(config: HarnessConfig, cwd: string, homeDir: string = homedir()): string {
-  const sqlitePath = config.storage.scope === 'local' ? (config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH) : DEFAULT_SQLITE_PATH
+export function resolveSqlitePath(
+  config: HarnessConfig,
+  cwd: string,
+  homeDir: string = homedir()
+): string {
+  const sqlitePath =
+    config.storage.scope === 'local'
+      ? (config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH)
+      : DEFAULT_SQLITE_PATH
   return resolveSqlitePathForScope(config.storage.scope, sqlitePath, cwd, config, homeDir)
 }
 
@@ -654,7 +711,11 @@ export function resolveSqlitePath(config: HarnessConfig, cwd: string, homeDir: s
  *  uses. Mirrors `resolveSqlitePath()` — call sites (materializers, reset,
  *  health) should use this instead of reading `storage.markdownFallback.path`
  *  directly, since that field doesn't exist at all under scope='global'. */
-export function resolveMarkdownFallbackPath(config: HarnessConfig, cwd: string, homeDir: string = homedir()): string {
+export function resolveMarkdownFallbackPath(
+  config: HarnessConfig,
+  cwd: string,
+  homeDir: string = homedir()
+): string {
   return config.storage.scope === 'global'
     ? join(resolveGlobalStorageDir(config, homeDir), 'current.md')
     : resolve(cwd, config.storage.markdownFallback.path)
@@ -684,7 +745,11 @@ export function readStorageStateFile(cwd: string, storageDir: string): StorageSt
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
-export async function openDB(config: HarnessConfig, cwd: string, homeDir: string = homedir()): Promise<HarnessDB> {
+export async function openDB(
+  config: HarnessConfig,
+  cwd: string,
+  homeDir: string = homedir()
+): Promise<HarnessDB> {
   const dbConfig = config.database
   let driver: DBDriver
 
@@ -712,11 +777,12 @@ export async function openDB(config: HarnessConfig, cwd: string, homeDir: string
           const existingState = JSON.parse(readFileSync(existingStatePath, 'utf8')) as StorageState
           if (existingState.projectId !== config.storage.projectId) {
             throw new Error(
-              `Global storage dir ${globalDir} already holds a different project (projectId: ${existingState.projectId}). Refusing to reuse it.`,
+              `Global storage dir ${globalDir} already holds a different project (projectId: ${existingState.projectId}). Refusing to reuse it.`
             )
           }
         } catch (err) {
-          if (err instanceof Error && err.message.includes('already holds a different project')) throw err
+          if (err instanceof Error && err.message.includes('already holds a different project'))
+            throw err
           // Malformed/unreadable state file — ignore and proceed, mkdirSync below is idempotent.
         }
       }

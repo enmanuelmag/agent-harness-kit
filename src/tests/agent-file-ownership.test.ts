@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
@@ -62,7 +70,14 @@ const PROVIDERS: { provider: Provider; dir: string; files: string[] }[] = [
   {
     provider: 'codex-cli',
     dir: '.codex/agents',
-    files: ['lead.toml', 'explorer.toml', 'consultant.toml', 'builder.toml', 'reviewer.toml', 'default.toml'],
+    files: [
+      'lead.toml',
+      'explorer.toml',
+      'consultant.toml',
+      'builder.toml',
+      'reviewer.toml',
+      'default.toml',
+    ],
   },
   {
     provider: 'grok-cli',
@@ -97,7 +112,11 @@ for (const { provider, dir, files } of PROVIDERS) {
       const report = await materializer.build(configFor(provider), cwd)
 
       assert.equal(readFileSync(target, 'utf8'), customized, 'the edit must survive rebuild')
-      assert.equal(report.agents.overwritten.length, 0, 'nothing may be overwritten without --force')
+      assert.equal(
+        report.agents.overwritten.length,
+        0,
+        'nothing may be overwritten without --force'
+      )
       assert.equal(report.agents.preserved.length, files.length)
     })
 
@@ -149,7 +168,7 @@ for (const { provider, dir, files } of PROVIDERS) {
       assert.equal(
         readFileSync(backedUp, 'utf8'),
         'IRREPLACEABLE\n',
-        'the backup must hold the PREVIOUS content, not the regenerated one',
+        'the backup must hold the PREVIOUS content, not the regenerated one'
       )
     })
 
@@ -163,7 +182,7 @@ for (const { provider, dir, files } of PROVIDERS) {
       assert.equal(report.agents.backupDir, undefined)
       assert.ok(
         !existsSync(join(cwd, config.storage.dir, 'backups')),
-        'a non-destructive build must not create a backups directory',
+        'a non-destructive build must not create a backups directory'
       )
     })
   })
@@ -257,8 +276,12 @@ describe('writeAgentFiles — backup is fail-safe', () => {
 
     try {
       assert.throws(
-        () => writeAgentFiles(cwd, [{ relPath, content: 'REGENERATED\n' }], { force: true, backupRoot }),
-        /Aborting WITHOUT overwriting anything/,
+        () =>
+          writeAgentFiles(cwd, [{ relPath, content: 'REGENERATED\n' }], {
+            force: true,
+            backupRoot,
+          }),
+        /Aborting WITHOUT overwriting anything/
       )
       // The fail-safe guarantee: the destructive write never ran.
       assert.equal(readFileSync(join(cwd, relPath), 'utf8'), original)
@@ -275,7 +298,7 @@ describe('writeAgentFiles — backup is fail-safe', () => {
 
     assert.throws(
       () => writeAgentFiles(cwd, [{ relPath, content: 'REGENERATED\n' }], { force: true }),
-      /Refusing to overwrite without a backup/,
+      /Refusing to overwrite without a backup/
     )
     assert.equal(readFileSync(join(cwd, relPath), 'utf8'), 'ORIGINAL\n')
   })
@@ -303,7 +326,11 @@ describe('writeAgentFiles — backup is fail-safe', () => {
     writeFileSync(target, 'EDIT TWO\n', 'utf8')
     const second = await materializer.build(config, cwd, { force: true })
 
-    assert.notEqual(first.agents.backupDir, second.agents.backupDir, 'a second --force must not clobber the first backup')
+    assert.notEqual(
+      first.agents.backupDir,
+      second.agents.backupDir,
+      'a second --force must not clobber the first backup'
+    )
     const backupsRoot = join(cwd, config.storage.dir, 'backups')
     assert.equal(readdirSync(backupsRoot).length, 2)
   })

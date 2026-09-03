@@ -1,35 +1,32 @@
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
 
-import { AgentBadge } from '@/components/shared/agent-badge';
-import { EmptyTableRow } from '@/components/shared/empty-table-row';
-import { LoadingTableRow } from '@/components/shared/loading-state';
-import { OperationBadge } from '@/components/shared/operation-badge';
-import { PageHeader } from '@/components/shared/page-header';
-import { api, formatDate,qk } from '@/lib/api';
+import { AgentBadge } from '@/components/shared/agent-badge'
+import { EmptyTableRow } from '@/components/shared/empty-table-row'
+import { LoadingTableRow } from '@/components/shared/loading-state'
+import { OperationBadge } from '@/components/shared/operation-badge'
+import { PageHeader } from '@/components/shared/page-header'
+import { api, formatDate, qk } from '@/lib/api'
 
-import type { RecentFile } from '@/schema/api';
+import type { RecentFile } from '@/schema/api'
 
 export const Route = createFileRoute('/files')({
   component: FilesPage,
-});
+})
 
 function FilesPage() {
   const topFiles = useQuery({
     queryKey: qk.topFiles,
     queryFn: () => api.topFiles(25),
-  });
+  })
   const recentFiles = useQuery({
     queryKey: qk.recentFiles,
     queryFn: () => api.recentFiles(60),
-  });
+  })
 
   return (
     <div>
-      <PageHeader
-        title="Files"
-        subtitle="File operations across all agent actions"
-      />
+      <PageHeader title="Files" subtitle="File operations across all agent actions" />
 
       <div className="p-6 space-y-8">
         {/* Most-touched files */}
@@ -40,14 +37,7 @@ function FilesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--color-border)]">
-                {[
-                  'File Path',
-                  'Total',
-                  'Read',
-                  'Created',
-                  'Modified',
-                  'Deleted',
-                ].map((h) => (
+                {['File Path', 'Total', 'Read', 'Created', 'Modified', 'Deleted'].map((h) => (
                   <th
                     key={h}
                     className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-2"
@@ -73,15 +63,11 @@ function FilesPage() {
                   <td className="px-4 py-2 font-mono text-xs text-[var(--color-text-faint)]">
                     {f.read || '—'}
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-green-400">
-                    {f.created || '—'}
-                  </td>
+                  <td className="px-4 py-2 font-mono text-xs text-green-400">{f.created || '—'}</td>
                   <td className="px-4 py-2 font-mono text-xs text-amber-400">
                     {f.modified || '—'}
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-red-400">
-                    {f.deleted || '—'}
-                  </td>
+                  <td className="px-4 py-2 font-mono text-xs text-red-400">{f.deleted || '—'}</td>
                 </tr>
               ))}
               {!topFiles.isLoading && topFiles.data?.length === 0 && (
@@ -99,16 +85,14 @@ function FilesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--color-border)]">
-                {['Op', 'File Path', 'Agent', 'Task', 'Notes', 'When'].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-2"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {['Op', 'File Path', 'Agent', 'Task', 'Notes', 'When'].map((h) => (
+                  <th
+                    key={h}
+                    className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-2"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -124,7 +108,7 @@ function FilesPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function RecentFileRow({ file }: { file: RecentFile }) {
@@ -149,5 +133,5 @@ function RecentFileRow({ file }: { file: RecentFile }) {
         {formatDate(file.called_at)}
       </td>
     </tr>
-  );
+  )
 }

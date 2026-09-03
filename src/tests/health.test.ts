@@ -105,7 +105,7 @@ export default {
   },
 }
 `,
-    'utf8',
+    'utf8'
   )
 
   mkdirSync(join(TMP, '.harness'), { recursive: true })

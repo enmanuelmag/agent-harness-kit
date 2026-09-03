@@ -313,7 +313,9 @@ function configObject(params: ConfigTemplateParams): Record<string, unknown> {
       },
       // Same scope rule as configObjectBody(): 'global' has no local path to
       // declare, so markdownFallback.path is omitted for it.
-      markdownFallback: isGlobal ? { enabled: true } : { enabled: true, path: '.harness/current.md' },
+      markdownFallback: isGlobal
+        ? { enabled: true }
+        : { enabled: true, path: '.harness/current.md' },
       scope: params.scope,
       projectId: params.projectId,
     },
@@ -417,7 +419,10 @@ export function injectDelegationGuidance(md: string, delegationGuidance: string)
   if (researchSection) {
     const insertionPoint = researchSection[1].length + '## Available Research Tools\n\n'.length
     const afterResearch = md.slice(insertionPoint)
-    return md.slice(0, insertionPoint) + `\n## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${afterResearch}`
+    return (
+      md.slice(0, insertionPoint) +
+      `\n## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${afterResearch}`
+    )
   }
   // Fallback: insert after H1 heading block.
   const headingMatch = md.match(/^(#\s+.*?\n\n)/m)
@@ -425,7 +430,11 @@ export function injectDelegationGuidance(md: string, delegationGuidance: string)
   return `${headingMatch[1]}## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${md.slice(headingMatch[1].length)}`
 }
 
-export function agentLead(opts: { projectName: string }, capabilityHints = '', delegationGuidance = ''): string {
+export function agentLead(
+  opts: { projectName: string },
+  capabilityHints = '',
+  delegationGuidance = ''
+): string {
   let result = loadAgentTemplate('lead', opts)
   result = injectCapabilityHints(result, capabilityHints)
   result = injectDelegationGuidance(result, delegationGuidance)
@@ -545,34 +554,58 @@ ${safe(instructions)}
 `
 }
 
-export function agentLeadToml(vars: { projectName: string }, opts?: CodexAgentModelChoice, delegationGuidance = ''): string {
+export function agentLeadToml(
+  vars: { projectName: string },
+  opts?: CodexAgentModelChoice,
+  delegationGuidance = ''
+): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  const bodyWithDelegation = delegationGuidance ? `${body}\n\n## Provider Delegation Guidance\n\n${delegationGuidance}` : body
+  const bodyWithDelegation = delegationGuidance
+    ? `${body}\n\n## Provider Delegation Guidance\n\n${delegationGuidance}`
+    : body
   return toCodexToml('lead', 'lead', description, bodyWithDelegation, opts)
 }
 
-export function agentLeadAsDefaultToml(vars: { projectName: string }, opts?: CodexAgentModelChoice, delegationGuidance = ''): string {
+export function agentLeadAsDefaultToml(
+  vars: { projectName: string },
+  opts?: CodexAgentModelChoice,
+  delegationGuidance = ''
+): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('lead', vars))
-  const bodyWithDelegation = delegationGuidance ? `${body}\n\n## Provider Delegation Guidance\n\n${delegationGuidance}` : body
+  const bodyWithDelegation = delegationGuidance
+    ? `${body}\n\n## Provider Delegation Guidance\n\n${delegationGuidance}`
+    : body
   return toCodexToml('default', 'lead', description, bodyWithDelegation, opts)
 }
 
-export function agentExplorerToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
+export function agentExplorerToml(
+  vars: { projectName: string },
+  opts?: CodexAgentModelChoice
+): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('explorer', vars))
   return toCodexToml('explorer', 'explorer', description, body, opts)
 }
 
-export function agentBuilderToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
+export function agentBuilderToml(
+  vars: { projectName: string },
+  opts?: CodexAgentModelChoice
+): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('builder', vars))
   return toCodexToml('builder', 'builder', description, body, opts)
 }
 
-export function agentReviewerToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
+export function agentReviewerToml(
+  vars: { projectName: string },
+  opts?: CodexAgentModelChoice
+): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('reviewer', vars))
   return toCodexToml('reviewer', 'reviewer', description, body, opts)
 }
 
-export function agentConsultantToml(vars: { projectName: string }, opts?: CodexAgentModelChoice): string {
+export function agentConsultantToml(
+  vars: { projectName: string },
+  opts?: CodexAgentModelChoice
+): string {
   const { description, body } = stripFrontmatter(loadAgentTemplate('consultant', vars))
   return toCodexToml('consultant', 'consultant', description, body, opts)
 }
@@ -617,7 +650,11 @@ function appendFrontmatterScalar(md: string, key: string, value: string): string
  * Appends a nested YAML mapping (e.g. `permission:\n  edit: deny`) to the end of
  * the frontmatter, just before its closing `---`.
  */
-function appendFrontmatterMapping(md: string, key: string, entries: Record<string, string>): string {
+function appendFrontmatterMapping(
+  md: string,
+  key: string,
+  entries: Record<string, string>
+): string {
   const keys = Object.keys(entries)
   if (keys.length === 0) return md
   const block = `${key}:\n${keys.map((k) => `  ${k}: ${entries[k]}`).join('\n')}\n`

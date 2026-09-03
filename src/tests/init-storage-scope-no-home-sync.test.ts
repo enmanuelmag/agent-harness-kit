@@ -60,11 +60,20 @@ describe('storage.scope=global never writes agent/skill files under the home dir
 
     // The DB storage dir (task #45 behavior) is the only thing expected under
     // the fake home when scope=global.
-    assert.ok(existsSync(join(fakeHome, '.harness', 'dbs')), 'DB storage dir should still be created under home')
+    assert.ok(
+      existsSync(join(fakeHome, '.harness', 'dbs')),
+      'DB storage dir should still be created under home'
+    )
 
     // Provider agent/skill files must exist project-locally instead.
-    assert.ok(existsSync(join(installDir, '.claude', 'agents', 'lead.md')), 'agents must be scaffolded project-locally')
-    assert.ok(existsSync(join(installDir, '.claude', 'skills')), 'skills must be scaffolded project-locally')
+    assert.ok(
+      existsSync(join(installDir, '.claude', 'agents', 'lead.md')),
+      'agents must be scaffolded project-locally'
+    )
+    assert.ok(
+      existsSync(join(installDir, '.claude', 'skills')),
+      'skills must be scaffolded project-locally'
+    )
 
     // Sanity: fake home only contains the expected .harness tree, nothing else.
     const homeEntries = readdirSync(fakeHome)

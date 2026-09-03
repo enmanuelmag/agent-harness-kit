@@ -3,7 +3,10 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 
-import { detectPackageManager, getMcpCommandParts } from '@/core/materializer/detect-package-manager'
+import {
+  detectPackageManager,
+  getMcpCommandParts,
+} from '@/core/materializer/detect-package-manager'
 import { pkg } from '@/core/package-data'
 
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-detect-package-manager')
@@ -133,31 +136,66 @@ function makeLocalInstallTmp(suffix: string): string {
 describe('getMcpCommandParts — local install (package manager mediated)', () => {
   test('npm → npx --no ahk serve --port <port>', () => {
     const dir = makeLocalInstallTmp('cmd-local-npm')
-    assert.deepEqual(getMcpCommandParts('npm', 3456, dir), ['npx', '--no', 'ahk', 'serve', '--port', '3456'])
+    assert.deepEqual(getMcpCommandParts('npm', 3456, dir), [
+      'npx',
+      '--no',
+      'ahk',
+      'serve',
+      '--port',
+      '3456',
+    ])
     cleanTmp()
   })
 
   test('pnpm → pnpm exec ahk serve --port <port>', () => {
     const dir = makeLocalInstallTmp('cmd-local-pnpm')
-    assert.deepEqual(getMcpCommandParts('pnpm', 3456, dir), ['pnpm', 'exec', 'ahk', 'serve', '--port', '3456'])
+    assert.deepEqual(getMcpCommandParts('pnpm', 3456, dir), [
+      'pnpm',
+      'exec',
+      'ahk',
+      'serve',
+      '--port',
+      '3456',
+    ])
     cleanTmp()
   })
 
   test('yarn-classic → yarn run ahk serve --port <port>', () => {
     const dir = makeLocalInstallTmp('cmd-local-yarn-classic')
-    assert.deepEqual(getMcpCommandParts('yarn-classic', 3456, dir), ['yarn', 'run', 'ahk', 'serve', '--port', '3456'])
+    assert.deepEqual(getMcpCommandParts('yarn-classic', 3456, dir), [
+      'yarn',
+      'run',
+      'ahk',
+      'serve',
+      '--port',
+      '3456',
+    ])
     cleanTmp()
   })
 
   test('yarn-berry → yarn run ahk serve --port <port>', () => {
     const dir = makeLocalInstallTmp('cmd-local-yarn-berry')
-    assert.deepEqual(getMcpCommandParts('yarn-berry', 3456, dir), ['yarn', 'run', 'ahk', 'serve', '--port', '3456'])
+    assert.deepEqual(getMcpCommandParts('yarn-berry', 3456, dir), [
+      'yarn',
+      'run',
+      'ahk',
+      'serve',
+      '--port',
+      '3456',
+    ])
     cleanTmp()
   })
 
   test('bun → bunx --no-install ahk serve --port <port>', () => {
     const dir = makeLocalInstallTmp('cmd-local-bun')
-    assert.deepEqual(getMcpCommandParts('bun', 3456, dir), ['bunx', '--no-install', 'ahk', 'serve', '--port', '3456'])
+    assert.deepEqual(getMcpCommandParts('bun', 3456, dir), [
+      'bunx',
+      '--no-install',
+      'ahk',
+      'serve',
+      '--port',
+      '3456',
+    ])
     cleanTmp()
   })
 })
@@ -176,7 +214,10 @@ describe('getMcpCommandParts — global install (no local dependency)', () => {
 
   test('still bare when a package.json exists but does not depend on the package', () => {
     const dir = makeTmp('cmd-global-unrelated-pkg')
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'some-other-project', packageManager: 'pnpm@8.15.0' }))
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'some-other-project', packageManager: 'pnpm@8.15.0' })
+    )
     assert.deepEqual(getMcpCommandParts('pnpm', 3456, dir), BARE)
     cleanTmp()
   })

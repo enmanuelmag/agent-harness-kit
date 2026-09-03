@@ -35,7 +35,11 @@ export async function runHealth(cwd: string): Promise<void> {
   } else {
     // For remote DBs we can't check the file — assume reachable (openDB will fail fast if not)
     dbOk = true
-    checkLine('checking DB', true, `${config.database.type}://${config.database.connectionString.replace(/:[^:@]*@/, ':***@')} configured`)
+    checkLine(
+      'checking DB',
+      true,
+      `${config.database.type}://${config.database.connectionString.replace(/:[^:@]*@/, ':***@')} configured`
+    )
   }
   if (!dbOk) allOk = false
 
@@ -53,7 +57,7 @@ export async function runHealth(cwd: string): Promise<void> {
       i === 0 ? 'checking agents' : null,
       ok,
       `${name}${providerFiles.agentExtension} present`,
-      agentsLabelWidth,
+      agentsLabelWidth
     )
     if (!ok) allOk = false
   }

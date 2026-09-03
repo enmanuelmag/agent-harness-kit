@@ -67,13 +67,19 @@ describe('delegation guidance', () => {
     it('includes Provider Delegation Guidance section when delegationGuidance is passed', () => {
       const guidance = renderDelegationGuidance('claude-code', 'lead')
       const result = agentLead({ projectName: 'TestProject' }, '', guidance)
-      assert.ok(result.includes('## Provider Delegation Guidance'), 'should contain delegation section heading')
+      assert.ok(
+        result.includes('## Provider Delegation Guidance'),
+        'should contain delegation section heading'
+      )
       assert.ok(result.includes(guidance), 'should contain the rendered guidance text')
     })
 
     it('omits Provider Delegation Guidance when no delegationGuidance is provided', () => {
       const result = agentLead({ projectName: 'TestProject' })
-      assert.ok(!result.includes('## Provider Delegation Guidance'), 'should NOT contain delegation section')
+      assert.ok(
+        !result.includes('## Provider Delegation Guidance'),
+        'should NOT contain delegation section'
+      )
     })
 
     it('places delegation guidance after research tools when both are provided', () => {
@@ -113,26 +119,42 @@ describe('delegation guidance', () => {
 
   describe('all four providers produce delegation guidance for lead', () => {
     it('claude-code lead gets delegation guidance', () => {
-      const result = agentLead({ projectName: 'TestProject' }, '', renderDelegationGuidance('claude-code', 'lead'))
+      const result = agentLead(
+        { projectName: 'TestProject' },
+        '',
+        renderDelegationGuidance('claude-code', 'lead')
+      )
       assert.ok(result.includes('## Provider Delegation Guidance'))
       assert.ok(result.includes('@'))
     })
 
     it('opencode lead gets delegation guidance', () => {
-      const result = agentLead({ projectName: 'TestProject' }, '', renderDelegationGuidance('opencode', 'lead'))
+      const result = agentLead(
+        { projectName: 'TestProject' },
+        '',
+        renderDelegationGuidance('opencode', 'lead')
+      )
       assert.ok(result.includes('## Provider Delegation Guidance'))
       assert.ok(result.includes('@'))
     })
 
     it('codex-cli lead gets delegation guidance', () => {
-      const result = agentLead({ projectName: 'TestProject' }, '', renderDelegationGuidance('codex-cli', 'lead'))
+      const result = agentLead(
+        { projectName: 'TestProject' },
+        '',
+        renderDelegationGuidance('codex-cli', 'lead')
+      )
       assert.ok(result.includes('## Provider Delegation Guidance'))
       assert.ok(result.includes('spawn'))
       assert.ok(result.includes('delegate'))
     })
 
     it('grok-cli lead gets delegation guidance', () => {
-      const result = agentLead({ projectName: 'TestProject' }, '', renderDelegationGuidance('grok-cli', 'lead'))
+      const result = agentLead(
+        { projectName: 'TestProject' },
+        '',
+        renderDelegationGuidance('grok-cli', 'lead')
+      )
       assert.ok(result.includes('## Provider Delegation Guidance'))
       assert.ok(result.includes('/tasks'))
     })
@@ -185,7 +207,10 @@ describe('coordination skill injection', () => {
       content = injectDelegationGuidance(content, guidance)
       writeFileSync(join(destDir, 'SKILL.md'), content, 'utf8')
       const result = readFileSync(join(destDir, 'SKILL.md'), 'utf8')
-      assert.ok(result.includes('## Provider Delegation Guidance'), 'should contain delegation section')
+      assert.ok(
+        result.includes('## Provider Delegation Guidance'),
+        'should contain delegation section'
+      )
       assert.ok(result.includes(guidance), 'should contain rendered guidance text')
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
@@ -197,7 +222,13 @@ describe('coordination skill injection', () => {
     try {
       const srcDir = join(__dirname, '../../src/core/materializer/skills')
       writeSkills(tmpDir, '.skills')
-      for (const skillName of ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test']) {
+      for (const skillName of [
+        'ahk-ask',
+        'ahk-consultant',
+        'ahk-triage',
+        'ahk-review',
+        'ahk-test',
+      ]) {
         const source = readFileSync(join(srcDir, skillName, 'SKILL.md'), 'utf8')
         const dest = readFileSync(join(tmpDir, '.skills', skillName, 'SKILL.md'), 'utf8')
         assert.equal(dest, source, `${skillName} should be byte-for-byte copy`)

@@ -72,7 +72,9 @@ export function claudeDisallowedTools(agentName: AgentName): string[] {
  * dict is deprecated upstream in favour of `permission`, so nothing is emitted
  * for the unrestricted case.
  */
-export function opencodePermissions(agentName: AgentName): Record<string, 'allow' | 'ask' | 'deny'> {
+export function opencodePermissions(
+  agentName: AgentName
+): Record<string, 'allow' | 'ask' | 'deny'> {
   return restrictionFor(agentName) === 'no-write' ? { edit: 'deny' } : {}
 }
 
@@ -141,6 +143,16 @@ export function codexRestrictionNotice(agentName: AgentName): string {
  */
 export function grokToolsAllowlist(agentName: AgentName): string[] {
   return restrictionFor(agentName) === 'no-write'
-    ? ['Bash', 'Read', 'NotebookRead', 'Grep', 'Glob', 'WebFetch', 'WebSearch', 'search_tool', 'use_tool']
+    ? [
+        'Bash',
+        'Read',
+        'NotebookRead',
+        'Grep',
+        'Glob',
+        'WebFetch',
+        'WebSearch',
+        'search_tool',
+        'use_tool',
+      ]
     : []
 }

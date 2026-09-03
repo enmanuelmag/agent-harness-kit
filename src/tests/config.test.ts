@@ -13,7 +13,11 @@ afterEach(() => {
 
 function writeRawConfig(dir: string, objectLiteral: string): void {
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'agent-harness-kit.config.ts'), `export default ${objectLiteral}\n`, 'utf8')
+  writeFileSync(
+    join(dir, 'agent-harness-kit.config.ts'),
+    `export default ${objectLiteral}\n`,
+    'utf8'
+  )
 }
 
 // ─── applyDefaults() legacy-shape warn+normalize (task #56) ────────────────
@@ -45,7 +49,7 @@ describe('loadConfig — legacy contradictory storage shape (scope=global + loca
   },
   health: { scriptPath: './health.sh', required: false },
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
-}`,
+}`
     )
 
     const originalWarn = console.warn
@@ -62,14 +66,16 @@ describe('loadConfig — legacy contradictory storage shape (scope=global + loca
     }
 
     assert.ok(
-      warnings.some((w) => w.includes('database.path') && w.includes('storage.scope') && w.includes('global')),
-      `expected a warning about the legacy contradictory shape, got: ${JSON.stringify(warnings)}`,
+      warnings.some(
+        (w) => w.includes('database.path') && w.includes('storage.scope') && w.includes('global')
+      ),
+      `expected a warning about the legacy contradictory shape, got: ${JSON.stringify(warnings)}`
     )
     assert.equal(config.storage.scope, 'global')
     assert.ok(!('path' in config.database), 'database.path must be stripped under scope=global')
     assert.ok(
       !('path' in config.storage.markdownFallback),
-      'storage.markdownFallback.path must be stripped under scope=global',
+      'storage.markdownFallback.path must be stripped under scope=global'
     )
     // Non-contradictory fields must survive untouched.
     assert.equal(config.storage.projectId, 'legacy-contradictory-project')
@@ -94,7 +100,7 @@ describe('loadConfig — legacy contradictory storage shape (scope=global + loca
   },
   health: { scriptPath: './health.sh', required: false },
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
-}`,
+}`
     )
 
     const originalWarn = console.warn
@@ -110,7 +116,11 @@ describe('loadConfig — legacy contradictory storage shape (scope=global + loca
       console.warn = originalWarn
     }
 
-    assert.equal(warnings.length, 0, `expected no warnings for a valid scope=local config, got: ${JSON.stringify(warnings)}`)
+    assert.equal(
+      warnings.length,
+      0,
+      `expected no warnings for a valid scope=local config, got: ${JSON.stringify(warnings)}`
+    )
     assert.equal(config.storage.scope, 'local')
   })
 
@@ -132,7 +142,7 @@ describe('loadConfig — legacy contradictory storage shape (scope=global + loca
   },
   health: { scriptPath: './health.sh', required: false },
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
-}`,
+}`
     )
 
     const originalWarn = console.warn
@@ -166,7 +176,9 @@ describe('loadConfig — legacy contradictory storage shape (scope=global + loca
 // strips types before evaluation. An existing user config still declaring the
 // fields must load, not crash, with a non-blocking warning.
 
-function captureWarnings(fn: () => Promise<unknown>): Promise<{ warnings: string[]; value: unknown }> {
+function captureWarnings(
+  fn: () => Promise<unknown>
+): Promise<{ warnings: string[]; value: unknown }> {
   const originalWarn = console.warn
   const warnings: string[] = []
   console.warn = (...args: unknown[]) => {
@@ -212,7 +224,7 @@ describe('loadConfig — removed `agents` key', () => {
   },
   health: { scriptPath: './health.sh', required: false },
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
-}`,
+}`
     )
 
     const { warnings, value } = await captureWarnings(() => loadConfig(dir))
@@ -221,18 +233,18 @@ describe('loadConfig — removed `agents` key', () => {
     // The warning must name the offending key and say it no longer applies.
     assert.ok(
       warnings.some((w) => w.includes("'agents'") && w.includes('no longer')),
-      `expected a warning naming the removed key, got: ${JSON.stringify(warnings)}`,
+      `expected a warning naming the removed key, got: ${JSON.stringify(warnings)}`
     )
     // It must say where the settings moved to, so the warning is actionable
     // rather than just an alarm. Naming the file is the whole point: the model
     // and the role instructions are now edited there.
     assert.ok(
       warnings.some((w) => w.includes('model') && w.includes('.claude/agents/')),
-      `warning must point at the agent file, got: ${JSON.stringify(warnings)}`,
+      `warning must point at the agent file, got: ${JSON.stringify(warnings)}`
     )
     assert.ok(
       warnings.some((w) => w.includes('--force')),
-      `warning must mention how to regenerate agent files, got: ${JSON.stringify(warnings)}`,
+      `warning must mention how to regenerate agent files, got: ${JSON.stringify(warnings)}`
     )
 
     // Non-blocking: the config loads and the key is gone entirely.
@@ -274,7 +286,7 @@ describe('loadConfig — removed `agents` key', () => {
   },
   health: { scriptPath: './health.sh', required: false },
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
-}`,
+}`
     )
 
     const { warnings, value } = await captureWarnings(() => loadConfig(dir))
@@ -294,7 +306,7 @@ describe('loadConfig — removed `agents` key', () => {
     // of what was ignored.
     assert.ok(
       warnings[0].includes('agents.lead') && warnings[0].includes('agents.custom'),
-      `warning must enumerate the declared roles, got: ${warnings[0]}`,
+      `warning must enumerate the declared roles, got: ${warnings[0]}`
     )
 
     // INVERTED vs. the previous suite: `model` no longer survives. It is not
@@ -325,7 +337,7 @@ describe('loadConfig — removed `agents` key', () => {
   },
   health: { scriptPath: './health.sh', required: false },
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
-}`,
+}`
     )
 
     const { warnings } = await captureWarnings(() => loadConfig(dir))

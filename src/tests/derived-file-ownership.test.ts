@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
@@ -79,7 +87,11 @@ for (const { provider, files } of PROVIDERS) {
       const report = await materializer.build(configFor(provider), cwd)
 
       for (const [i, file] of files.entries()) {
-        assert.equal(readFileSync(join(cwd, file), 'utf8'), before[i], `${file} must be byte-identical (idempotent)`)
+        assert.equal(
+          readFileSync(join(cwd, file), 'utf8'),
+          before[i],
+          `${file} must be byte-identical (idempotent)`
+        )
         assert.ok(report.derived.current.includes(file), `${file} should be reported current`)
       }
       assert.equal(report.derived.created.length, 0)
@@ -102,7 +114,11 @@ for (const { provider, files } of PROVIDERS) {
         assert.match(after, MARKER_RE, `${file} must be re-stamped with a fresh marker`)
         assert.ok(report.derived.propagated.includes(file), `${file} should be reported propagated`)
       }
-      assert.equal(report.derived.preserved.length, 0, 'nothing may be preserved — the files were our own output')
+      assert.equal(
+        report.derived.preserved.length,
+        0,
+        'nothing may be preserved — the files were our own output'
+      )
     })
 
     test('a HAND-EDITED file is preserved untouched and reported', async () => {
@@ -118,10 +134,18 @@ for (const { provider, files } of PROVIDERS) {
       const report = await materializer.build(configFor(provider), cwd)
 
       for (const file of files) {
-        assert.equal(readFileSync(join(cwd, file), 'utf8'), edited, `${file} edit must survive the build`)
+        assert.equal(
+          readFileSync(join(cwd, file), 'utf8'),
+          edited,
+          `${file} edit must survive the build`
+        )
         assert.ok(report.derived.preserved.includes(file), `${file} should be reported preserved`)
       }
-      assert.equal(report.derived.overwritten.length, 0, 'nothing may be overwritten without --force')
+      assert.equal(
+        report.derived.overwritten.length,
+        0,
+        'nothing may be overwritten without --force'
+      )
       assert.equal(report.derived.backupDir, undefined)
     })
 
@@ -135,7 +159,11 @@ for (const { provider, files } of PROVIDERS) {
       const report = await getMaterializer(provider).build(configFor(provider), cwd)
 
       for (const file of files) {
-        assert.equal(readFileSync(join(cwd, file), 'utf8'), legacy, `${file} must be preserved on first upgrade build`)
+        assert.equal(
+          readFileSync(join(cwd, file), 'utf8'),
+          legacy,
+          `${file} must be preserved on first upgrade build`
+        )
         assert.ok(report.derived.preserved.includes(file), `${file} should be reported preserved`)
       }
       assert.equal(report.derived.overwritten.length, 0)
@@ -153,16 +181,26 @@ for (const { provider, files } of PROVIDERS) {
       const report = await materializer.build(config, cwd, { force: true })
 
       assert.ok(report.derived.backupDir, '--force must report a backup directory')
-      assert.ok(report.derived.backupDir!.includes('derived-'), 'backup dir must use the derived- prefix')
+      assert.ok(
+        report.derived.backupDir!.includes('derived-'),
+        'backup dir must use the derived- prefix'
+      )
       for (const file of files) {
         const regenerated = readFileSync(join(cwd, file), 'utf8')
         assert.match(regenerated, MARKER_RE, `${file} must be re-stamped after --force`)
         assert.notEqual(regenerated, irreplaceable, `${file} must have been regenerated`)
-        assert.ok(report.derived.overwritten.includes(file), `${file} should be reported overwritten`)
+        assert.ok(
+          report.derived.overwritten.includes(file),
+          `${file} should be reported overwritten`
+        )
 
         const backedUp = join(report.derived.backupDir!, file)
         assert.ok(existsSync(backedUp), `${file} must exist in the backup`)
-        assert.equal(readFileSync(backedUp, 'utf8'), irreplaceable, 'backup must hold the PREVIOUS content')
+        assert.equal(
+          readFileSync(backedUp, 'utf8'),
+          irreplaceable,
+          'backup must hold the PREVIOUS content'
+        )
       }
     })
 
@@ -195,16 +233,27 @@ describe('scaffold — freshly scaffolded derived files carry a marker', () => {
 
       for (const file of files) {
         const content = readFileSync(join(cwd, file), 'utf8')
-        assert.match(content, MARKER_RE, `${file} must be stamped by scaffold so the first build does not freeze it`)
+        assert.match(
+          content,
+          MARKER_RE,
+          `${file} must be stamped by scaffold so the first build does not freeze it`
+        )
       }
 
       // The very first build after scaffold must recognize the file as our own
       // output and no-op it — NOT preserve it as if it were human-edited.
       const report = await getMaterializer(provider).build(configFor(provider), cwd)
       for (const file of files) {
-        assert.ok(report.derived.current.includes(file), `${file} must be 'current' on the first post-scaffold build`)
+        assert.ok(
+          report.derived.current.includes(file),
+          `${file} must be 'current' on the first post-scaffold build`
+        )
       }
-      assert.equal(report.derived.preserved.length, 0, 'a scaffolded file must never look human-edited on first build')
+      assert.equal(
+        report.derived.preserved.length,
+        0,
+        'a scaffolded file must never look human-edited on first build'
+      )
     })
   }
 })
@@ -228,7 +277,7 @@ describe('reconcile — derived backup is fail-safe', () => {
     try {
       await assert.rejects(
         () => materializer.build(config, cwd, { force: true }),
-        /Aborting WITHOUT overwriting anything/,
+        /Aborting WITHOUT overwriting anything/
       )
       // The fail-safe guarantee: the destructive write never ran.
       assert.equal(readFileSync(join(cwd, 'AGENTS.md'), 'utf8'), irreplaceable)
@@ -250,7 +299,11 @@ describe('reconcile — derived backup is fail-safe', () => {
     writeFileSync(join(cwd, 'AGENTS.md'), 'EDIT TWO\n', 'utf8')
     const second = await materializer.build(config, cwd, { force: true })
 
-    assert.notEqual(first.derived.backupDir, second.derived.backupDir, 'a second --force must not clobber the first backup')
+    assert.notEqual(
+      first.derived.backupDir,
+      second.derived.backupDir,
+      'a second --force must not clobber the first backup'
+    )
     const backupsRoot = join(cwd, config.storage.dir, 'backups')
     const derivedBackups = readdirSync(backupsRoot).filter((d) => d.startsWith('derived-'))
     assert.equal(derivedBackups.length, 2)

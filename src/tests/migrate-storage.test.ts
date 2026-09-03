@@ -68,7 +68,10 @@ const SHARED_STORAGE_FIELDS = {
  *  the runtime value happens to be 'local'), so spreading it and overriding
  *  `scope` doesn't type-check cleanly against either union member (task #56).
  *  Building the object from known-local fields sidesteps that entirely. */
-function localStorage(projectId: string, overrides: Partial<Omit<LocalStorageConfig, 'scope' | 'projectId'>> = {}): HarnessConfig['storage'] {
+function localStorage(
+  projectId: string,
+  overrides: Partial<Omit<LocalStorageConfig, 'scope' | 'projectId'>> = {}
+): HarnessConfig['storage'] {
   return {
     ...SHARED_STORAGE_FIELDS,
     markdownFallback: { enabled: true, path: '.harness/current.md' },
@@ -104,8 +107,12 @@ async function seedData(db: HarnessDB): Promise<{ taskId: number }> {
   const slug = `seed-task-${++seedCounter}`
   const task = await db.addTask({ slug, title: 'Seed Task', acceptance: ['must pass'] })
   const action = await db.startAction(task.id, 'lead')
-  await db.recordFiles(action.id, [{ filePath: 'src/index.ts', operation: 'modified', notes: 'note' }])
-  await db.recordTools(action.id, [{ toolName: 'Bash', argsJson: '{"cmd":"ls"}', resultSummary: 'summary' }])
+  await db.recordFiles(action.id, [
+    { filePath: 'src/index.ts', operation: 'modified', notes: 'note' },
+  ])
+  await db.recordTools(action.id, [
+    { toolName: 'Bash', argsJson: '{"cmd":"ls"}', resultSummary: 'summary' },
+  ])
   await db.writeSection(action.id, 'result', 'done')
   await db.completeAction(action.id, 'done')
   return { taskId: task.id }
@@ -117,7 +124,11 @@ describe('exportJson — full 6-table export (task #47)', () => {
 
   test('includes tasks, task_acceptance, actions, action_sections, action_files, action_tools', async () => {
     mkdirSync(dir, { recursive: true })
-    const config = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'harness.db') }) })
+    const config = baseConfig({
+      storage: localStorage('migrate-storage-test-project', {
+        sqlitePath: join(dir, 'harness.db'),
+      }),
+    })
     const db = await openDB(config, dir)
     try {
       await seedData(db)
@@ -140,7 +151,9 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('imports all 6 tables into an empty sqlite destination with matching row counts', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -170,7 +183,9 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('a failing insert rolls back the ENTIRE import — destination left exactly as found', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src2.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src2.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -204,7 +219,9 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('sqlite: after import, a subsequent TaskRepository.add() (no explicit id) does not collide with imported ids', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src3.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src3.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -235,7 +252,9 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('mocked remote (postgres-dialect) destination: sequence reset prevents id collision on next insert', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src4.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src4.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -261,7 +280,9 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('sqlite: after import, a subsequent ActionRepository.create() (no explicit id) does not collide with imported action ids (task #73)', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src5.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src5.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -283,7 +304,7 @@ describe('importFullExport — id preservation, transactional rollback, sequence
       const newId = await repo.create(1, 'reviewer', new Date().toISOString())
       assert.ok(
         newId > maxImportedActionId,
-        `new action id ${newId} must be greater than max imported action id ${maxImportedActionId}`,
+        `new action id ${newId} must be greater than max imported action id ${maxImportedActionId}`
       )
     } finally {
       await destDriver.close()
@@ -292,7 +313,9 @@ describe('importFullExport — id preservation, transactional rollback, sequence
 
   test('mocked remote (postgres-dialect) destination: actions sequence reset prevents id collision on next ActionRepository.create() (task #73)', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src6.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src6.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -312,13 +335,15 @@ describe('importFullExport — id preservation, transactional rollback, sequence
     const newId = await repo.create(1, 'reviewer', new Date().toISOString())
     assert.ok(
       newId > maxImportedActionId,
-      `new action id ${newId} must be greater than max imported action id ${maxImportedActionId} (sequence reset must have run)`,
+      `new action id ${newId} must be greater than max imported action id ${maxImportedActionId} (sequence reset must have run)`
     )
   })
 
   test('importFullExport rejects a legacy (pre-2.0) export with string/UUID action ids instead of a raw driver error (task #73)', async () => {
     mkdirSync(dir, { recursive: true })
-    const srcConfig = baseConfig({ storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src7.db') }) })
+    const srcConfig = baseConfig({
+      storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src7.db') }),
+    })
     const srcDb = await openDB(srcConfig, dir)
     let data
     try {
@@ -339,10 +364,14 @@ describe('importFullExport — id preservation, transactional rollback, sequence
     try {
       await assert.rejects(
         () => importFullExport(destDriver, legacyData, 'sqlite', { truncateFirst: false }),
-        /older version|pre-2\.0|integer-id/i,
+        /older version|pre-2\.0|integer-id/i
       )
       const counts = await getRowCounts(destDriver)
-      assert.equal(counts.actions, 0, 'nothing should have been imported once the legacy-id check rejected the export')
+      assert.equal(
+        counts.actions,
+        0,
+        'nothing should have been imported once the legacy-id check rejected the export'
+      )
     } finally {
       await destDriver.close()
     }

@@ -1,22 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
 
-import { AgentBadge } from '@/components/shared/agent-badge';
-import { LoadingState } from '@/components/shared/loading-state';
-import { PageHeader } from '@/components/shared/page-header';
-import { api, qk } from '@/lib/api';
+import { AgentBadge } from '@/components/shared/agent-badge'
+import { LoadingState } from '@/components/shared/loading-state'
+import { PageHeader } from '@/components/shared/page-header'
+import { api, qk } from '@/lib/api'
 
-import type { AgentStat } from '@/schema/api';
+import type { AgentStat } from '@/schema/api'
 
 export const Route = createFileRoute('/agents')({
   component: AgentsPage,
-});
+})
 
 function AgentsPage() {
   const { data: agents = [], isLoading } = useQuery({
     queryKey: qk.agentStats,
     queryFn: api.agentStats,
-  });
+  })
 
   return (
     <div>
@@ -32,9 +32,7 @@ function AgentsPage() {
         </div>
 
         {agents.length === 0 && !isLoading && (
-          <p className="font-mono text-xs text-[var(--color-text-faint)]">
-            No agent activity yet.
-          </p>
+          <p className="font-mono text-xs text-[var(--color-text-faint)]">No agent activity yet.</p>
         )}
 
         {/* All actions table */}
@@ -46,14 +44,7 @@ function AgentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-border)]">
-                  {[
-                    'Agent',
-                    'Total Actions',
-                    'Completed',
-                    'Blocked',
-                    'Tasks',
-                    'Files',
-                  ].map((h) => (
+                  {['Agent', 'Total Actions', 'Completed', 'Blocked', 'Tasks', 'Files'].map((h) => (
                     <th
                       key={h}
                       className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-2"
@@ -72,21 +63,13 @@ function AgentsPage() {
                     <td className="px-4 py-3">
                       <AgentBadge agent={a.agent} />
                     </td>
-                    <td className="px-4 py-3 font-mono text-sm">
-                      {a.actions_total}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm text-green-400">
-                      {a.actions_done}
-                    </td>
+                    <td className="px-4 py-3 font-mono text-sm">{a.actions_total}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-green-400">{a.actions_done}</td>
                     <td className="px-4 py-3 font-mono text-sm text-red-400">
                       {a.actions_blocked}
                     </td>
-                    <td className="px-4 py-3 font-mono text-sm">
-                      {a.tasks_worked}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">
-                      {a.files_touched}
-                    </td>
+                    <td className="px-4 py-3 font-mono text-sm">{a.tasks_worked}</td>
+                    <td className="px-4 py-3 font-mono text-sm">{a.files_touched}</td>
                   </tr>
                 ))}
               </tbody>
@@ -95,38 +78,27 @@ function AgentsPage() {
         )}
       </div>
     </div>
-  );
+  )
 }
 
 function AgentCard({ stat }: { stat: AgentStat }) {
   const pctDone =
-    stat.actions_total > 0
-      ? Math.round((stat.actions_done / stat.actions_total) * 100)
-      : 0;
+    stat.actions_total > 0 ? Math.round((stat.actions_done / stat.actions_total) * 100) : 0
 
   return (
     <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-md p-4 space-y-3">
       <div className="flex items-center justify-between">
         <AgentBadge agent={stat.agent} />
-        <span className="font-mono text-xs text-[var(--color-text-faint)]">
-          {pctDone}% done
-        </span>
+        <span className="font-mono text-xs text-[var(--color-text-faint)]">{pctDone}% done</span>
       </div>
 
       <div className="w-full bg-[var(--color-bg-elevated)] rounded-full h-1">
-        <div
-          className="bg-green-700 h-1 rounded-full"
-          style={{ width: `${pctDone}%` }}
-        />
+        <div className="bg-green-700 h-1 rounded-full" style={{ width: `${pctDone}%` }} />
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         <Stat label="Actions" value={stat.actions_total} />
-        <Stat
-          label="Completed"
-          value={stat.actions_done}
-          color="text-green-400"
-        />
+        <Stat label="Completed" value={stat.actions_done} color="text-green-400" />
         <Stat label="Tasks" value={stat.tasks_worked} />
         <Stat
           label="Blocked"
@@ -141,18 +113,10 @@ function AgentCard({ stat }: { stat: AgentStat }) {
         />
       </div>
     </div>
-  );
+  )
 }
 
-function Stat({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color?: string;
-}) {
+function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <div className="flex justify-between items-center">
       <span className="text-xs text-[var(--color-text-faint)]">{label}</span>
@@ -160,5 +124,5 @@ function Stat({
         {value}
       </span>
     </div>
-  );
+  )
 }

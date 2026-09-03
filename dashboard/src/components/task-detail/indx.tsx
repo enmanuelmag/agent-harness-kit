@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState } from 'react'
 
-import { AgentBadge } from '@/components/shared/agent-badge';
-import { StatusBadge } from '@/components/shared/status-badge';
-import { formatDate, formatDuration } from '@/lib/api';
+import { AgentBadge } from '@/components/shared/agent-badge'
+import { StatusBadge } from '@/components/shared/status-badge'
+import { formatDate, formatDuration } from '@/lib/api'
 
-import type { ActionDetail, ActionSection } from '@/schema/api';
+import type { ActionDetail, ActionSection } from '@/schema/api'
 
 export function ActionCard({ action }: { action: ActionDetail }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasSections = action.sections.length > 0;
-  const duration = formatDuration(action.created_at, action.completed_at);
+  const [expanded, setExpanded] = useState(false)
+  const hasSections = action.sections.length > 0
+  const duration = formatDuration(action.created_at, action.completed_at)
 
   return (
     <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-md">
@@ -21,9 +21,7 @@ export function ActionCard({ action }: { action: ActionDetail }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <StatusBadge status={action.status} size="xs" />
-            <span className="font-mono text-xs text-[var(--color-text-faint)]">
-              {duration}
-            </span>
+            <span className="font-mono text-xs text-[var(--color-text-faint)]">{duration}</span>
             {action.tools.length > 0 && (
               <span className="font-mono text-[10px] text-[var(--color-text-faint)]">
                 {action.tools.length} tool{action.tools.length !== 1 ? 's' : ''}
@@ -36,9 +34,7 @@ export function ActionCard({ action }: { action: ActionDetail }) {
             )}
           </div>
           {action.summary && (
-            <div className="text-xs text-[var(--color-text-secondary)] mt-1">
-              {action.summary}
-            </div>
+            <div className="text-xs text-[var(--color-text-secondary)] mt-1">{action.summary}</div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -46,9 +42,7 @@ export function ActionCard({ action }: { action: ActionDetail }) {
             {formatDate(action.created_at)}
           </span>
           {hasSections && (
-            <span className="text-[var(--color-text-faint)] text-xs">
-              {expanded ? '▲' : '▼'}
-            </span>
+            <span className="text-[var(--color-text-faint)] text-xs">{expanded ? '▲' : '▼'}</span>
           )}
         </div>
       </button>
@@ -61,7 +55,7 @@ export function ActionCard({ action }: { action: ActionDetail }) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
 export function SectionBlock({ section }: { section: ActionSection }) {
@@ -74,7 +68,7 @@ export function SectionBlock({ section }: { section: ActionSection }) {
         {section.content}
       </pre>
     </div>
-  );
+  )
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -82,20 +76,14 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
     <h2 className="font-mono text-xs text-[var(--color-text-muted)] uppercase tracking-wider">
       {children}
     </h2>
-  );
+  )
 }
 
-export function TimestampItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+export function TimestampItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="text-[var(--color-text-faint)] text-[10px]">{label}</div>
       <div className="text-[var(--color-text-secondary)]">{value}</div>
     </div>
-  );
+  )
 }

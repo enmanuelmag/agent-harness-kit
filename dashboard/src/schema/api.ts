@@ -1,4 +1,4 @@
-import * as v from 'valibot';
+import * as v from 'valibot'
 
 // Overview stats
 export const StatsOverviewSchema = v.object({
@@ -24,7 +24,6 @@ export enum StatusEnum {
 }
 
 export const StatusEnumSchema = v.enum(StatusEnum)
-
 
 // Tasks
 export const TaskSummarySchema = v.object({
@@ -107,10 +106,13 @@ export const ActionDetailSchema = v.object({
 
 export type ActionDetail = v.InferOutput<typeof ActionDetailSchema>
 
-export const TaskDetailSchema = v.intersect([TaskSummarySchema, v.object({
-  acceptance: v.array(AcceptanceCriterionSchema),
-  actions: v.array(ActionDetailSchema),
-})])
+export const TaskDetailSchema = v.intersect([
+  TaskSummarySchema,
+  v.object({
+    acceptance: v.array(AcceptanceCriterionSchema),
+    actions: v.array(ActionDetailSchema),
+  }),
+])
 
 export type TaskDetail = v.InferOutput<typeof TaskDetailSchema>
 

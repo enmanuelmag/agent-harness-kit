@@ -32,7 +32,9 @@ export async function runExport(cwd: string, opts: ExportOptions): Promise<void>
     }
 
     if (opts.sql) {
-      console.error(pc.dim('SQL dump requires direct SQLite access — use: sqlite3 .harness/harness.db .dump'))
+      console.error(
+        pc.dim('SQL dump requires direct SQLite access — use: sqlite3 .harness/harness.db .dump')
+      )
       process.exit(1)
     }
   } finally {

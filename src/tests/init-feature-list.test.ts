@@ -127,7 +127,9 @@ describe('reconcileFeatureList (task #62 — never clobber the feature_list back
 
   test('duplicate-slug firstTask (already in backlog) → deduped, not doubled', async () => {
     const { installDir, db, storageDir, featureListPath } = await setup('dup-slug')
-    const backlog = [{ slug: 'existing-feature', title: 'Existing Feature', acceptance: ['keep me'] }]
+    const backlog = [
+      { slug: 'existing-feature', title: 'Existing Feature', acceptance: ['keep me'] },
+    ]
     writeFileSync(featureListPath, JSON.stringify(backlog, null, 2) + '\n')
 
     // firstTask title slugifies to the SAME slug already present.
@@ -154,7 +156,11 @@ describe('reconcileFeatureList (task #62 — never clobber the feature_list back
     await db.close()
 
     assert.equal(parseFailed, true)
-    assert.equal(readFileSync(featureListPath, 'utf8'), broken, 'malformed file must be left byte-for-byte intact')
+    assert.equal(
+      readFileSync(featureListPath, 'utf8'),
+      broken,
+      'malformed file must be left byte-for-byte intact'
+    )
     assert.ok(!existsSync(rootPath))
   })
 
@@ -169,7 +175,11 @@ describe('reconcileFeatureList (task #62 — never clobber the feature_list back
     })
 
     assert.equal(parseFailed, true)
-    assert.equal(readFileSync(featureListPath, 'utf8'), broken, 'file must remain untouched even with a firstTask')
+    assert.equal(
+      readFileSync(featureListPath, 'utf8'),
+      broken,
+      'file must remain untouched even with a firstTask'
+    )
     const seeded = await db.getTaskBySlug('rescued-task')
     await db.close()
     assert.ok(seeded, 'a supplied firstTask must not be dropped just because the file is malformed')

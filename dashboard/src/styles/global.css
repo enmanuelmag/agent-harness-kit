@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -8,27 +8,27 @@
 }
 
 :root {
-  --color-bg-base:        #ffffff;
-  --color-bg-surface:     #f4f4f5;
-  --color-bg-elevated:    #e4e4e7;
-  --color-border:         #d4d4d8;
-  --color-text-primary:   #09090b;
+  --color-bg-base: #ffffff;
+  --color-bg-surface: #f4f4f5;
+  --color-bg-elevated: #e4e4e7;
+  --color-border: #d4d4d8;
+  --color-text-primary: #09090b;
   --color-text-secondary: #3f3f46;
-  --color-text-muted:     #71717a;
-  --color-text-faint:     #a1a1aa;
-  --color-accent:         #16a34a;
+  --color-text-muted: #71717a;
+  --color-text-faint: #a1a1aa;
+  --color-accent: #16a34a;
 }
 
 :root.dark {
-  --color-bg-base:        #000000;
-  --color-bg-surface:     #0a0a0a;
-  --color-bg-elevated:    #1f1f1f;
-  --color-border:         #1f1f1f;
-  --color-text-primary:   #fafafa;
+  --color-bg-base: #000000;
+  --color-bg-surface: #0a0a0a;
+  --color-bg-elevated: #1f1f1f;
+  --color-border: #1f1f1f;
+  --color-text-primary: #fafafa;
   --color-text-secondary: #d4d4d8;
-  --color-text-muted:     #71717a;
-  --color-text-faint:     #3f3f46;
-  --color-accent:         #4ade80;
+  --color-text-muted: #71717a;
+  --color-text-faint: #3f3f46;
+  --color-accent: #4ade80;
 }
 
 * {

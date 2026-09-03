@@ -35,7 +35,10 @@ export interface FindFreePortOptions {
  * they intend to bind on, otherwise the probe answers a different question than
  * the one being asked.
  */
-export function isPortFree(port: number, host: string | undefined = DASHBOARD_BIND_HOST): Promise<boolean> {
+export function isPortFree(
+  port: number,
+  host: string | undefined = DASHBOARD_BIND_HOST
+): Promise<boolean> {
   return new Promise((resolve) => {
     const server = createServer()
     server.once('error', () => resolve(false))
@@ -46,7 +49,10 @@ export function isPortFree(port: number, host: string | undefined = DASHBOARD_BI
   })
 }
 
-export async function findFreePort(start: number, options: FindFreePortOptions = {}): Promise<number> {
+export async function findFreePort(
+  start: number,
+  options: FindFreePortOptions = {}
+): Promise<number> {
   const { maxAttempts = 10, host = DASHBOARD_BIND_HOST } = options
 
   // Guard the boundary. `start` MUST be a number: the loop below computes

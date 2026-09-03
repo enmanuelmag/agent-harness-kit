@@ -86,7 +86,10 @@ export function resolveOnPath(name: string, options: ResolveOnPathOptions = {}):
     const lowerName = name.toLowerCase()
     // Candidate filenames (lowercased): the bare name (in case the caller
     // passed one that already includes an extension) plus name + each ext.
-    const candidates = new Set<string>([lowerName, ...normalizeExts(pathext).map((ext) => `${lowerName}${ext}`)])
+    const candidates = new Set<string>([
+      lowerName,
+      ...normalizeExts(pathext).map((ext) => `${lowerName}${ext}`),
+    ])
     for (const dir of dirs) {
       let entries: string[]
       try {
@@ -135,8 +138,14 @@ export function isExecutableOnPath(name: string): boolean {
 export function printMissingGlobalBinaryWarning(): void {
   console.error(pc.yellow('⚠ `ahk` was not found on your PATH.'))
   console.error(pc.dim('  Your project has no local install, so the generated MCP config launches'))
-  console.error(pc.dim('  `ahk serve` directly. Without `ahk` on your PATH, starting the MCP server'))
-  console.error(pc.dim('  from that config will fail. This is only a warning — the command continues.'))
+  console.error(
+    pc.dim('  `ahk serve` directly. Without `ahk` on your PATH, starting the MCP server')
+  )
+  console.error(
+    pc.dim('  from that config will fail. This is only a warning — the command continues.')
+  )
   console.error(pc.dim(`  Run: npm i -g ${pkg.name}   (install globally)`))
-  console.error(pc.dim(`  or:  npm install --save-dev ${pkg.name}   (install locally in this project)`))
+  console.error(
+    pc.dim(`  or:  npm install --save-dev ${pkg.name}   (install locally in this project)`)
+  )
 }

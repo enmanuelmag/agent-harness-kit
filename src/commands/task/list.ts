@@ -65,7 +65,11 @@ export async function runTaskList(cwd: string, opts: TaskListOptions): Promise<v
     if (!opts.archived && !opts.includeArchived) {
       const archivedTasks = await db.getArchivedTasks()
       if (archivedTasks.length > 0) {
-        console.log(pc.dim(`${archivedTasks.length} archived task${archivedTasks.length !== 1 ? 's' : ''} (use --archived to view)`))
+        console.log(
+          pc.dim(
+            `${archivedTasks.length} archived task${archivedTasks.length !== 1 ? 's' : ''} (use --archived to view)`
+          )
+        )
       }
     }
   } finally {

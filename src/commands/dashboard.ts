@@ -17,7 +17,8 @@ interface DashboardOptions {
 export async function runDashboard(cwd: string, opts: DashboardOptions): Promise<void> {
   const config = await loadConfig(cwd)
   const db = await openDB(config, cwd)
-  const dbPath = config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
+  const dbPath =
+    config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
   const staticPath = join(__dirname, 'dashboard-dist')
 
   const { url } = await startDashboardServer(db, dbPath, staticPath, opts.port)
@@ -36,5 +37,5 @@ export async function runDashboard(cwd: string, opts: DashboardOptions): Promise
   })
 
   // Keep process alive until SIGINT
-  await new Promise<void>(() => { })
+  await new Promise<void>(() => {})
 }

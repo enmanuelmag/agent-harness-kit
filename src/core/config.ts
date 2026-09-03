@@ -41,18 +41,20 @@ export async function loadConfig(cwd: string): Promise<HarnessConfig> {
     try {
       raw = readFileSync(configPath, 'utf8')
     } catch (err) {
-      throw new Error(`Could not read ${configPath}: ${err instanceof Error ? err.message : String(err)}`)
+      throw new Error(
+        `Could not read ${configPath}: ${err instanceof Error ? err.message : String(err)}`
+      )
     }
     try {
       config = JSON.parse(raw) as HarnessConfig
     } catch (err) {
       throw new Error(
-        `${configPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+        `${configPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
       )
     }
   } else {
     const jiti = createJiti(import.meta.url)
-    const mod = await jiti.import(configPath) as { default?: HarnessConfig } | HarnessConfig
+    const mod = (await jiti.import(configPath)) as { default?: HarnessConfig } | HarnessConfig
     config = (mod as { default?: HarnessConfig }).default ?? (mod as HarnessConfig)
   }
 
@@ -115,7 +117,7 @@ function normalizeLegacyStorageShape(raw: Record<string, unknown>): Record<strin
   console.warn(
     `[agent-harness-kit] storage.scope is 'global' but ${offenders.join(', ')} ${offenders.length > 1 ? 'are' : 'is'} set in ` +
       `agent-harness-kit.config.ts — ${offenders.length > 1 ? 'these are' : 'this is'} ignored under global scope and will be ` +
-      `removed by a future major version. See docs/architecture.md#storage-scope.`,
+      `removed by a future major version. See docs/architecture.md#storage-scope.`
   )
 
   return { ...raw, storage: normalizedStorage, database: normalizedDatabase ?? database }
@@ -157,7 +159,7 @@ function normalizeLegacyAgentsKey(raw: Record<string, unknown>): Record<string, 
       `.claude/agents/<role>.md (Claude Code), .opencode/agents/<role>.md (OpenCode) or ` +
       `.codex/agents/<role>.toml (Codex CLI). 'ahk build' creates those files when missing and never ` +
       `overwrites them; use 'ahk build --force' to regenerate them from the packaged templates. ` +
-      `Remove the 'agents' key from your config. See docs/architecture.md#agent-restrictions.`,
+      `Remove the 'agents' key from your config. See docs/architecture.md#agent-restrictions.`
   )
 
   return normalized
@@ -165,7 +167,7 @@ function normalizeLegacyAgentsKey(raw: Record<string, unknown>): Record<string, 
 
 function applyDefaults(config: HarnessConfig): HarnessConfig {
   const normalized = normalizeLegacyAgentsKey(
-    normalizeLegacyStorageShape(config as unknown as Record<string, unknown>),
+    normalizeLegacyStorageShape(config as unknown as Record<string, unknown>)
   )
   const c = normalized as Partial<HarnessConfig>
 

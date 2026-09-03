@@ -40,12 +40,18 @@ function oldName(table: string): string {
  *  ones are renamed away; the CREATE TABLE/INDEX IF NOT EXISTS statements
  *  for tasks/task_acceptance in it are no-ops since those tables are
  *  untouched by this migration. */
-export async function migrateActionsToIntegerIds(driver: DBDriver, dbType: DbType, schemaSql: string): Promise<void> {
+export async function migrateActionsToIntegerIds(
+  driver: DBDriver,
+  dbType: DbType,
+  schemaSql: string
+): Promise<void> {
   await resumeIfInterrupted(driver, dbType)
 
   if (!(await needsMigration(driver, dbType))) return
 
-  console.log('[agent-harness-kit] Migrating actions table to integer ids (one-time, automatic) — do not interrupt.')
+  console.log(
+    '[agent-harness-kit] Migrating actions table to integer ids (one-time, automatic) — do not interrupt.'
+  )
 
   if (dbType === 'mysql') {
     // MySQL DDL (RENAME/CREATE/DROP TABLE) auto-commits statement-by-statement,
@@ -102,7 +108,9 @@ async function resumeIfInterrupted(driver: DBDriver, dbType: DbType): Promise<vo
   }
   if (leftoverTables.length === 0) return
 
-  console.log('[agent-harness-kit] Detected leftover tables from an interrupted actions-table migration — resuming.')
+  console.log(
+    '[agent-harness-kit] Detected leftover tables from an interrupted actions-table migration — resuming.'
+  )
 
   if (await migrationDataComplete(driver, dbType, leftoverTables)) {
     // Every table with a surviving `_old` backup already has its full copy
@@ -131,7 +139,11 @@ async function resumeIfInterrupted(driver: DBDriver, dbType: DbType): Promise<vo
  *  interrupted the migration. A single incomplete/missing live table makes
  *  this false, which triggers the safe "restore and redo" path instead of
  *  risking treating a partial copy as done. */
-async function migrationDataComplete(driver: DBDriver, dbType: DbType, tablesWithBackup: string[]): Promise<boolean> {
+async function migrationDataComplete(
+  driver: DBDriver,
+  dbType: DbType,
+  tablesWithBackup: string[]
+): Promise<boolean> {
   for (const table of tablesWithBackup) {
     if (!(await tableExists(driver, dbType, table))) return false
     const liveCount = await countRows(driver, table)
@@ -154,12 +166,12 @@ async function needsMigration(driver: DBDriver, dbType: DbType): Promise<boolean
   }
   if (dbType === 'postgres') {
     const row = await driver.queryOne<{ data_type: string }>(
-      `SELECT data_type FROM information_schema.columns WHERE table_name = 'actions' AND column_name = 'id'`,
+      `SELECT data_type FROM information_schema.columns WHERE table_name = 'actions' AND column_name = 'id'`
     )
     return row?.data_type === 'text'
   }
   const row = await driver.queryOne<{ data_type: string }>(
-    `SELECT DATA_TYPE as data_type FROM information_schema.columns WHERE TABLE_NAME = 'actions' AND COLUMN_NAME = 'id' AND TABLE_SCHEMA = DATABASE()`,
+    `SELECT DATA_TYPE as data_type FROM information_schema.columns WHERE TABLE_NAME = 'actions' AND COLUMN_NAME = 'id' AND TABLE_SCHEMA = DATABASE()`
   )
   return row?.data_type === 'varchar'
 }
@@ -168,20 +180,20 @@ async function tableExists(driver: DBDriver, dbType: DbType, table: string): Pro
   if (dbType === 'sqlite') {
     const row = await driver.queryOne<{ name: string }>(
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
-      [table],
+      [table]
     )
     return !!row
   }
   if (dbType === 'postgres') {
     const row = await driver.queryOne<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables WHERE table_name = ?`,
-      [table],
+      [table]
     )
     return !!row
   }
   const row = await driver.queryOne<{ table_name: string }>(
     `SELECT TABLE_NAME as table_name FROM information_schema.tables WHERE TABLE_NAME = ? AND TABLE_SCHEMA = DATABASE()`,
-    [table],
+    [table]
   )
   return !!row
 }
@@ -198,7 +210,9 @@ interface OldActionRow {
 
 async function runMigration(driver: DBDriver, dbType: DbType, schemaSql: string): Promise<void> {
   // 1. Build the UUID -> sequential-integer map, in creation order.
-  const oldOrder = await driver.query<{ id: string }>(`SELECT id FROM actions ORDER BY created_at, id`)
+  const oldOrder = await driver.query<{ id: string }>(
+    `SELECT id FROM actions ORDER BY created_at, id`
+  )
   const idMap = new Map<string, number>()
   oldOrder.forEach((row, i) => idMap.set(row.id, i + 1))
 
@@ -227,19 +241,40 @@ async function runMigration(driver: DBDriver, dbType: DbType, schemaSql: string)
   await applySchema(driver, dbType, schemaSql)
 
   // 4. Copy `actions` rows with remapped integer ids.
-  const oldActions = await driver.query<OldActionRow>(`SELECT * FROM ${oldName('actions')} ORDER BY created_at, id`)
+  const oldActions = await driver.query<OldActionRow>(
+    `SELECT * FROM ${oldName('actions')} ORDER BY created_at, id`
+  )
   for (const row of oldActions) {
     const newId = idMap.get(row.id)!
     await driver.exec(
       `INSERT INTO actions (id, task_id, agent, status, created_at, completed_at, summary) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [newId, row.task_id, row.agent, row.status, row.created_at, row.completed_at, row.summary],
+      [newId, row.task_id, row.agent, row.status, row.created_at, row.completed_at, row.summary]
     )
   }
 
   // 5. Copy the 3 child tables, keeping their own id but remapping action_id.
-  await copyChildTable(driver, 'action_sections', idMap, ['id', 'action_id', 'section_type', 'content', 'created_at'])
-  await copyChildTable(driver, 'action_files', idMap, ['id', 'action_id', 'file_path', 'operation', 'notes'])
-  await copyChildTable(driver, 'action_tools', idMap, ['id', 'action_id', 'tool_name', 'args_json', 'result_summary', 'called_at'])
+  await copyChildTable(driver, 'action_sections', idMap, [
+    'id',
+    'action_id',
+    'section_type',
+    'content',
+    'created_at',
+  ])
+  await copyChildTable(driver, 'action_files', idMap, [
+    'id',
+    'action_id',
+    'file_path',
+    'operation',
+    'notes',
+  ])
+  await copyChildTable(driver, 'action_tools', idMap, [
+    'id',
+    'action_id',
+    'tool_name',
+    'args_json',
+    'result_summary',
+    'called_at',
+  ])
 
   // 6. Drop the old renamed tables — children first so FK constraints never block it.
   for (const table of [...CHILD_TABLES, 'actions']) {
@@ -256,17 +291,24 @@ async function copyChildTable(
   driver: DBDriver,
   table: (typeof CHILD_TABLES)[number],
   idMap: Map<string, number>,
-  columns: string[],
+  columns: string[]
 ): Promise<void> {
-  const oldRows = await driver.query<Record<string, unknown>>(`SELECT * FROM ${oldName(table)} ORDER BY id`)
+  const oldRows = await driver.query<Record<string, unknown>>(
+    `SELECT * FROM ${oldName(table)} ORDER BY id`
+  )
   const placeholders = columns.map(() => '?').join(', ')
   for (const row of oldRows) {
     const newActionId = idMap.get(row.action_id as string)
     if (newActionId === undefined) {
-      throw new Error(`actions migration: ${table} row ${String(row.id)} references unknown action_id ${String(row.action_id)}`)
+      throw new Error(
+        `actions migration: ${table} row ${String(row.id)} references unknown action_id ${String(row.action_id)}`
+      )
     }
     const values = columns.map((c) => (c === 'action_id' ? newActionId : row[c]))
-    await driver.exec(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`, values)
+    await driver.exec(
+      `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
+      values
+    )
   }
 }
 

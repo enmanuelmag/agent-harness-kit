@@ -29,7 +29,7 @@ export async function runStatus(cwd: string, opts: StatusOptions): Promise<void>
           ...t,
           actions: await db.getActionsForTask(t.id),
           acceptance: await db.getTaskAcceptance(t.id),
-        })),
+        }))
       )
       const archivedCount = (await db.getArchivedTasks()).length
       console.log(JSON.stringify({ tasks: actions, summary, archivedCount }, null, 2))
@@ -84,7 +84,9 @@ export async function runStatus(cwd: string, opts: StatusOptions): Promise<void>
 
     const archivedTasks = await db.getArchivedTasks()
     if (archivedTasks.length > 0) {
-      console.log(pc.dim(`${archivedTasks.length} archived (use \`ahk task list --archived\` to view)`))
+      console.log(
+        pc.dim(`${archivedTasks.length} archived (use \`ahk task list --archived\` to view)`)
+      )
     }
   } finally {
     await db.close()

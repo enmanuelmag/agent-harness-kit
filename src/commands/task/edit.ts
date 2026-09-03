@@ -14,7 +14,7 @@ export async function runTaskEdit(cwd: string): Promise<void> {
   try {
     // 1. Get all non-done tasks
     const allTasks = await db.getTasks()
-    const activeTasks = allTasks.filter(t => t.status !== 'done')
+    const activeTasks = allTasks.filter((t) => t.status !== 'done')
 
     if (activeTasks.length === 0) {
       p.log.error('No active tasks to edit.')
@@ -24,29 +24,41 @@ export async function runTaskEdit(cwd: string): Promise<void> {
     // 2. Let user select a task
     const taskId = await p.select({
       message: 'Select a task to edit',
-      options: activeTasks.map(t => ({
+      options: activeTasks.map((t) => ({
         label: `#${t.id} — ${t.title} (${t.slug})`,
         value: t.id,
       })),
     })
-    if (p.isCancel(taskId)) { p.cancel('Cancelled.'); process.exit(0) }
+    if (p.isCancel(taskId)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
 
     const task = await db.getTaskById(taskId as number)
-    if (!task) { p.log.error('Task not found'); process.exit(1) }
+    if (!task) {
+      p.log.error('Task not found')
+      process.exit(1)
+    }
 
     // 3. Edit title
     const title = await p.text({
       message: 'Title',
       initialValue: task.title,
     })
-    if (p.isCancel(title)) { p.cancel('Cancelled.'); process.exit(0) }
+    if (p.isCancel(title)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
 
     // 4. Edit description
     const description = await p.text({
       message: 'Description (what and why)',
       initialValue: task.description ?? '',
     })
-    if (p.isCancel(description)) { p.cancel('Cancelled.'); process.exit(0) }
+    if (p.isCancel(description)) {
+      p.cancel('Cancelled.')
+      process.exit(0)
+    }
 
     // 5. Edit acceptance criteria
     const currentAcceptance = await db.getTaskAcceptance(task.id)
@@ -62,7 +74,10 @@ export async function runTaskEdit(cwd: string): Promise<void> {
         initialValue: ac.criterion,
         defaultValue: '',
       })
-      if (p.isCancel(val)) { p.cancel('Cancelled.'); process.exit(0) }
+      if (p.isCancel(val)) {
+        p.cancel('Cancelled.')
+        process.exit(0)
+      }
       const trimmed = (val as string).trim()
       if (trimmed !== '') {
         newAcceptance.push(trimmed)
@@ -72,7 +87,10 @@ export async function runTaskEdit(cwd: string): Promise<void> {
 
     // Add new criteria
     while (true) {
-      const val = await p.text({ message: 'New acceptance criterion', placeholder: '(press Enter to finish)' })
+      const val = await p.text({
+        message: 'New acceptance criterion',
+        placeholder: '(press Enter to finish)',
+      })
       if (p.isCancel(val) || !val || !(val as string).trim()) break
       newAcceptance.push((val as string).trim())
     }

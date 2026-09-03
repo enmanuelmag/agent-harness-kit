@@ -10,3 +10,4 @@ dashboard/@/src/dashboard-dist
 pnpm-lock.yaml
 *.generated.ts
 routeTree.gen.ts
+*.md
