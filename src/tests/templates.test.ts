@@ -2039,7 +2039,7 @@ describe('ahk-test — regression: four existing skills still present and matchi
     rmSync(TMP_REG, { recursive: true, force: true })
   }
 
-  const ALL_SKILLS = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test']
+  const ALL_SKILLS = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test', 'ahk-use-cases', 'ahk-use-case-tech']
 
   for (const skillName of ALL_SKILLS) {
     test(`${skillName}: materialized by all four providers`, () => {

@@ -43,7 +43,7 @@ const TIMEOUT_MS = 2000
 const LIB_VERSION_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const AGENT_NAMES = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 export type AgentName = (typeof AGENT_NAMES)[number]
-const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test'] as const
+const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test', 'ahk-use-cases', 'ahk-use-case-tech'] as const
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
