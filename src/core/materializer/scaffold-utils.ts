@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -338,14 +338,19 @@ export function slugify(title: string): string {
 export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?: string): void {
   const skillNames = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test', 'ahk-use-cases', 'ahk-use-case-tech']
   for (const skillName of skillNames) {
-    const src = join(__dirname, 'skills', skillName, 'SKILL.md')
+    const srcDir = join(__dirname, 'skills', skillName)
     const destDir = join(cwd, skillsDir, skillName)
-    const dest = join(destDir, 'SKILL.md')
-    mkdirSync(destDir, { recursive: true })
-    let content = readFileSync(src, 'utf8')
+    // Copy the complete canonical skill tree: resources are part of the skill
+    // contract, not optional companions to its manifest.
+    cpSync(srcDir, destDir, { recursive: true })
+
+    // Provider guidance is intentionally injected into the manifest only.
+    // Resource files must remain byte-for-byte copies of their canonical source.
+    const skillManifest = join(srcDir, 'SKILL.md')
+    let content = readFileSync(skillManifest, 'utf8')
     if (delegationGuidance) {
       content = injectDelegationGuidance(content, delegationGuidance)
     }
-    writeFileSync(dest, content, 'utf8')
+    writeFileSync(join(destDir, 'SKILL.md'), content, 'utf8')
   }
 }

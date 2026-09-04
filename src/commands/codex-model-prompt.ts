@@ -13,14 +13,15 @@ const AGENT_LABELS: { key: AgentName; label: string }[] = [
 
 // Verified against Codex CLI's own Rust source (see task #81 consultant
 // advisory for citations): `codex-rs/skills/src/assets/samples/openai-docs/
-// references/latest-model.md` lists these 7 slugs. Six are corroborated by
+// references/latest-model.md` lists these 8 slugs. Seven are corroborated by
 // repo-wide code-search hits; `gpt-5.3-codex-spark` has none, but the user
 // explicitly confirmed keeping it (they trust the live picker over a
 // public-repo grep). This is a plain string list, not a TS literal union —
 // model catalogs go stale fast, and a hardcoded compile-time union would
 // turn a stale entry into a hard error for someone hand-editing a newer
 // model into their TOML.
-const CODEX_MODEL_CHOICES = [
+export const CODEX_MODEL_CHOICES = [
+  'gpt-6-astra',
   'gpt-5.6-sol',
   'gpt-5.6-terra',
   'gpt-5.6-luna',

@@ -2,8 +2,8 @@ import type { HarnessConfig } from '@cardor/agent-harness-kit'
 
 const config: HarnessConfig = {
   project: {
-    name: "@cardor/agent-harness-kit",
-    description: "A CLI and MCP tools for LLM providers",
+    name: '@cardor/agent-harness-kit',
+    description: 'A CLI and MCP tools for LLM providers',
     docsPath: './docs',
   },
 
@@ -23,29 +23,29 @@ const config: HarnessConfig = {
   database: { type: 'sqlite' },
 
   storage: {
-    dir:    '.harness',
-    tasks:  { adapter: 'local' },
+    dir: '.harness',
+    tasks: { adapter: 'local' },
     sections: {
-      toolsUsed:     true,
+      toolsUsed: true,
       filesModified: true,
-      result:        true,
-      blockers:      true,
-      nextSteps:     false,
+      result: true,
+      blockers: true,
+      nextSteps: false,
     },
     markdownFallback: { enabled: true },
     // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
     // under ~/.harness/dbs/<projectId>/, outside the project tree.
-    scope:     'global',
+    scope: 'global',
     projectId: '07108fd5-e404-4864-a839-eb698c84025c',
   },
 
   health: {
     scriptPath: './health.sh',
-    required:   true,
+    required: true,
   },
 
   tools: {
-    mcp:     { enabled: true, port: 3742 },
+    mcp: { enabled: true, port: 3742 },
     scripts: { enabled: true, outputDir: './.harness/scripts' },
   },
 }

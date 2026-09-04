@@ -426,8 +426,18 @@ export function injectDelegationGuidance(md: string, delegationGuidance: string)
   }
   // Fallback: insert after H1 heading block.
   const headingMatch = md.match(/^(#\s+.*?\n\n)/m)
-  if (!headingMatch) return md
-  return `${headingMatch[1]}## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${md.slice(headingMatch[1].length)}`
+  if (headingMatch) {
+    return `${headingMatch[1]}## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${md.slice(headingMatch[1].length)}`
+  }
+
+  // Canonical skills are manifests with YAML frontmatter and no H1. Keep the
+  // manifest intact, then place provider-specific guidance at the start of
+  // the Markdown body.
+  const frontmatterMatch = md.match(/^(---\r?\n[\s\S]*?\r?\n---\r?\n?)/)
+  if (!frontmatterMatch) return md
+  const frontmatter = frontmatterMatch[1]
+  const separator = frontmatter.endsWith('\n\n') ? '' : '\n'
+  return `${frontmatter}${separator}## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${md.slice(frontmatter.length)}`
 }
 
 export function agentLead(

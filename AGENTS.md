@@ -1,9 +1,3 @@
-## Available Research Tools
-
-- Context7 MCP tools available: resolve library ID before querying docs
-- Mintlify Index available for publisher-maintained technical documentation
-- Web search available for current information outside documentation indexes
-
 # AGENTS.md — @cardor/agent-harness-kit
 
 **Read this file first.** It is the navigation map for every AI agent working in this repository.
@@ -88,4 +82,4 @@ If implementing: ./docs/
 If orchestrating: Agent definition files in your provider's agents directory
 ```
 
-<!-- ahk:generated c3223361ee482aa6d8fe1e38019ed9eb27bb544e942861d62d39c343b09e33f1 -->
+<!-- ahk:generated f286054233a09f3b46fb9e77ec7f24083a3ae57e1f87e0c3d7fd2d51d9ed4076 -->

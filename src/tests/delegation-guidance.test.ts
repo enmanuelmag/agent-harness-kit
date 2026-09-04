@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, it } from 'node:test'
@@ -191,27 +191,53 @@ describe('injectDelegationGuidance fallback', () => {
     const result = injectDelegationGuidance(md, '')
     assert.equal(result, md, 'should return unchanged markdown')
   })
+
+  it('inserts after YAML frontmatter when the document has no H1', () => {
+    const manifest = '---\nname: test\ndescription: test skill\n---\n\nBody.\n'
+    const guidance = renderDelegationGuidance('claude-code', 'coordination-skill')
+    const result = injectDelegationGuidance(manifest, guidance)
+
+    assert.match(result, /^---\nname: test\ndescription: test skill\n---\n\n/)
+    assert.ok(result.includes('## Provider Delegation Guidance'))
+    assert.ok(result.includes(guidance))
+    assert.ok(result.indexOf('## Provider Delegation Guidance') < result.indexOf('Body.'))
+  })
 })
 
 describe('coordination skill injection', () => {
-  it('writeSkills with delegation guidance injects into skill content', () => {
+  it('writeSkills injects guidance into canonical manifests and preserves resources byte-for-byte', () => {
     const tmpDir = mkdtempSync(join(os.tmpdir(), 'ahk-test-'))
     try {
       const guidance = renderDelegationGuidance('claude-code', 'coordination-skill')
-      // Use mock markdown with H1 heading (real SKILL.md has frontmatter but no H1)
-      const mockMd = '# Test Skill\n\nThis is a test skill.\n'
-      const destDir = join(tmpDir, '.skills', 'ahk-ask')
-      mkdirSync(destDir, { recursive: true })
-      // Simulate what writeSkills does: read + inject + write
-      let content = mockMd
-      content = injectDelegationGuidance(content, guidance)
-      writeFileSync(join(destDir, 'SKILL.md'), content, 'utf8')
-      const result = readFileSync(join(destDir, 'SKILL.md'), 'utf8')
-      assert.ok(
-        result.includes('## Provider Delegation Guidance'),
-        'should contain delegation section'
-      )
-      assert.ok(result.includes(guidance), 'should contain rendered guidance text')
+      const srcDir = join(__dirname, '../../src/core/materializer/skills')
+      writeSkills(tmpDir, '.skills', guidance)
+
+      for (const skillName of [
+        'ahk-ask',
+        'ahk-consultant',
+        'ahk-triage',
+        'ahk-review',
+        'ahk-test',
+        'ahk-use-cases',
+        'ahk-use-case-tech',
+      ]) {
+        const result = readFileSync(join(tmpDir, '.skills', skillName, 'SKILL.md'), 'utf8')
+        assert.ok(result.includes('## Provider Delegation Guidance'), `${skillName} should contain guidance`)
+        assert.ok(result.includes(guidance), `${skillName} should contain rendered guidance`)
+      }
+
+      for (const resourcePath of [
+        'ahk-use-cases/resources/discovery-workflow.md',
+        'ahk-use-cases/resources/use-case-template.md',
+        'ahk-use-case-tech/resources/technical-template.md',
+        'ahk-use-case-tech/resources/technical-workflow.md',
+      ]) {
+        assert.deepEqual(
+          readFileSync(join(tmpDir, '.skills', resourcePath)),
+          readFileSync(join(srcDir, resourcePath)),
+          `${resourcePath} should remain byte-for-byte identical`
+        )
+      }
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }

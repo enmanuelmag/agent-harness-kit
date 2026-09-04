@@ -1727,6 +1727,12 @@ describe('record_tool/record_file tracking guidance — batch-only, no per-call 
 describe('ahk-test — skill materialization across all providers', () => {
   const TMP_SKILL = join(import.meta.dirname, '../../.tmp-skill-materialize')
   const CANONICAL_SRC = join(import.meta.dirname, '../core/materializer/skills/ahk-test/SKILL.md')
+  const CANONICAL_RESOURCES = [
+    'ahk-use-cases/resources/discovery-workflow.md',
+    'ahk-use-cases/resources/use-case-template.md',
+    'ahk-use-case-tech/resources/technical-template.md',
+    'ahk-use-case-tech/resources/technical-workflow.md',
+  ]
 
   function setup(): void {
     mkdirSync(TMP_SKILL, { recursive: true })
@@ -1766,6 +1772,21 @@ describe('ahk-test — skill materialization across all providers', () => {
         const live = readFileSync(materialized, 'utf8')
         const canonical = readFileSync(CANONICAL_SRC, 'utf8')
         assert.equal(live, canonical, `${providerName}: must match canonical source byte-for-byte`)
+      } finally {
+        teardown()
+      }
+    })
+
+    test(`${providerName}: copies every canonical resource byte-for-byte`, () => {
+      setup()
+      try {
+        writeSkills(TMP_SKILL, skillsSubdir)
+        for (const relativePath of CANONICAL_RESOURCES) {
+          const materialized = join(TMP_SKILL, skillsSubdir, relativePath)
+          const canonical = join(import.meta.dirname, '../core/materializer/skills', relativePath)
+          assert.ok(existsSync(materialized), `${providerName}: ${relativePath} should exist`)
+          assert.equal(readFileSync(materialized, 'utf8'), readFileSync(canonical, 'utf8'))
+        }
       } finally {
         teardown()
       }
@@ -1843,14 +1864,22 @@ describe('ahk-test — doctor states', () => {
     }
   }
 
-  test('ok when skill present and identical to canonical source', async () => {
-    const dir = makeTmp('skill-ok')
+  function resourcePathForProvider(dir: string, provider: string, relativePath: string): string {
+    return join(skillPathForProvider(dir, provider), '..', '..', relativePath)
+  }
+
+  test('freshly built manifests and resources are ok for every provider', async () => {
     try {
-      await buildProject(dir, 'claude-code')
-      const status = await getDoctorStatus(dir)
-      const skill = status.skills.find((s) => s.name === 'ahk-test')
-      assert.ok(skill, 'ahk-test should appear in skills list')
-      assert.equal(skill.status, 'ok', 'ahk-test should be ok when freshly built')
+      for (const provider of ['claude-code', 'opencode', 'codex-cli', 'grok-cli'] as const) {
+        const dir = makeTmp(`skill-ok-${provider}`)
+        await buildProject(dir, provider)
+        const status = await getDoctorStatus(dir)
+        assert.ok(status.skills.length > 0, `${provider}: skills should be checked`)
+        assert.ok(
+          status.skills.every((skill) => skill.status === 'ok'),
+          `${provider}: freshly built manifests and resources should be ok`
+        )
+      }
     } finally {
       cleanup()
     }
@@ -1880,6 +1909,41 @@ describe('ahk-test — doctor states', () => {
       const skill = status.skills.find((s) => s.name === 'ahk-test')
       assert.ok(skill)
       assert.equal(skill.status, 'outdated', 'ahk-test should be outdated after modification')
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('missing when a skill resource is deleted', async () => {
+    const dir = makeTmp('resource-missing')
+    try {
+      await buildProject(dir, 'opencode')
+      rmSync(resourcePathForProvider(dir, 'opencode', 'ahk-use-cases/resources/discovery-workflow.md'))
+      const status = await getDoctorStatus(dir)
+      assert.equal(
+        status.skills.find((s) => s.name === 'ahk-use-cases/resources/discovery-workflow.md')?.status,
+        'missing'
+      )
+    } finally {
+      cleanup()
+    }
+  })
+
+  test('outdated when a skill resource is modified', async () => {
+    const dir = makeTmp('resource-outdated')
+    try {
+      await buildProject(dir, 'grok-cli')
+      const resource = resourcePathForProvider(
+        dir,
+        'grok-cli',
+        'ahk-use-case-tech/resources/technical-template.md'
+      )
+      writeFileSync(resource, readFileSync(resource, 'utf8') + '\n<!-- tampered -->\n', 'utf8')
+      const status = await getDoctorStatus(dir)
+      assert.equal(
+        status.skills.find((s) => s.name === 'ahk-use-case-tech/resources/technical-template.md')?.status,
+        'outdated'
+      )
     } finally {
       cleanup()
     }

@@ -1,0 +1,8 @@
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+sandbox_mode = "danger-full-access"
+
+[mcp_servers.agent-harness-kit]
+command = "ahk"
+args = ["serve","--port","3742"]
+default_tools_approval_mode = "approve"

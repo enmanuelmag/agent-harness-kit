@@ -1,9 +1,13 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { loadConfig } from '@/core/config'
+import { renderDelegationGuidance } from '@/core/materializer/delegation-guidance'
+import { injectDelegationGuidance } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
+
+import type { Provider } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,31 +163,57 @@ function getProviderSkillsDir(provider: string): string {
 // Root-based comparison — shared by both the project-local (cwd) and global
 // (homeDir) checks. `skillsRoot` is an absolute directory already resolved
 // by the caller.
-function checkSkillsAtRoot(skillsRoot: string): SkillStatus[] {
-  // Skills are in src/core/materializer/skills/ — at runtime dist/core/materializer/skills/
-  const skillSourceBase = join(__dirname, 'materializer', 'skills')
+function checkSkillsAtRoot(skillsRoot: string, provider: Provider): SkillStatus[] {
+  // Source execution keeps skills beside the materializer; the bundled CLI
+  // copies them to dist/skills (beside cli.js).
+  const bundledSkills = join(__dirname, 'skills')
+  const skillSourceBase = existsSync(bundledSkills)
+    ? bundledSkills
+    : join(__dirname, 'materializer', 'skills')
 
-  return SKILL_NAMES.map((name) => {
-    const livePath = join(skillsRoot, name, 'SKILL.md')
-    const sourcePath = join(skillSourceBase, name, 'SKILL.md')
+  return SKILL_NAMES.flatMap((skillName) => {
+    const sourceRoot = join(skillSourceBase, skillName)
+    return listFiles(sourceRoot).map((relativePath) => {
+      const name = relativePath === 'SKILL.md' ? skillName : join(skillName, relativePath)
+      const livePath = join(skillsRoot, skillName, relativePath)
+      const sourcePath = join(sourceRoot, relativePath)
 
-    if (!existsSync(livePath)) {
-      return { name, status: 'missing' as const }
-    }
+      if (!existsSync(livePath)) {
+        return { name, status: 'missing' as const }
+      }
 
-    try {
-      const live = readFileSync(livePath, 'utf8')
-      const source = readFileSync(sourcePath, 'utf8')
-      return { name, status: live === source ? 'ok' : 'outdated' }
-    } catch {
-      return { name, status: 'outdated' as const }
-    }
+      try {
+        const live = readFileSync(livePath, 'utf8')
+        const source = readFileSync(sourcePath, 'utf8')
+        // Manifests are materialized with provider-specific delegation guidance.
+        // Every other file in the tree, including resources, must remain an exact
+        // byte-for-byte copy of the canonical source.
+        const expected =
+          relativePath === 'SKILL.md'
+            ? injectDelegationGuidance(
+                source,
+                renderDelegationGuidance(provider, 'coordination-skill')
+              )
+            : source
+        return { name, status: live === expected ? 'ok' : 'outdated' }
+      } catch {
+        return { name, status: 'outdated' as const }
+      }
+    })
   })
 }
 
-function checkSkills(cwd: string, provider: string): SkillStatus[] {
+/** Returns every file below a canonical skill directory, relative to that directory. */
+function listFiles(root: string, relativeDir = ''): string[] {
+  return readdirSync(join(root, relativeDir), { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = join(relativeDir, entry.name)
+    return entry.isDirectory() ? listFiles(root, relativePath) : [relativePath]
+  })
+}
+
+function checkSkills(cwd: string, provider: Provider): SkillStatus[] {
   const skillsDir = getProviderSkillsDir(provider)
-  return checkSkillsAtRoot(join(cwd, skillsDir))
+  return checkSkillsAtRoot(join(cwd, skillsDir), provider)
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────

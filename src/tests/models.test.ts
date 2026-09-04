@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
+import { CODEX_MODEL_CHOICES } from '@/commands/codex-model-prompt'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { resolveModelsContext } from '@/commands/models'
 import { claudeAgentFiles } from '@/core/materializer/claude-code'
@@ -63,6 +64,21 @@ function writeRealConfig(dir: string, provider: Provider): void {
     'utf8'
   )
 }
+
+describe('Codex model picker', () => {
+  test('offers gpt-6-astra without changing the existing catalog order', () => {
+    assert.deepEqual(CODEX_MODEL_CHOICES, [
+      'gpt-6-astra',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.3-codex-spark',
+    ])
+  })
+})
 
 describe('claudeAgentFiles — direct export used by ahk models', () => {
   test('injects the given per-role model map into frontmatter, per role, no cross-contamination', () => {
