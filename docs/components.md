@@ -203,6 +203,10 @@ Agents are not configured from `agent-harness-kit.config.ts` — there is no
   "..."` TOML line) — the answer is written straight into the generated file,
   never into config. OpenCode and Grok Build have no closed model enum, so
   neither is prompted; hand-edit the frontmatter for those providers.
+  Codex proposes `gpt-5.6-terra` with `medium` effort for lead, consultant,
+  builder, and reviewer; explorer is proposed as `gpt-5.6-luna` with `medium`
+  effort. `ahk build --force` backs up existing agent files, re-runs this
+  per-role prompt, and replaces the generated TOMLs with those fresh choices.
   Separately, Codex's `.codex/config.toml` always carries a project-wide
   top-level default (`model = "gpt-5.6-terra"`, `model_reasoning_effort =
   "medium"`), preserved across re-runs once hand-edited.

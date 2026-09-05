@@ -3,10 +3,11 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
-import { CODEX_MODEL_CHOICES } from '@/commands/codex-model-prompt'
+import { CODEX_AGENT_DEFAULTS, CODEX_MODEL_CHOICES } from '@/commands/codex-model-prompt'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { resolveModelsContext } from '@/commands/models'
 import { claudeAgentFiles } from '@/core/materializer/claude-code'
+import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { getMaterializer } from '@/core/materializer/index'
 
 import type { BuildMaterializerOptions } from '@/core/materializer/index'
@@ -77,6 +78,29 @@ describe('Codex model picker', () => {
       'gpt-5.4-mini',
       'gpt-5.3-codex-spark',
     ])
+  })
+
+  test('uses Terra/medium for every role except Explorer, which uses Luna/medium', () => {
+    assert.deepEqual(CODEX_AGENT_DEFAULTS, {
+      lead: { model: 'gpt-5.6-terra', effort: 'medium' },
+      explorer: { model: 'gpt-5.6-luna', effort: 'medium' },
+      consultant: { model: 'gpt-5.6-terra', effort: 'medium' },
+      builder: { model: 'gpt-5.6-terra', effort: 'medium' },
+      reviewer: { model: 'gpt-5.6-terra', effort: 'medium' },
+    })
+  })
+
+  test('uses the lead choice unchanged for Codex default.toml', () => {
+    const entries = codexAgentFiles(configFor('codex-cli'), CODEX_AGENT_DEFAULTS)
+    const byPath = Object.fromEntries(entries.map((entry) => [entry.relPath, entry.content]))
+    const roleConfig = (content: string) =>
+      content.match(/^(?:model|model_reasoning_effort) = .+$/gm)?.join('\n')
+
+    assert.equal(
+      roleConfig(byPath['.codex/agents/default.toml']),
+      roleConfig(byPath['.codex/agents/lead.toml'])
+    )
+    assert.match(byPath['.codex/agents/explorer.toml'], /^model = "gpt-5\.6-luna"$/m)
   })
 })
 

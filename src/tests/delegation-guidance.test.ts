@@ -40,12 +40,15 @@ describe('delegation guidance', () => {
       assert.ok(result.includes('Wait For Completion'))
     })
 
-    it('produces spawn/delegate output for codex-cli lead', () => {
+    it('uses Codex-native delegation guidance without invented commands', () => {
       const result = renderDelegationGuidance('codex-cli', 'lead')
-      assert.ok(result.includes('spawn'), 'should mention spawn')
+      assert.ok(result.includes('bounded, independent work'))
       assert.ok(result.includes('delegate'), 'should mention delegate')
       assert.ok(result.includes('Parallel'))
       assert.ok(result.includes('Inspect Progress'), 'should have Inspect Progress key')
+      assert.ok(result.includes('/agent'), 'should mention the interactive inspection command')
+      assert.ok(!result.includes('spawn → delegate → wait → summarize'))
+      assert.ok(!result.includes('status commands'))
     })
 
     it('produces /tasks output for grok-cli lead', () => {
@@ -145,8 +148,9 @@ describe('delegation guidance', () => {
         renderDelegationGuidance('codex-cli', 'lead')
       )
       assert.ok(result.includes('## Provider Delegation Guidance'))
-      assert.ok(result.includes('spawn'))
+      assert.ok(result.includes('bounded, independent work'))
       assert.ok(result.includes('delegate'))
+      assert.ok(result.includes('/agent'))
     })
 
     it('grok-cli lead gets delegation guidance', () => {

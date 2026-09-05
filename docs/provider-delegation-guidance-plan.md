@@ -58,7 +58,7 @@ type ProviderDelegationGuidance = {
 const PROVIDER_DELEGATION_GUIDANCE = {
   'claude-code': { /* natural-language name and @mention guidance */ },
   opencode: { /* @mention and fresh-child-context guidance */ },
-  'codex-cli': { /* explicit spawn/delegate/wait/summarize guidance */ },
+  'codex-cli': { /* bounded delegation and /agent inspection guidance */ },
   'grok-cli': { /* explicit project subagent and /tasks guidance */ },
 } satisfies Record<Provider, ProviderDelegationGuidance>
 ```
@@ -111,7 +111,9 @@ The generated index must distinguish:
 
 ### Codex CLI
 
-- Use direct language such as spawn, delegate, parallel, wait, and summarize.
+- Delegate bounded independent work with self-contained context; wait for
+  results and consolidate them in the parent thread. In the interactive CLI,
+  use `/agent` to inspect delegated threads when needed.
 - Keep the default lead shim and TOML conversion in the Codex materializer.
 - State that current read-only role restrictions are prompt-level because the project config uses `danger-full-access`.
 

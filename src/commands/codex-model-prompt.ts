@@ -31,6 +31,17 @@ export const CODEX_MODEL_CHOICES = [
   'gpt-5.3-codex-spark',
 ] as const
 
+/** Defaults shown by the Codex per-role picker. They are written only when
+ * the user accepts them during `init`, `build --force`, or provider migration;
+ * `.codex/config.toml` remains the separate project-wide fallback. */
+export const CODEX_AGENT_DEFAULTS = {
+  lead: { model: 'gpt-5.6-terra', effort: 'medium' },
+  explorer: { model: 'gpt-5.6-luna', effort: 'medium' },
+  consultant: { model: 'gpt-5.6-terra', effort: 'medium' },
+  builder: { model: 'gpt-5.6-terra', effort: 'medium' },
+  reviewer: { model: 'gpt-5.6-terra', effort: 'medium' },
+} as const satisfies Record<AgentName, CodexAgentModelChoice>
+
 // Intersection of Codex's real `ReasoningEffort` wire enum
 // (`codex-rs/protocol/src/openai_models.rs`: none|minimal|low|medium|high|
 // xhigh|max|ultra|Custom) and the whitelist its own per-agent-role-file
@@ -62,10 +73,11 @@ export async function promptCodexAgentModels(
   if (provider !== 'codex-cli') return codexAgentModels
 
   for (const agent of AGENT_LABELS) {
+    const defaults = CODEX_AGENT_DEFAULTS[agent.key]
     const modelVal = await p.select({
       message: `Model for ${agent.label}`,
       options: CODEX_MODEL_CHOICES.map((value) => ({ value, label: value })),
-      initialValue: 'gpt-5.6-terra',
+      initialValue: defaults.model,
     })
     if (p.isCancel(modelVal)) {
       p.cancel('Cancelled.')
@@ -75,7 +87,7 @@ export async function promptCodexAgentModels(
     const effortVal = await p.select({
       message: `Reasoning effort for ${agent.label}`,
       options: CODEX_EFFORT_CHOICES.map((value) => ({ value, label: value })),
-      initialValue: 'medium',
+      initialValue: defaults.effort,
     })
     if (p.isCancel(effortVal)) {
       p.cancel('Cancelled.')

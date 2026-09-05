@@ -32,14 +32,15 @@ export const PROVIDER_DELEGATION_GUIDANCE: Readonly<Record<Provider, ProviderDel
       waitForCompletion: 'Wait for each @mention to complete before proceeding.',
     },
     'codex-cli': {
-      invoke: ['spawn', 'delegate', 'parallel', 'wait', 'summarize'],
+      invoke: ['subagent delegation', '/agent'],
       sequential:
-        'Use spawn → delegate → wait → summarize pattern. Explicit commands for each step.',
-      parallel: 'Use parallel spawns for independent agents. Wait for all to complete.',
+        'Delegate only bounded, independent work; retain decisions and the final synthesis in the parent thread.',
+      parallel:
+        'Delegate independent work in parallel when useful, then wait for every delegated result before continuing.',
       contextTransfer:
-        'Provide full context in the spawn command — no shared state between children.',
-      waitForCompletion: 'Use explicit wait after spawning parallel tasks.',
-      inspectProgress: 'Check progress via status commands between waits.',
+        'Give every delegated task a self-contained objective, scope, relevant context, restrictions, and output contract.',
+      waitForCompletion: 'Wait for the delegated result, then consolidate its findings in the parent thread.',
+      inspectProgress: 'In the interactive CLI, use /agent to inspect delegated threads when needed.',
     },
     'grok-cli': {
       invoke: ['project subagent', '/tasks'],
