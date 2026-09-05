@@ -192,7 +192,7 @@ tasks.get('in_progress')   → is there something already in progress? resume it
 tasks.get('pending')        → pick the task with the lowest id
 ```
 
-If `.harness/current.md` is available and MCP is unreachable, read it as fallback.
+If MCP is unreachable, stop and ask the user to restore the MCP connection.
 
 ### 2. Find or create a task
 

@@ -88,7 +88,6 @@ export default {
   database: { type: 'sqlite', path: '.harness/harness.db' },
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
     sections: {
       toolsUsed: true,
       filesModified: true,
@@ -96,7 +95,6 @@ export default {
       blockers: true,
       nextSteps: false,
     },
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
   },
   health: { scriptPath: './health.sh', required: true },
   tools: {

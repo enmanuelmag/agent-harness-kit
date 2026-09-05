@@ -14,7 +14,6 @@ export type {
   StorageConfig,
   TaskRow,
   TasksAdapter,
-  TaskSeed,
   TaskStatus,
   ToolsConfig,
 } from '@/types'

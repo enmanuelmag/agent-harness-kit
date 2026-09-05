@@ -69,7 +69,6 @@ npx ahk init --name "My Cool App"
 
 # The setup will create:
 # - .harness/harness.db          # SQLite database for workflow state
-# - .harness/feature_list.json   # Task backlog in JSON format  
 # - AGENTS.md                    # Generated agent navigation map
 # - health.sh                    # Customizable health check script
 # - agent-harness-kit.config.ts  # Core configuration file
@@ -102,7 +101,7 @@ export default defineHarness({
 
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
+    tasks: { adapter: 'mcp' },
     sections: {
       toolsUsed: true,        // log which tools agents used
       filesModified: true,    // log which files were touched  
@@ -110,11 +109,6 @@ export default defineHarness({
       blockers: true,         // log blockers
       nextSteps: false,       // optional next steps field
     },
-    markdownFallback: { 
-      enabled: true, 
-      path: '.harness/current.md' 
-    },
-    // scope: 'local' (shown here) — sqlitePath/markdownFallback.path only
     // exist on this branch of the StorageConfig union. 'global' moves both
     // under ~/.harness/dbs/<projectId>/ and drops both fields entirely.
     scope: 'local',
@@ -289,8 +283,6 @@ ahk export --sql --output dump.sql    # Export SQL to file
 #### `.harness/` Directory 
 This directory contains all runtime data:
 - `harness.db` - SQLite database with tasks, actions, and logs  
-- `feature_list.json` - Human-editable task backlog (version controlled)
-- `current.md` - Auto-generated session snapshot for non-MCP environments  
 
 #### Provider Configuration
 The system supports four providers:
@@ -320,7 +312,6 @@ The main configuration file with all customizable settings. It includes:
 4. **Storage Configuration** 
    - Database location
    - Logging preferences
-   - Fallback settings
 5. **Health Settings**
    - Custom health script path
    - Health check enforcement

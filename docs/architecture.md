@@ -57,7 +57,6 @@ The agent-harness-kit is built on a structured multi-agent workflow that leverag
                                                       │    ┌─────────────────────────┐   │
                                                       │    │  - health.sh             │   │
                                                       │    │  - AGENTS.md             │   │
-                                                      │    │  - feature_list.json     │   │
                                                       │    │  - agent-harness-kit.config.ts│   │
                                                       │    └─────────────────────────┘   │
                                                       └──────────────────────────────────┘
@@ -151,8 +150,6 @@ The SQLite database stores all state information for the agent harness in a stru
 
 #### Files System
 - `.harness/harness.db` - Main SQLite database file
-- `.harness/feature_list.json` - Human-editable task backlog
-- `.harness/current.md` - Auto-generated session snapshot (for non-MCP environments)
 - `health.sh` - Custom health check script
 - `agent-harness-kit.config.ts` - Core project configuration
 
@@ -213,7 +210,7 @@ export default defineHarness({
   database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
+    tasks: { adapter: 'mcp' },
     sections: {
       toolsUsed: true,        // log which tools agents used
       filesModified: true,    // log which files were touched
@@ -221,7 +218,6 @@ export default defineHarness({
       blockers: true,         // log blockers
       nextSteps: false,       // optional next steps field
     },
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
     scope: 'local',           // 'local' | 'global'
     projectId: '5f2c...',     // UUID, generated once at init, never regenerated
     // sqlitePath: '.harness/harness.db', // optional — only valid under scope: 'local'
@@ -241,15 +237,12 @@ export default defineHarness({
 
 `StorageConfig` (`src/types.ts`) is `LocalStorageConfig | GlobalStorageConfig`, narrowed on the `scope` field:
 
-- **`scope: 'local'`** (shown above) — the sqlite DB and `current.md` fallback live project-relative, under `.harness/`. `sqlitePath` (optional, defaults to `.harness/harness.db` via `DEFAULT_SQLITE_PATH` in `src/core/db.ts`) and `markdownFallback.path` exist only on this branch.
-- **`scope: 'global'`** — both live under `~/.harness/dbs/<projectId>/`, outside the project tree. Neither `sqlitePath` nor `markdownFallback.path` exist on this branch at all — declaring them is a compile-time error, not a silently-ignored field:
 
 ```typescript
 storage: {
   dir: '.harness',
-  tasks: { adapter: 'local' },
+  tasks: { adapter: 'mcp' },
   sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
-  markdownFallback: { enabled: true }, // no `path`
   scope: 'global',
   projectId: '5f2c...',
   // sqlitePath is NOT a valid field on GlobalStorageConfig
@@ -258,7 +251,6 @@ storage: {
 
 `DatabaseConfig` (`SQLiteConfig | RemoteDBConfig`) stays engine-only and scope-agnostic — `RemoteDBConfig`'s `connectionString` is the same regardless of local/global scope, so it's untouched by this split.
 
-Because `loadConfig()` loads `agent-harness-kit.config.ts` via `jiti.import()` at runtime (types are stripped before the module is evaluated), an on-disk config that still has the old contradictory shape (`scope: 'global'` alongside `database.path`/`storage.markdownFallback.path`) gets no compile-time protection. `applyDefaults()` (`src/core/config.ts`) detects that shape at runtime, strips the offending fields, and emits a `console.warn` rather than crashing.
 
 This applies with full force to JSON configs, which have no compile-time protection at all — there is no type to check them against. A `.json` config is read and parsed directly rather than through `jiti` (pure data, no module semantics, and a parse error can name the file and the reason), then handed to the same `applyDefaults()`. Both normalizers — `normalizeLegacyStorageShape()` and `normalizeLegacyAgentsKey()`, the latter stripping the `agents` key removed in a prior version — run identically for every format.
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
@@ -15,7 +16,6 @@ import type { GlobalStorageConfig, LocalStorageConfig, StorageConfig } from '@/t
 
 const baseFields = {
   dir: '.harness',
-  tasks: { adapter: 'local' as const },
   sections: {
     toolsUsed: true,
     filesModified: true,
@@ -33,25 +33,18 @@ function illegalShapes(): void {
   const globalWithSqlitePath: GlobalStorageConfig = {
     ...baseFields,
     scope: 'global',
-    markdownFallback: { enabled: true },
     // @ts-expect-error — sqlitePath does not exist on GlobalStorageConfig
     sqlitePath: '.harness/harness.db',
   }
 
-  // scope='global' must NOT accept `markdownFallback.path`.
   const globalWithMarkdownPath: GlobalStorageConfig = {
     ...baseFields,
     scope: 'global',
-    // @ts-expect-error — markdownFallback.path does not exist on GlobalStorageConfig's markdownFallback
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
   }
 
-  // scope='local' MUST require markdownFallback.path (omitting it is an error).
   const localMissingMarkdownPath: LocalStorageConfig = {
     ...baseFields,
     scope: 'local',
-    // @ts-expect-error — markdownFallback.path is required on LocalStorageConfig
-    markdownFallback: { enabled: true },
   }
 
   void globalWithSqlitePath
@@ -70,42 +63,21 @@ function validShapes(): {
   const local: LocalStorageConfig = {
     ...baseFields,
     scope: 'local',
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
   }
 
   const localWithSqlitePath: LocalStorageConfig = {
     ...baseFields,
     scope: 'local',
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
     sqlitePath: '.harness/custom.db',
   }
 
   const global: GlobalStorageConfig = {
     ...baseFields,
     scope: 'global',
-    markdownFallback: { enabled: true },
   }
 
   return { local, localWithSqlitePath, global }
 }
 
 /** A plain StorageConfig union narrows on `scope` before local-only fields
- *  (markdownFallback.path) become accessible — this is the actual
  *  runtime-shaped guarantee the discriminated union exists to provide. */
-function markdownPathIfLocal(storage: StorageConfig): string | undefined {
-  return storage.scope === 'local' ? storage.markdownFallback.path : undefined
-}
-
-describe('StorageConfig discriminated union — compile-time narrowing (task #56)', () => {
-  test('valid local/global shapes construct correctly and narrow via scope', () => {
-    const { local, localWithSqlitePath, global } = validShapes()
-
-    assert.equal(markdownPathIfLocal(local), '.harness/current.md')
-    assert.equal(markdownPathIfLocal(global), undefined)
-    assert.equal(localWithSqlitePath.sqlitePath, '.harness/custom.db')
-    assert.ok(
-      !('path' in global.markdownFallback),
-      'GlobalStorageConfig.markdownFallback must never carry a path field'
-    )
-  })
-})

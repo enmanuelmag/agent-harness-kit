@@ -46,7 +46,7 @@ function configFor(provider: Provider) {
     description: 'demo',
     provider,
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
   })
 }
 

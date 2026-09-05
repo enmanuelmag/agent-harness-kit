@@ -54,7 +54,6 @@ npx ahk init
     - [`agent-harness-kit.config.{json|ts|mjs|cjs}`](#agent-harness-kitconfigjsontsmjscjs)
     - [`health.sh`](#healthsh)
     - [Agent definition files](#agent-definition-files)
-    - [`.harness/feature_list.json`](#harnessfeature_listjson)
   - [MCP tools (for agents)](#mcp-tools-for-agents)
   - [Agent roles](#agent-roles)
     - [MCP tool permissions by role](#mcp-tool-permissions-by-role)
@@ -119,11 +118,9 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Atomic task claiming** — agents use `tasks.claim()` which uses a SQLite transaction to prevent two agents from picking up the same task at the same time.
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
 - **Health gate** — agents must run `health.sh` and get a green exit before starting or closing any task. You define what "healthy" means.
-- **Markdown fallback** — `current.md` is always regenerated so agents can understand the session state even without the MCP server.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
 - **Specification discovery** — `ahk-use-cases` turns an agreed product conversation into an iterative, non-technical Markdown spec in `docs/specs/`; `ahk-use-case-tech` creates a linked technical spec only after the source use case is approved.
 - **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
-- **Incremental scaffold** — `ahk init` preserves files you've already customized (agent definitions you've edited are kept). A hand-written `.harness/feature_list.json` backlog is **merged, never overwritten** — existing tasks survive and any first task you add during init is folded in (deduplicated by slug). `ahk build` also creates missing agent files and never touches existing ones. Use `ahk build --force` to regenerate them from the latest templates, discarding your edits (a backup is written first).
 - **Global installation** — `ahk init` can scaffold the harness into your home directory (`~/.claude` or `~/.config/opencode`) to share it across all projects.
 - **Input validation** — CLI prompts validate all inputs (name length, path format, task title, etc.) and retry with the error message instead of silently accepting bad values.
 
@@ -203,7 +200,6 @@ Separately, `.codex/config.toml` always gets a project-wide top-level default �
 
 OpenCode and Grok Build are unaffected by either prompt — it never appears for those providers, since neither has a closed model enum to prompt against.
 
-**Storage scope** — where the harness DB (and its `current.md` fallback) physically lives:
 
 - `local` (default) — `.harness/harness.db`, inside the project.
 - `global` — `~/.harness/dbs/<projectId>/harness.db`, outside the project tree (useful to keep the DB out of version control entirely, or to centralize storage for many projects). `<projectId>` is a UUID generated once at init and persisted in `agent-harness-kit.config.ts` — it's never regenerated on subsequent runs.
@@ -390,7 +386,6 @@ All skills follow the same contract: they invoke Explorer, Builder, or Reviewer 
 
 ### `ahk sync`
 
-Syncs `.harness/feature_list.json` ↔ SQLite. Tasks already in the DB are skipped by slug. Use this to seed the backlog from the JSON file without duplicating existing tasks.
 
 ```bash
 ahk sync                         # both directions (default)
@@ -417,7 +412,6 @@ ahk serve --port 3456    # store a port hint in config (stdio transport only)
 
 ### `ahk task add`
 
-Interactively adds a new task to the backlog (SQLite + `feature_list.json`).
 
 ```bash
 ahk task add
@@ -467,7 +461,6 @@ ahk reset --provider grok-cli
 What it can reset:
 
 - The SQLite `.db` file (plus WAL and SHM files if present)
-- `.harness/feature_list.json`
 - Agent definition files in `.claude/agents/`, `.opencode/agents/`, `.codex/agents/`, or `.grok/agents/`
 
 After a reset, run `ahk init` to scaffold a fresh harness.
@@ -509,7 +502,6 @@ What it does, case by case:
 | Situation | Behavior |
 |---|---|
 | Config and real storage state already match | No-op — reports "nothing to migrate" |
-| Only `storage.scope` differs (same DB engine) | Copies the `.db` file (+ WAL/SHM) and `current.md` directly to the new location, verifies the copy, then removes the original |
 | Only `database.type` differs (sqlite → postgres/mysql) | Full export/import of all 6 tables inside one transaction; on failure, the destination is rolled back exactly as it was found |
 | Destination already has data | **Requires `--force`.** Without it, the command aborts and touches nothing. With it, the destination's current content is backed up to `.harness/backups/pre-migrate-<timestamp>.json` **before** anything is overwritten — if the backup can't be written, the whole command aborts |
 | Both source and destination have diverging data (not just empty vs. full) | Same as above (`--force` + backup required) — the command never attempts to auto-merge two independent histories |
@@ -548,9 +540,7 @@ your-project/
 ├── health.sh
 ├── .harness/
 │   ├── harness.db                 ← gitignored (local scope only — absent when scope: 'global')
-│   ├── current.md                 ← gitignored (local scope only — absent when scope: 'global')
 │   ├── storage-state.json         ← always present, reflects the REAL current storage scope/projectId
-│   └── feature_list.json
 └── .claude/
     ├── agents/
     │   ├── lead.md
@@ -620,9 +610,7 @@ your-project/
 | `agent-harness-kit.config.{json\|ts\|mjs\|cjs}` | Defines project metadata, provider, storage paths, MCP port. JSON when the package isn't installed locally, otherwise `.ts`/`.mjs`/`.cjs` | Yes — it's yours                                            |
 | `AGENTS.md`                   | Navigation map agents read first. Regenerated by `ahk build`                          | No — changes will be overwritten                            |
 | `health.sh`                   | Shell script agents run before starting work. Must exit 0                             | **Yes — implement your checks here**                        |
-| `.harness/feature_list.json`  | Task backlog in JSON. Humans edit this, `ahk sync` loads it into SQLite               | Yes — add tasks here                                        |
 | `.harness/harness.db`         | SQLite database (local scope only). Source of truth for tasks, actions, sections      | No — managed by the harness                                 |
-| `.harness/current.md`         | Auto-generated session snapshot for agents without MCP access (local scope only)      | No — regenerated automatically                              |
 | `.harness/storage-state.json` | Always project-local. Records the REAL current storage state (`scope`, `projectId`, `dbType`, `migratedAt`) — used by migration tooling | No — managed by the harness |
 | `.claude/agents/*.md`         | Agent role definitions (Claude Code). Created once, never overwritten (`ahk build --force` regenerates)                 | **Yes — customize agent behavior**                          |
 | `.claude/mcp.json`            | MCP server registration for Claude Code. Merged by `ahk build`                        | Yes, carefully — don't remove the `agent-harness-kit` entry |
@@ -676,12 +664,9 @@ const config: HarnessConfig = {
   // database: { type: 'mysql', connectionString: process.env.DATABASE_URL },
 
   // ── Storage — scope: 'local' (default) ─────────────────────────────────────
-  // DB and current.md live project-relative, in .harness/. `sqlitePath` and
-  // `markdownFallback.path` are only valid (and only exist on the type) when
   // `scope: 'local'`.
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' }, // 'local' | 'jira' | 'linear' | 'mcp'
     sections: {
       toolsUsed: true, // log which tools agents used
       filesModified: true, // log which files were touched
@@ -689,7 +674,6 @@ const config: HarnessConfig = {
       blockers: true, // log blockers agents hit
       nextSteps: false, // optional next steps field
     },
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
     scope: 'local',
     projectId: '5f2c...', // UUID, generated once at init, never regenerated
     // sqlitePath: '.harness/harness.db', // optional — defaults to '.harness/harness.db' when omitted
@@ -730,7 +714,6 @@ export default config
       "blockers": true,
       "nextSteps": false
     },
-    "markdownFallback": { "enabled": true, "path": ".harness/current.md" },
     "scope": "local",
     "projectId": "5f2c..."
   },
@@ -744,21 +727,17 @@ export default config
 
 Every option documented below applies to both forms — the same keys, the same defaults, the same runtime normalization. The only difference is that the JSON form has no type checking or autocompletion behind it, since there is no package to resolve them from. To switch a JSON config to TypeScript, install the package locally (`npm install --save-dev @cardor/agent-harness-kit`) and rename the file to `agent-harness-kit.config.ts`, wrapping the object as shown above. `ahk` will not convert it for you — an existing config always keeps its format.
 
-**`scope: 'global'`** — DB and current.md live under `~/.harness/dbs/<projectId>/`, outside the project tree. Under this scope, `sqlitePath` and `markdownFallback.path` don't exist on the type at all (a type error, not just a no-op) — there's nothing local to declare a path for:
 
 ```ts
 storage: {
   dir: '.harness',
-  tasks: { adapter: 'local' },
   sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
-  markdownFallback: { enabled: true }, // no `path` — auto-managed under ~/.harness/dbs/<projectId>/
   scope: 'global',
   projectId: '5f2c...',
   // sqlitePath is NOT a valid field here — omit it entirely
 },
 ```
 
-> `StorageConfig` is a discriminated union on `scope` (`LocalStorageConfig | GlobalStorageConfig`, see `src/types.ts`) — this is what makes declaring `sqlitePath`/`markdownFallback.path` under `scope: 'global'` a compile-time error instead of a silently-ignored field. If you're loading a config file at runtime (via `loadConfig()`, which uses `jiti` and does not type-check), an existing `scope: 'global'` config that still has these fields set gets normalized automatically with a `console.warn` rather than crashing — see `applyDefaults()` in `src/core/config.ts`.
 
 > `defineHarness()` is still exported for anyone who prefers the value-import form (`import { defineHarness } from '@cardor/agent-harness-kit'` + `export default defineHarness({ ... })`) — it's an identity function kept for backward compatibility, and `loadConfig()` supports both shapes.
 
@@ -888,7 +867,6 @@ For the builder, `tools:` is omitted entirely, same as every other provider — 
 
 The equivalent constraint under Claude Code is expressed as `disallowedTools: [Write, Edit]`, under OpenCode as `permission: { edit: deny }`, and under Grok Build as the `tools:` allowlist shown above.
 
-### `.harness/feature_list.json`
 
 The human-editable task backlog. Add tasks here, then run `ahk sync` to load them into SQLite.
 
@@ -993,7 +971,6 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `AGENTS.md`                   | Yes                 |
 | `CLAUDE.md`                   | Yes                 |
 | `health.sh`                   | Yes                 |
-| `.harness/feature_list.json`  | Yes                 |
 | `.claude/agents/*.md`         | Yes                 |
 | `.claude/mcp.json`            | Yes                 |
 | `.claude/settings.json`       | Yes                 |
@@ -1004,7 +981,6 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `.grok/agents/*.md`           | Yes                 |
 | `.grok/config.toml`           | Yes                 |
 | `.harness/harness.db`         | **No** (gitignored, local scope only) |
-| `.harness/current.md`         | **No** (gitignored, local scope only) |
 | `.harness/storage-state.json` | Yes (metadata, not gitignored — always present regardless of scope) |
 
 The rule: commit inputs (config, task definitions, agent instructions). Ignore outputs (DB, auto-generated snapshots). `storage-state.json` is metadata about *where* those outputs live, not an output itself — it's committed so the harness can detect storage drift.
@@ -1103,7 +1079,7 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability reporting process, suppor
 ## Roadmap
 
 - ✅ **`ahk dashboard`** — local web UI with real-time WebSocket updates. Shows tasks, action timelines, file activity, tool usage, and per-agent breakdowns.
-- ✅ **`ahk reset`** — interactively clear the SQLite DB, feature list, and agent files to start a project fresh.
+- ✅ **`ahk reset`** — interactively clear the SQLite DB and agent files to start a project fresh.
 - ✅ **PostgreSQL + MySQL drivers** — remote database support via `postgres` and `mysql2` packages. Configure with `database: { type: 'postgres', connectionString: '...' }`.
 - ✅ **`actions.record_file` + `actions.record_tool`** — dedicated MCP tools for populating the Files and Tools dashboard views.
 - ✅ **`tasks.add` via MCP** — agents can create new tasks on the fly without leaving the conversation.
@@ -1113,7 +1089,6 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability reporting process, suppor
 - ✅ **Grok Build provider** — full support for xAI's Grok Build. Generates `.grok/agents/*.md` files with a `tools:` allowlist per role and merges `.grok/config.toml` for MCP registration.
 - **Graphify integration** — connect the harness to Graphify to visualize agent workflows, task dependencies, and action timelines as interactive graphs.
 - **Open Telemetry integration** — emit OpenTelemetry spans for all agent actions, file operations, and tool calls.
-- **Jira task adapter** — pull tasks directly from Jira instead of maintaining `feature_list.json` manually.
 - **Linear task adapter** — same as Jira, for Linear.
 - **GitHub Issues adapter** — same, for GitHub Issues.
 - **Remote MCP adapter** — connect to a hosted MCP server instead of a local SQLite file. Enables shared task state across machines and team members without syncing a DB file.

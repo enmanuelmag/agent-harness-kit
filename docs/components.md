@@ -29,7 +29,6 @@ Each task in the system has:
 ```
 
 #### Task Backlog
-Tasks are managed in `.harness/feature_list.json` and can be:
 - Added manually via `ahk task add`
 - Synced between JSON and SQLite backends using `ahk sync`
 - Viewed through CLI with `ahk task list`
@@ -221,14 +220,13 @@ per-tool in the generated agent files — see `src/core/materializer/agent-restr
 
 `database` never carries a file path — physical location is a `storage`
 concern (`storage.sqlitePath`), not a `database` one. `storage.scope`
-determines which fields are valid: `sqlitePath`/`markdownFallback.path` only
 exist under `scope: 'local'`.
 
 ```typescript
 database: { type: 'sqlite' },
 storage: {
   dir: '.harness',
-  tasks: { adapter: 'local' },
+  tasks: { adapter: 'mcp' },
   sections: {
     toolsUsed: true,
     filesModified: true, 
@@ -236,7 +234,6 @@ storage: {
     blockers: true,
     nextSteps: false
   },
-  markdownFallback: { enabled: true, path: '.harness/current.md' },
   scope: 'local', // 'local' | 'global'
   projectId: '5f2c...', // UUID, generated once at init
   // sqlitePath: '.harness/harness.db', // optional override, local scope only

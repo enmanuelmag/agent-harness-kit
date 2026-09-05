@@ -15,7 +15,6 @@ const config: HarnessConfig = {
   database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
     sections: {
       toolsUsed: true,
       filesModified: true,
@@ -23,7 +22,6 @@ const config: HarnessConfig = {
       blockers: true,
       nextSteps: false,
     },
-    markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
     scope: 'local',
     projectId: 'mcp-reads-test',
     sqlitePath: join(TMP, 'harness.db'),

@@ -54,7 +54,6 @@ export async function runTaskAdd(cwd: string): Promise<void> {
       description: description || undefined,
       acceptance,
     })
-    await db.writeFeatureList(cwd)
     await db.close()
 
     spinner.stop('')

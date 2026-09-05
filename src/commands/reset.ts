@@ -96,13 +96,10 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
     process.exit(1)
   }
 
-  const storageDir = config.storage.dir || '.harness'
   const dbPath =
     config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
-  const featureListPath = resolve(cwd, storageDir, 'feature_list.json')
 
   let resetDb = false
-  let resetFeatureList = false
   let resetAgentMdsFlag = false
 
   // ─── Determine what to reset ────────────────────────────────────────────────
@@ -139,23 +136,6 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
     )
   }
 
-  // Reset feature_list.json?
-  if (existsSync(featureListPath)) {
-    if (opts.force) {
-      resetFeatureList = true
-    } else {
-      const confirm = await p.confirm({
-        message: `Delete feature list (${storageDir}/feature_list.json)?`,
-        initialValue: true,
-      })
-      if (p.isCancel(confirm)) {
-        console.log(pc.red('  Cancelled by user.'))
-        return
-      }
-      resetFeatureList = confirm
-    }
-  }
-
   // Reset agent MD files?
   if (opts.provider) {
     resetAgentMdsFlag = true
@@ -173,22 +153,12 @@ export async function runReset(cwd: string, opts: ResetOptions): Promise<void> {
     }
   }
 
-  if (resetFeatureList) {
-    try {
-      rmSync(featureListPath, { force: true })
-      console.log(pc.green(`  ✓ Removed ${storageDir}/feature_list.json`))
-      //  = true
-    } catch {
-      console.error(pc.red(`  ✗ Failed to remove ${featureListPath}`))
-    }
-  }
-
   if (resetAgentMdsFlag) {
     console.log('')
     await resetAgentMds(cwd, opts.provider || 'claude-code')
   }
 
-  if (!resetDb && !resetFeatureList && !resetAgentMdsFlag) {
+  if (!resetDb && !resetAgentMdsFlag) {
     console.log(pc.yellow('  Nothing to reset (all items missing or skipped).'))
     return
   }

@@ -49,7 +49,7 @@ function configFor(provider: Provider, name = 'demo-app') {
     description: 'demo',
     provider,
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
   })
 }
 

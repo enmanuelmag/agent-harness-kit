@@ -36,7 +36,7 @@ export interface ProjectConfig {
  * Do NOT confuse this with the `AgentName` type below — that is the agent
  * identifier used by the DB and MCP layers, and it is unaffected. */
 
-export type TasksAdapter = 'local' | 'jira' | 'linear' | 'mcp'
+export type TasksAdapter = 'mcp'
 
 export interface ActionSections {
   toolsUsed: boolean
@@ -64,9 +64,9 @@ export interface RemoteDBConfig {
 export type DatabaseConfig = SQLiteConfig | RemoteDBConfig
 
 interface BaseStorageConfig {
-  /** Directory for local harness files: current.md, feature_list.json, scripts */
+  /** Directory for harness metadata and scripts. Task state stays in the MCP database. */
   dir: string
-  tasks: { adapter: TasksAdapter; [key: string]: unknown }
+  tasks?: { adapter: TasksAdapter; [key: string]: unknown }
   sections: ActionSections
   /** Stable UUID identifying this project's storage. Generated once at init
    *  via randomUUID() and never regenerated. Used to namespace the global
@@ -74,11 +74,9 @@ interface BaseStorageConfig {
   projectId: string
 }
 
-/** scope: 'local' — DB (and current.md fallback) live project-relative, in
- *  .harness/ (default, backward compatible). */
+/** scope: 'local' — DB lives project-relative in .harness/. */
 export interface LocalStorageConfig extends BaseStorageConfig {
   scope: 'local'
-  markdownFallback: { enabled: boolean; path: string }
   /** Relative path to the sqlite .db file, resolved against cwd. Only
    *  meaningful when `database.type === 'sqlite'`. Optional — defaults to
    *  `DEFAULT_SQLITE_PATH` ('.harness/harness.db', see src/core/db.ts) when
@@ -86,20 +84,12 @@ export interface LocalStorageConfig extends BaseStorageConfig {
   sqlitePath?: string
 }
 
-/** scope: 'global' — DB (and current.md fallback) live under
- *  ~/.harness/dbs/<projectId>/, outside the project tree. There is no
- *  meaningful local path to declare for either the sqlite file or the
- *  markdown fallback under this scope — both are computed via
- *  `resolveGlobalStorageDir()` (src/core/db.ts). */
+/** scope: 'global' — DB lives under ~/.harness/dbs/<projectId>/. */
 export interface GlobalStorageConfig extends BaseStorageConfig {
   scope: 'global'
-  markdownFallback: { enabled: boolean }
 }
 
-/** Where the harness DB (and current.md fallback) physically lives.
- *  Discriminated on `scope` so that `scope: 'global'` configs cannot declare
- *  the now-meaningless local-only path fields (`sqlitePath`,
- *  `markdownFallback.path`) without a type error. */
+/** Where the harness database physically lives. */
 export type StorageConfig = LocalStorageConfig | GlobalStorageConfig
 
 /** Shape of .harness/storage-state.json — always written to the project,
@@ -196,15 +186,6 @@ export interface ActionToolRow {
   args_json: string | null
   result_summary: string | null
   called_at: string
-}
-
-// ─── feature_list.json seed format ───────────────────────────────────────────
-
-export interface TaskSeed {
-  slug: string
-  title: string
-  description?: string
-  acceptance?: string[]
 }
 
 // ─── MCP tool result helpers ──────────────────────────────────────────────────

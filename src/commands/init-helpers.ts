@@ -56,7 +56,7 @@ export function applyConfigDefaults(params: {
   description: string
   provider: Provider
   docsPath: string
-  tasksAdapter: string
+  tasksAdapter?: string
   /** Storage scope chosen during init. Defaults to 'local' for backward compat. */
   scope?: 'local' | 'global'
   /** Reuse an existing projectId (e.g. re-running init logic). If omitted, a
@@ -67,7 +67,7 @@ export function applyConfigDefaults(params: {
   const projectId = params.projectId ?? randomUUID()
   const baseStorage = {
     dir: '.harness',
-    tasks: { adapter: params.tasksAdapter as 'local' },
+    tasks: { adapter: 'mcp' as const },
     sections: {
       toolsUsed: true,
       filesModified: true,
@@ -76,15 +76,7 @@ export function applyConfigDefaults(params: {
       nextSteps: false,
     },
   }
-  const storage: HarnessConfig['storage'] =
-    scope === 'global'
-      ? { ...baseStorage, markdownFallback: { enabled: true }, scope: 'global', projectId }
-      : {
-          ...baseStorage,
-          markdownFallback: { enabled: true, path: '.harness/current.md' },
-          scope: 'local',
-          projectId,
-        }
+  const storage: HarnessConfig['storage'] = { ...baseStorage, scope, projectId }
 
   return {
     provider: params.provider,

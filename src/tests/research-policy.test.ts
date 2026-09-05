@@ -249,7 +249,7 @@ describe('research-policy — provider-native tool names do not leak into shared
       description: 'test',
       provider: 'claude-code',
       docsPath: './docs',
-      tasksAdapter: 'local',
+      tasksAdapter: 'mcp',
     })
     const md = agentsMd(config)
     assert.doesNotMatch(md, /mcp__/, 'agentsMd must not contain provider-native MCP patterns')

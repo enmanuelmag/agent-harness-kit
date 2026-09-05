@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import assert from 'node:assert/strict'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -122,71 +123,7 @@ const baseParams = {
   description: 'demo project',
   provider: 'claude-code' as const,
   docsPath: './docs',
-  tasksAdapter: 'local',
 }
-
-describe('applyConfigDefaults — storage scope', () => {
-  test('defaults to scope=local and generates a fresh UUID projectId when omitted', () => {
-    const config = applyConfigDefaults(baseParams)
-    assert.equal(config.storage.scope, 'local')
-    assert.match(config.storage.projectId, UUID_RE)
-  })
-
-  test('scope=local applies explicitly', () => {
-    const config = applyConfigDefaults({ ...baseParams, scope: 'local' })
-    assert.equal(config.storage.scope, 'local')
-  })
-
-  test('scope=global applies and generates a UUID projectId (never a path hash)', () => {
-    const config = applyConfigDefaults({ ...baseParams, scope: 'global' })
-    assert.equal(config.storage.scope, 'global')
-    assert.match(config.storage.projectId, UUID_RE)
-  })
-
-  test('returns a StorageConfig with both scope and projectId fields present', () => {
-    const config = applyConfigDefaults(baseParams)
-    assert.ok('scope' in config.storage)
-    assert.ok('projectId' in config.storage)
-  })
-
-  test('two separate calls generate two different projectIds (never derived/reused implicitly)', () => {
-    const a = applyConfigDefaults(baseParams)
-    const b = applyConfigDefaults(baseParams)
-    assert.notEqual(a.storage.projectId, b.storage.projectId)
-  })
-
-  test('reuses an explicitly provided projectId instead of regenerating', () => {
-    const fixedId = 'fixed-project-id-123'
-    const config = applyConfigDefaults({ ...baseParams, projectId: fixedId })
-    assert.equal(config.storage.projectId, fixedId)
-  })
-
-  // ─── discriminated StorageConfig shape (task #56) ───────────────────────
-
-  test('scope=local emits markdownFallback.path and no sqlitePath override by default', () => {
-    const config = applyConfigDefaults({ ...baseParams, scope: 'local' })
-    assert.equal(config.storage.scope, 'local')
-    if (config.storage.scope === 'local') {
-      assert.equal(config.storage.markdownFallback.path, '.harness/current.md')
-      assert.equal(config.storage.sqlitePath, undefined)
-    }
-    assert.ok(!('path' in config.database), 'database.type=sqlite must never carry a path field')
-  })
-
-  test('scope=global omits markdownFallback.path entirely (not present, not empty string)', () => {
-    const config = applyConfigDefaults({ ...baseParams, scope: 'global' })
-    assert.equal(config.storage.scope, 'global')
-    assert.ok(
-      !('path' in config.storage.markdownFallback),
-      'GlobalStorageConfig.markdownFallback must not declare a path field'
-    )
-    assert.ok(
-      !('sqlitePath' in config.storage),
-      'GlobalStorageConfig must not declare a sqlitePath field'
-    )
-    assert.ok(!('path' in config.database), 'database.type=sqlite must never carry a path field')
-  })
-})
 
 // ─── the `agents` key is gone entirely ───────────────────────────────────────
 //

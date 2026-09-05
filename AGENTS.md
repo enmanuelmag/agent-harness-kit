@@ -19,8 +19,6 @@ If it exits non-zero, stop and report the issue. Do not proceed with codebase ch
 | File | Purpose |
 |------|---------|
 | `.harness/harness.db` | SQLite: all tasks, actions, file changes, tool calls |
-| `.harness/current.md` | Markdown fallback — read this if MCP server is unavailable |
-| `.harness/feature_list.json` | Human-editable task seed list |
 
 ## MCP tools (preferred)
 
@@ -77,7 +75,6 @@ docs.search          query                                  → search ./docs fo
 ## What to read
 
 ```
-Always:         .harness/current.md (or MCP tasks.get)
 If implementing: ./docs/
 If orchestrating: Agent definition files in your provider's agents directory
 ```

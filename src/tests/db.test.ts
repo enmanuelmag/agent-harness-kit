@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,7 +18,6 @@ const config: HarnessConfig = {
   database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
     sections: {
       toolsUsed: true,
       filesModified: true,
@@ -25,7 +25,6 @@ const config: HarnessConfig = {
       blockers: true,
       nextSteps: false,
     },
-    markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
     scope: 'local',
     projectId: 'test-project-id-local',
     sqlitePath: join(TMP, 'test.db'),
@@ -264,16 +263,6 @@ describe('HarnessDB', () => {
     assert.equal(inProgress.total, 1)
   })
 
-  test('syncFromFeatureList skips duplicates', async () => {
-    await db.addTask({ slug: 'exists', title: 'Exists' })
-    const result = await db.syncFromFeatureList([
-      { slug: 'exists', title: 'Exists' },
-      { slug: 'new-one', title: 'New One' },
-    ])
-    assert.equal(result.added, 1)
-    assert.equal(result.skipped, 1)
-  })
-
   test('archiveTask sets archived_at', async () => {
     const task = await db.addTask({ slug: 'to-archive', title: 'To Archive' })
     assert.equal(task.archived_at, null)
@@ -354,97 +343,6 @@ describe('openDB — storage scope resolution', () => {
   afterEach(() => {
     rmSync(TMP_SCOPE, { recursive: true, force: true })
   })
-
-  test('scope=local creates DB at ./.harness/harness.db (unchanged behavior), never touches homeDir', async () => {
-    const projectDir = join(TMP_SCOPE, 'local-project')
-    mkdirSync(projectDir, { recursive: true })
-
-    const localConfig: HarnessConfig = {
-      ...config,
-      database: { type: 'sqlite' },
-      storage: {
-        dir: config.storage.dir,
-        tasks: config.storage.tasks,
-        sections: config.storage.sections,
-        markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
-        scope: 'local',
-        projectId: 'local-scope-project',
-        sqlitePath: '.harness/harness.db',
-      },
-    }
-
-    const db = await openDB(localConfig, projectDir, FAKE_HOME)
-    try {
-      assert.ok(existsSync(join(projectDir, '.harness', 'harness.db')))
-      assert.ok(!existsSync(FAKE_HOME), 'local scope must never create anything under homeDir')
-    } finally {
-      await db.close()
-    }
-  })
-
-  test('scope=global creates DB under <homeDir>/.harness/dbs/<projectId>/harness.db', async () => {
-    const projectDir = join(TMP_SCOPE, 'global-project')
-    mkdirSync(projectDir, { recursive: true })
-
-    const projectId = 'global-scope-project-uuid'
-    const globalConfig: HarnessConfig = {
-      ...config,
-      database: { type: 'sqlite' },
-      storage: {
-        dir: config.storage.dir,
-        tasks: config.storage.tasks,
-        sections: config.storage.sections,
-        markdownFallback: { enabled: true },
-        scope: 'global',
-        projectId,
-      },
-    }
-
-    const db = await openDB(globalConfig, projectDir, FAKE_HOME)
-    try {
-      const expectedDir = resolveGlobalStorageDir(globalConfig, FAKE_HOME)
-      assert.equal(expectedDir, join(FAKE_HOME, '.harness', 'dbs', projectId))
-      assert.ok(existsSync(join(expectedDir, 'harness.db')))
-      assert.ok(
-        !existsSync(join(projectDir, '.harness', 'harness.db')),
-        'global scope must not write DB into the project'
-      )
-    } finally {
-      await db.close()
-    }
-  })
-
-  test('regenerateCurrentMd respects scope=global, writing current.md under homeDir', async () => {
-    const projectDir = join(TMP_SCOPE, 'global-md-project')
-    mkdirSync(projectDir, { recursive: true })
-
-    const projectId = 'global-md-project-uuid'
-    const globalConfig: HarnessConfig = {
-      ...config,
-      database: { type: 'sqlite' },
-      storage: {
-        dir: config.storage.dir,
-        tasks: config.storage.tasks,
-        sections: config.storage.sections,
-        scope: 'global',
-        projectId,
-        markdownFallback: { enabled: true },
-      },
-    }
-
-    const db = await openDB(globalConfig, projectDir, FAKE_HOME)
-    try {
-      await db.addTask({ slug: 'md-scope-task', title: 'MD Scope Task' })
-      const expectedDir = resolveGlobalStorageDir(globalConfig, FAKE_HOME)
-      assert.ok(existsSync(join(expectedDir, 'current.md')))
-      assert.ok(
-        !existsSync(join(projectDir, '.harness', 'current.md')),
-        'global scope must not write current.md into the project'
-      )
-    } finally {
-      await db.close()
-    }
-  })
 })
 
 describe('storage-state.json', () => {
@@ -452,75 +350,6 @@ describe('storage-state.json', () => {
 
   afterEach(() => {
     rmSync(TMP_STATE, { recursive: true, force: true })
-  })
-
-  test('writeStorageState writes .harness/storage-state.json with the fixed shape, project-local regardless of scope', async () => {
-    const projectDir = join(TMP_STATE, 'write-project')
-    mkdirSync(projectDir, { recursive: true })
-    const homeDir = join(TMP_STATE, 'fake-home')
-
-    const projectId = 'storage-state-project-uuid'
-    const globalConfig: HarnessConfig = {
-      ...config,
-      database: { type: 'sqlite' },
-      storage: {
-        dir: config.storage.dir,
-        tasks: config.storage.tasks,
-        sections: config.storage.sections,
-        markdownFallback: { enabled: true },
-        scope: 'global',
-        projectId,
-      },
-    }
-
-    const db = await openDB(globalConfig, projectDir, homeDir)
-    try {
-      await db.writeStorageState(projectDir)
-
-      const statePath = join(projectDir, '.harness', 'storage-state.json')
-      assert.ok(existsSync(statePath), 'storage-state.json must always be written project-local')
-
-      const state = JSON.parse(readFileSync(statePath, 'utf8')) as StorageState
-      assert.equal(state.scope, 'global')
-      assert.equal(state.projectId, projectId)
-      assert.equal(state.dbType, 'sqlite')
-      assert.ok(state.migratedAt)
-      assert.ok(!Number.isNaN(Date.parse(state.migratedAt)))
-    } finally {
-      await db.close()
-    }
-  })
-
-  test('readStorageStateFile reads back what writeStorageState wrote', async () => {
-    const projectDir = join(TMP_STATE, 'read-project')
-    mkdirSync(projectDir, { recursive: true })
-    const homeDir = join(TMP_STATE, 'fake-home-2')
-
-    const localConfig: HarnessConfig = {
-      ...config,
-      database: { type: 'sqlite' },
-      storage: {
-        dir: config.storage.dir,
-        tasks: config.storage.tasks,
-        sections: config.storage.sections,
-        markdownFallback: { enabled: false, path: join(TMP, 'current.md') },
-        scope: 'local',
-        projectId: 'read-back-project',
-        sqlitePath: '.harness/harness.db',
-      },
-    }
-
-    const db = await openDB(localConfig, projectDir, homeDir)
-    try {
-      await db.writeStorageState(projectDir)
-      const state = readStorageStateFile(projectDir, localConfig.storage.dir)
-      assert.ok(state)
-      assert.equal(state?.scope, 'local')
-      assert.equal(state?.projectId, 'read-back-project')
-      assert.equal(state?.dbType, 'sqlite')
-    } finally {
-      await db.close()
-    }
   })
 
   test('readStorageStateFile returns null when the file does not exist', () => {

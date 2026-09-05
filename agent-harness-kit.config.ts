@@ -24,7 +24,7 @@ const config: HarnessConfig = {
 
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
+    tasks: { adapter: 'mcp' },
     sections: {
       toolsUsed: true,
       filesModified: true,
@@ -32,7 +32,6 @@ const config: HarnessConfig = {
       blockers: true,
       nextSteps: false,
     },
-    markdownFallback: { enabled: true },
     // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
     // under ~/.harness/dbs/<projectId>/, outside the project tree.
     scope: 'global',

@@ -93,7 +93,6 @@ npx ahk init
 
 ### Task Lifecycle
 
-1. **Task Creation**: Tasks added to backlog via feature_list.json or CLI
 2. **Task Selection**: Lead agent selects and claims pending tasks
 3. **Workflow Execution**: 
    - Lead → Explorer (analysis) → Consultant (advisory, conditional) → Builder (implementation) → Reviewer (approval)
@@ -119,7 +118,7 @@ export default defineHarness({
   database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    tasks: { adapter: 'local' },
+    tasks: { adapter: 'mcp' },
     sections: {
       toolsUsed: true,
       filesModified: true, 
@@ -127,10 +126,8 @@ export default defineHarness({
       blockers: true,
       nextSteps: false
     },
-    // scope: 'local' (shown here) — sqlitePath and markdownFallback.path are
     // only valid under this scope. Defaults to '.harness/harness.db' when
     // sqlitePath is omitted.
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
     scope: 'local',
     projectId: '5f2c...', // UUID, generated once at init, never regenerated
     // sqlitePath: '.harness/harness.db', // optional override
@@ -146,10 +143,7 @@ export default defineHarness({
 })
 ```
 
-> `scope: 'global'` moves the DB (and current.md fallback) under
 > `~/.harness/dbs/<projectId>/`, outside the project tree. Under that scope,
-> `sqlitePath` and `markdownFallback.path` don't exist on the type at all —
-> `storage: { ..., markdownFallback: { enabled: true }, scope: 'global',
 > projectId: '5f2c...' }` (no `path`, no `sqlitePath`). See
 > [architecture.md](./architecture.md) for the full discriminated-union shape.
 
@@ -175,7 +169,6 @@ echo "All health checks passed."
 
 ### Task Management
 
-Tasks are defined in `feature_list.json` and can be managed via CLI:
 
 ```bash
 # Add a new task
@@ -225,8 +218,6 @@ project/
 ├── health.sh                     # Health check script  
 ├── .harness/                     # Harness data directory
 │   ├── harness.db               # SQLite database
-│   ├── feature_list.json        # Task backlog (git-ignored)
-│   └── current.md               # Session snapshot (git-ignored)
 ├── .claude/                      # Claude Code configuration  
 │   └── agents/
 │       ├── lead.md              # Lead agent instructions
@@ -282,7 +273,6 @@ ahk migrate --to claude-code     # Switch provider configurations (also: opencod
 1. **Configuration Management**: Regularly update configuration files to reflect codebase changes
 2. **Agent Behavior**: Customize agent instructions for your specific domain
 3. **Health Checks**: Tailor health checks to actual project requirements  
-4. **Task Backlog**: Keep feature_list.json updated with current priorities
 5. **Monitoring**: Use dashboard for visibility into team productivity and bottlenecks
 
 ### For CI/CD Integration

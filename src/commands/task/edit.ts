@@ -107,7 +107,6 @@ export async function runTaskEdit(cwd: string): Promise<void> {
         slug: newSlug,
       })
       await db.updateTaskAcceptance(task.id, newAcceptance)
-      await db.writeFeatureList(cwd)
 
       spinner.stop('')
       console.log(pc.green(`✓ Task #${task.id} updated — ${newSlug}`))

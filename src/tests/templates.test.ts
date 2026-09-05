@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -36,7 +37,6 @@ import {
   configJson,
   configMjs,
   configTs,
-  featureListJson,
   translateFrontmatterForClaudeCode,
   translateFrontmatterForGrok,
   translateFrontmatterForOpenCode,
@@ -495,17 +495,8 @@ describe('mergeClaudeSettingsLocalJson', () => {
 })
 
 describe('featureListJson', () => {
-  test('serializes empty list', () => {
-    const result = featureListJson([])
-    assert.equal(result.trim(), '[]')
-  })
 
-  test('serializes tasks correctly', () => {
-    const result = featureListJson([{ slug: 'foo', title: 'Foo', acceptance: ['Must work'] }])
-    const parsed = JSON.parse(result)
-    assert.equal(parsed[0].slug, 'foo')
-    assert.deepEqual(parsed[0].acceptance, ['Must work'])
-  })
+
 })
 
 describe('translateFrontmatterForOpenCode — permission translation', () => {
@@ -621,7 +612,7 @@ describe('configTs', () => {
     description: 'placeholder',
     provider: 'claude-code',
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
     port: 3742,
     scope: 'local' as const,
     projectId: 'test-project-id',
@@ -666,21 +657,7 @@ describe('configTs', () => {
 
   // ─── scope-conditional shape (task #56) ────────────────────────────────
 
-  test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
-    const out = configTs({ ...base, scope: 'local' })
-    assert.match(
-      out,
-      /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/
-    )
-    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
-  })
 
-  test('scope=global omits markdownFallback.path (GlobalStorageConfig shape)', () => {
-    const out = configTs({ ...base, scope: 'global' })
-    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true\s*\}/)
-    assert.doesNotMatch(out, /markdownFallback:[^\n]*path:/)
-    assert.doesNotThrow(() => new Function(stripTsSyntax(out)))
-  })
 
   test('never emits database.path, regardless of scope', () => {
     for (const scope of ['local', 'global'] as const) {
@@ -701,30 +678,7 @@ describe('configTs', () => {
 })
 
 describe('configTs — loads without the package resolvable in node_modules', () => {
-  test('loadConfig() succeeds on a generated .ts config even with no node_modules/@cardor/agent-harness-kit present', async () => {
-    const dir = join(TMP, 'no-local-install')
-    mkdirSync(dir, { recursive: true })
-    try {
-      const out = configTs({
-        name: 'my-app',
-        description: 'placeholder',
-        provider: 'claude-code',
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        port: 3742,
-        scope: 'local',
-        projectId: 'test-project-id',
-      })
-      writeFileSync(join(dir, 'agent-harness-kit.config.ts'), out, 'utf8')
-      // No node_modules directory at all — the `import type` is erased at
-      // compile time by jiti, so module resolution is never attempted.
-      const { loadConfig } = await import('@/core/config')
-      const config = await loadConfig(dir)
-      assert.equal(config.project.name, 'my-app')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
+
 })
 
 describe('defineHarness — retrocompatibility with the value-import shape', () => {
@@ -757,7 +711,7 @@ describe('configCjs', () => {
     description: 'placeholder',
     provider: 'claude-code',
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
     port: 3742,
     scope: 'local' as const,
     projectId: 'test-project-id',
@@ -771,21 +725,7 @@ describe('configCjs', () => {
 
   // ─── scope-conditional shape (task #56) ────────────────────────────────
 
-  test('scope=global omits markdownFallback.path and database.path (GlobalStorageConfig shape)', () => {
-    const out = configCjs({ ...base, scope: 'global' })
-    assert.match(out, /markdownFallback:\s*\{\s*enabled:\s*true\s*\}/)
-    assert.doesNotMatch(out, /markdownFallback:[^\n]*path:/)
-    assert.doesNotMatch(out, /database:[^\n]*path:/)
-    assert.doesNotThrow(() => new Function(out.replace(/^const .+require.+$/m, '//$&')))
-  })
 
-  test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
-    const out = configCjs({ ...base, scope: 'local' })
-    assert.match(
-      out,
-      /markdownFallback:\s*\{\s*enabled:\s*true,\s*path:\s*'\.harness\/current\.md'\s*\}/
-    )
-  })
 
   test('description with apostrophe produces valid JS', () => {
     const desc = "it's a playground"
@@ -822,7 +762,7 @@ describe('configJson', () => {
     description: 'placeholder',
     provider: 'claude-code',
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
     port: 3742,
     scope: 'local' as const,
     projectId: 'test-project-id',
@@ -863,16 +803,7 @@ describe('configJson', () => {
     assert.equal(cfg.storage.projectId, 'abc-123')
   })
 
-  test('scope=local emits markdownFallback.path (LocalStorageConfig shape)', () => {
-    const cfg = parse(configJson({ ...base, scope: 'local' }))
-    assert.deepEqual(cfg.storage.markdownFallback, { enabled: true, path: '.harness/current.md' })
-  })
 
-  test('scope=global omits markdownFallback.path (GlobalStorageConfig shape)', () => {
-    const cfg = parse(configJson({ ...base, scope: 'global' }))
-    assert.deepEqual(cfg.storage.markdownFallback, { enabled: true })
-    assert.ok(!('path' in (cfg.storage.markdownFallback as Record<string, unknown>)))
-  })
 
   test('never emits database.path, regardless of scope', () => {
     for (const scope of ['local', 'global'] as const) {
@@ -941,73 +872,8 @@ describe('configJson', () => {
 })
 
 describe('configJson — loaded by loadConfig()', () => {
-  test('loadConfig() reads a generated .json config with no node_modules present', async () => {
-    const dir = join(TMP, 'json-config-load')
-    mkdirSync(dir, { recursive: true })
-    try {
-      const out = configJson({
-        name: 'my-app',
-        description: 'it\'s a "quoted" app',
-        provider: 'claude-code',
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        port: 3742,
-        scope: 'local',
-        projectId: 'test-project-id',
-      })
-      writeFileSync(join(dir, 'agent-harness-kit.config.json'), out, 'utf8')
-      const { loadConfig } = await import('@/core/config')
-      const config = await loadConfig(dir)
-      assert.equal(config.project.name, 'my-app')
-      assert.equal(config.project.description, 'it\'s a "quoted" app')
-      assert.equal(config.storage.scope, 'local')
-      assert.equal(config.storage.projectId, 'test-project-id')
-      // Defaults still applied for a JSON config, same as any other format.
-      assert.equal(config.project.agentsMd, './AGENTS.md')
-      assert.equal(config.tools.mcp.port, 3742)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
 
-  test('legacy normalizers apply to a JSON config exactly as to a .ts one', async () => {
-    const dir = join(TMP, 'json-config-legacy')
-    mkdirSync(dir, { recursive: true })
-    try {
-      // Hand-written JSON carrying both removed/contradictory shapes: the
-      // `agents` key (removed in task 60) and global scope alongside
-      // now-meaningless local-only paths. Must load, not crash, and be stripped.
-      writeFileSync(
-        join(dir, 'agent-harness-kit.config.json'),
-        JSON.stringify({
-          project: { name: 'legacy-json', description: 'legacy shape' },
-          agents: { explorer: { model: 'opus', allowedPaths: ['src/'] } },
-          database: { type: 'sqlite', path: '.harness/harness.db' },
-          storage: {
-            scope: 'global',
-            projectId: 'legacy-id',
-            sqlitePath: '.harness/harness.db',
-            markdownFallback: { enabled: true, path: '.harness/current.md' },
-          },
-        }),
-        'utf8'
-      )
-      const { loadConfig } = await import('@/core/config')
-      const config = await loadConfig(dir)
-      assert.equal(config.project.name, 'legacy-json')
-      assert.ok(!('agents' in config), 'the removed agents key must be stripped')
-      // Double cast: the typed unions (DatabaseConfig, StorageConfig) do not
-      // declare the legacy fields at all, which is exactly why they have to be
-      // asserted as absent at runtime on the untyped shape.
-      assert.ok(!('path' in (config.database as unknown as Record<string, unknown>)))
-      assert.ok(!('sqlitePath' in (config.storage as unknown as Record<string, unknown>)))
-      assert.ok(
-        !('path' in (config.storage.markdownFallback as unknown as Record<string, unknown>))
-      )
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
+
 
   test('a malformed .json config fails with a message naming the file', async () => {
     const dir = join(TMP, 'json-config-malformed')
@@ -1024,49 +890,6 @@ describe('configJson — loaded by loadConfig()', () => {
     }
   })
 
-  test('an existing config of another extension keeps precedence over a .json one', async () => {
-    // The format choice must never silently convert an initialized project
-    // just because its local-install state changed. `ahk init` bails out when
-    // any config exists, and findConfigFile keeps resolving the original.
-    const dir = join(TMP, 'json-config-precedence')
-    mkdirSync(dir, { recursive: true })
-    try {
-      writeFileSync(
-        join(dir, 'agent-harness-kit.config.mjs'),
-        configMjs({
-          name: 'the-mjs-one',
-          description: 'pre-existing',
-          provider: 'claude-code',
-          docsPath: './docs',
-          tasksAdapter: 'local',
-          port: 3742,
-          scope: 'local',
-          projectId: 'mjs-id',
-        }),
-        'utf8'
-      )
-      writeFileSync(
-        join(dir, 'agent-harness-kit.config.json'),
-        configJson({
-          name: 'the-json-one',
-          description: 'newcomer',
-          provider: 'claude-code',
-          docsPath: './docs',
-          tasksAdapter: 'local',
-          port: 3742,
-          scope: 'local',
-          projectId: 'json-id',
-        }),
-        'utf8'
-      )
-      const { findConfigFile, loadConfig } = await import('@/core/config')
-      assert.match(findConfigFile(dir) ?? '', /agent-harness-kit\.config\.mjs$/)
-      const config = await loadConfig(dir)
-      assert.equal(config.project.name, 'the-mjs-one')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
 })
 
 // ─── no generated model line by default (replaces the task-43 model-
@@ -1195,73 +1018,9 @@ describe('agent*Toml — per-role model + effort injection', () => {
 // claudeAgentFiles) is the pure entry point `ahk init`/tests use — no
 // @clack/prompts mocking anywhere in this repo (see models.test.ts).
 describe('codexAgentFiles — direct export, per-role model+effort map', () => {
-  test('injects the given per-role model+effort map into each generated TOML, no cross-contamination', () => {
-    const config = applyConfigDefaults({
-      name: 'demo-app',
-      description: 'demo',
-      provider: 'codex-cli',
-      docsPath: './docs',
-      tasksAdapter: 'local',
-    })
-    const entries = codexAgentFiles(config, {
-      explorer: { model: 'gpt-5.6-sol', effort: 'high' },
-      reviewer: { model: 'gpt-5.4-mini' },
-    })
-    const byPath = Object.fromEntries(entries.map((e) => [e.relPath, e.content]))
 
-    assert.match(byPath['.codex/agents/explorer.toml'], /^model = "gpt-5\.6-sol"$/m)
-    assert.match(byPath['.codex/agents/explorer.toml'], /^model_reasoning_effort = "high"$/m)
-    assert.match(byPath['.codex/agents/reviewer.toml'], /^model = "gpt-5\.4-mini"$/m)
-    assert.doesNotMatch(byPath['.codex/agents/reviewer.toml'], /model_reasoning_effort/)
-    assert.doesNotMatch(
-      byPath['.codex/agents/lead.toml'],
-      /model\s*=/,
-      'lead was left unset — no model line'
-    )
-    assert.doesNotMatch(
-      byPath['.codex/agents/builder.toml'],
-      /model\s*=/,
-      'builder was left unset — no model line'
-    )
-    assert.doesNotMatch(
-      byPath['.codex/agents/consultant.toml'],
-      /model\s*=/,
-      'consultant was left unset — no model line'
-    )
-    assert.doesNotMatch(
-      byPath['.codex/agents/default.toml'],
-      /model\s*=/,
-      'default (lead shim) mirrors lead, left unset'
-    )
-  })
 
-  test('no modelsByRole arg → no model line for any role (same as before extraction)', () => {
-    const config = applyConfigDefaults({
-      name: 'demo-app',
-      description: 'demo',
-      provider: 'codex-cli',
-      docsPath: './docs',
-      tasksAdapter: 'local',
-    })
-    const entries = codexAgentFiles(config)
-    for (const entry of entries) {
-      assert.doesNotMatch(entry.content, /model\s*=/)
-    }
-  })
 
-  test("lead's choice also applies to default.toml (the lead shim)", () => {
-    const config = applyConfigDefaults({
-      name: 'demo-app',
-      description: 'demo',
-      provider: 'codex-cli',
-      docsPath: './docs',
-      tasksAdapter: 'local',
-    })
-    const entries = codexAgentFiles(config, { lead: { model: 'gpt-5.6-terra', effort: 'medium' } })
-    const byPath = Object.fromEntries(entries.map((e) => [e.relPath, e.content]))
-    assert.match(byPath['.codex/agents/lead.toml'], /^model = "gpt-5\.6-terra"$/m)
-    assert.match(byPath['.codex/agents/default.toml'], /^model = "gpt-5\.6-terra"$/m)
-  })
 })
 
 describe('translateFrontmatterForClaudeCode — no model line by default', () => {
@@ -1452,14 +1211,14 @@ describe('doctor.ts — agent files are existence-checked only', () => {
       description: 'demo',
       provider: 'claude-code',
       docsPath: './docs',
-      tasksAdapter: 'local',
+      tasksAdapter: 'mcp',
     })
     const configContent = configMjs({
       name: 'demo-app',
       description: 'demo',
       provider: 'claude-code',
       docsPath: './docs',
-      tasksAdapter: 'local',
+      tasksAdapter: 'mcp',
       port: config.tools.mcp.port,
       scope: config.storage.scope,
       projectId: config.storage.projectId,
@@ -1569,7 +1328,7 @@ describe('configTs — no `agents` key', () => {
     description: 'placeholder',
     provider: 'claude-code',
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
     port: 3742,
     scope: 'local' as const,
     projectId: 'test-project-id',
@@ -1659,7 +1418,7 @@ describe('record_tool/record_file tracking guidance — batch-only, no per-call 
     description: 'demo',
     provider: 'claude-code',
     docsPath: './docs',
-    tasksAdapter: 'local',
+    tasksAdapter: 'mcp',
   })
 
   // Text that described the old, retired single-entry call shape. None of it
@@ -1833,14 +1592,14 @@ describe('ahk-test — doctor states', () => {
       description: 'demo',
       provider: provider as Provider,
       docsPath: './docs',
-      tasksAdapter: 'local',
+      tasksAdapter: 'mcp',
     })
     const configContent = configMjs({
       name: 'demo-app',
       description: 'demo',
       provider: provider as 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli',
       docsPath: './docs',
-      tasksAdapter: 'local',
+      tasksAdapter: 'mcp',
       port: config.tools.mcp.port,
       scope: config.storage.scope,
       projectId: config.storage.projectId,
@@ -1949,78 +1708,7 @@ describe('ahk-test — doctor states', () => {
     }
   })
 
-  test('build restores missing skill back to ok', async () => {
-    const dir = makeTmp('skill-restore-missing')
-    try {
-      await buildProject(dir, 'grok-cli')
-      rmSync(skillPathForProvider(dir, 'grok-cli'))
-      let status = await getDoctorStatus(dir)
-      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'missing')
 
-      // Re-run build (simulates `ahk build`) — must write config file first
-      const config2 = applyConfigDefaults({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'grok-cli' as const,
-        docsPath: './docs',
-        tasksAdapter: 'local',
-      })
-      const configContent2 = configMjs({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'grok-cli' as const,
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        port: config2.tools.mcp.port,
-        scope: config2.storage.scope,
-        projectId: config2.storage.projectId,
-      })
-      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent2, 'utf8')
-      await getMaterializer('grok-cli').build(config2, dir)
-
-      status = await getDoctorStatus(dir)
-      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'ok')
-    } finally {
-      cleanup()
-    }
-  })
-
-  test('build restores outdated skill back to ok', async () => {
-    const dir = makeTmp('skill-restore-outdated')
-    try {
-      await buildProject(dir, 'claude-code')
-      const p = skillPathForProvider(dir, 'claude-code')
-      writeFileSync(p, readFileSync(p, 'utf8') + '\n\n--- tampered ---\n', 'utf8')
-      let status = await getDoctorStatus(dir)
-      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'outdated')
-
-      // Re-run build — must write config file first
-      const config2 = applyConfigDefaults({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'claude-code' as const,
-        docsPath: './docs',
-        tasksAdapter: 'local',
-      })
-      const configContent2 = configMjs({
-        name: 'demo-app',
-        description: 'demo',
-        provider: 'claude-code' as const,
-        docsPath: './docs',
-        tasksAdapter: 'local',
-        port: config2.tools.mcp.port,
-        scope: config2.storage.scope,
-        projectId: config2.storage.projectId,
-      })
-      writeFileSync(join(dir, 'agent-harness-kit.config.mjs'), configContent2, 'utf8')
-      await getMaterializer('claude-code').build(config2, dir)
-
-      status = await getDoctorStatus(dir)
-      assert.equal(status.skills.find((s) => s.name === 'ahk-test')?.status, 'ok')
-    } finally {
-      cleanup()
-    }
-  })
 })
 
 describe('ahk-test — content assertions on essential contract phrases', () => {

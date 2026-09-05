@@ -49,7 +49,6 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 
 ### Core Concepts
 
-- **Tasks**: Structured units of work defined in `feature_list.json`
 - **Actions**: Individual steps within a task (actions.start/complete)
 - **Sections**: Components that can be logged during an action (result, files_modified, etc.)
 - **Health Checks**: Predefined scripts run before task initiation and completion
@@ -58,7 +57,6 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
 ### How It Works
 
 1. Initialize the harness in a project using `ahk init`
-2. Create or identify tasks in the backlog (`feature_list.json`)
 3. Agents claim tasks and execute their roles in sequence
 4. All activities are logged in a local SQLite database (`harness.db`)
 5. The dashboard provides real-time visualization of all activities
@@ -79,7 +77,6 @@ The agent-harness-kit is a provider-agnostic scaffolding solution for running st
    - `agent-harness-kit.config.ts` for project settings
    - Agent definitions in `.claude/agents/*.md`
    - Health check script (`health.sh`)
-   - Task backlog in `.harness/feature_list.json`
 
 ## Command Reference
 

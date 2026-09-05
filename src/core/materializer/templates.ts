@@ -94,8 +94,6 @@ If it exits non-zero, stop and report the issue. Do not proceed with codebase ch
 | File | Purpose |
 |------|---------|
 | \`.harness/harness.db\` | SQLite: all tasks, actions, file changes, tool calls |
-| \`.harness/current.md\` | Markdown fallback — read this if MCP server is unavailable |
-| \`.harness/feature_list.json\` | Human-editable task seed list |
 
 ## MCP tools (preferred)
 
@@ -152,7 +150,7 @@ ${extraInitLines ? '\n' : ''}${extraInitLines}
 ## What to read
 
 \`\`\`
-Always:         .harness/current.md (or MCP tasks.get)
+Always:         MCP tasks.get. If MCP is unavailable, stop and ask the user to restore the MCP connection.
 If implementing: ${docsPath}/
 If orchestrating: ${orchestratingOverride ?? "Agent definition files in your provider's agents directory"}
 \`\`\`
@@ -213,17 +211,12 @@ interface ConfigTemplateParams {
  * each variant can control its own import/export shape around it.
  */
 function configObjectBody(params: ConfigTemplateParams): string {
-  const isGlobal = params.scope === 'global'
 
-  // scope='global' — the sqlite file and current.md fallback both live under
+  // scope='global' — the sqlite file lives under
   // ~/.harness/dbs/<projectId>/ (see resolveGlobalStorageDir in db.ts), so
   // there is no local path to declare for either. Emitting a `sqlitePath`
-  // (local-only field) or `markdownFallback.path` for this scope would be
+  // (local-only field) for this scope would be
   // silently ignored at runtime — omit them entirely for this scope.
-  const markdownFallbackLine = isGlobal
-    ? `markdownFallback: { enabled: true },`
-    : `markdownFallback: { enabled: true, path: '.harness/current.md' },`
-
   return `  project: {
     name: ${JSON.stringify(params.name)},
     description: ${JSON.stringify(params.description)},
@@ -255,7 +248,6 @@ function configObjectBody(params: ConfigTemplateParams): string {
       blockers:      true,
       nextSteps:     false,
     },
-    ${markdownFallbackLine}
     // 'local' — DB lives in .harness/ (project-relative). 'global' — DB lives
     // under ~/.harness/dbs/<projectId>/, outside the project tree.
     scope:     '${params.scope}',
@@ -289,7 +281,6 @@ function configObjectBody(params: ConfigTemplateParams): string {
  * not resolve would trade a type error for a fetch error.
  */
 function configObject(params: ConfigTemplateParams): Record<string, unknown> {
-  const isGlobal = params.scope === 'global'
 
   return {
     project: {
@@ -311,11 +302,6 @@ function configObject(params: ConfigTemplateParams): Record<string, unknown> {
         blockers: true,
         nextSteps: false,
       },
-      // Same scope rule as configObjectBody(): 'global' has no local path to
-      // declare, so markdownFallback.path is omitted for it.
-      markdownFallback: isGlobal
-        ? { enabled: true }
-        : { enabled: true, path: '.harness/current.md' },
       scope: params.scope,
       projectId: params.projectId,
     },
@@ -475,14 +461,6 @@ export function agentReviewer(opts: { projectName: string }, capabilityHints = '
 // model line is present. Permission/restriction fields ARE added downstream by each provider's
 // translator, driven by AGENT_RESTRICTIONS in ./agent-restrictions.ts, which is the single source
 // of truth for what a role may not do.
-
-// ─── feature_list.json initial seed ──────────────────────────────────────────
-
-export function featureListJson(
-  tasks: { slug: string; title: string; description?: string; acceptance?: string[] }[]
-): string {
-  return JSON.stringify(tasks, null, 2) + '\n'
-}
 
 // ─── Codex CLI agent TOML helpers ────────────────────────────────────────────
 
@@ -762,5 +740,4 @@ export const GITIGNORE_ENTRIES = `
 .harness/harness.db
 .harness/harness.db-shm
 .harness/harness.db-wal
-.harness/current.md
 `

@@ -13,7 +13,6 @@ import { runModels } from '@/commands/models'
 import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
-import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskEdit, runTaskList } from '@/commands/task/index'
 import { isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
@@ -65,7 +64,6 @@ program
     'AI provider: claude-code | opencode | codex-cli | grok-cli (skip prompt)'
   )
   .option('--docs <path>', 'Docs folder path (skip prompt)')
-  .option('--tasks <adapter>', 'Task adapter: local | jira | linear (skip prompt)')
   .option('--storage-scope <scope>', 'Storage scope: local | global (skip prompt)')
   .action(async (opts) => {
     await runInit(cwd, opts)
@@ -104,16 +102,6 @@ program
   .option('--json', 'Output as JSON')
   .action(async (opts) => {
     await runStatus(cwd, opts)
-  })
-
-// ─── sync ─────────────────────────────────────────────────────────────────────
-program
-  .command('sync')
-  .description('Sync feature_list.json ↔ SQLite')
-  .option('--dry-run', 'Show what would change without applying')
-  .option('--direction <direction>', 'in | out | both (default: both)')
-  .action(async (opts) => {
-    await runSync(cwd, { dryRun: opts['dry-run'], direction: opts.direction })
   })
 
 // ─── serve ────────────────────────────────────────────────────────────────────
@@ -225,7 +213,7 @@ program
 // ─── reset ────────────────────────────────────────────────────────────────────
 program
   .command('reset')
-  .description('Reset/clear harness data (DB, feature list, agent files)')
+  .description('Reset/clear harness data (DB, agent files)')
   .option('--force', 'Skip confirmation prompts')
   .option(
     '--provider <claude-code|opencode|codex-cli|grok-cli>',

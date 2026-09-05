@@ -5,14 +5,12 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import {
-  DEFAULT_MARKDOWN_PATH,
   DEFAULT_SQLITE_PATH,
   type FullExport,
   getRowCounts,
   isEmptyDatabase,
   openDB,
   readStorageStateFile,
-  resolveGlobalStorageDir,
   resolveSqlitePathForScope,
 } from '@/core/db'
 
@@ -35,31 +33,6 @@ function log(msg: string): void {
  *  testable without killing the test process. */
 function fail(msg: string): never {
   throw new Error(msg)
-}
-
-/** The relative markdown-fallback path to use as the base for
- *  `currentMdPathForScope()` below. Mirrors `defaultSqlitePathForConfig()` —
- *  `LocalStorageConfig.markdownFallback.path` only exists (and only means
- *  anything) when `config.storage.scope === 'local'`; for a config CURRENTLY
- *  in scope='global' there's no field to read a custom path from, so this
- *  always falls back to `DEFAULT_MARKDOWN_PATH` in that case. */
-function defaultMarkdownPathForConfig(config: HarnessConfig): string {
-  return config.storage.scope === 'local'
-    ? config.storage.markdownFallback.path
-    : DEFAULT_MARKDOWN_PATH
-}
-
-/** Physical location of a project's harness `current.md`, following the same
- *  scope convention `HarnessDB.regenerateCurrentMd()` uses. */
-function currentMdPathForScope(
-  scope: 'local' | 'global',
-  config: HarnessConfig,
-  cwd: string,
-  homeDir: string
-): string {
-  return scope === 'global'
-    ? join(resolveGlobalStorageDir(config, homeDir), 'current.md')
-    : resolve(cwd, defaultMarkdownPathForConfig(config))
 }
 
 /** The relative sqlite path override to use as the base for
@@ -254,8 +227,6 @@ async function migrateScopeOnly(
   const sqlitePath = defaultSqlitePathForConfig(config)
   const srcDb = resolveSqlitePathForScope(fromScope, sqlitePath, cwd, config, homeDir)
   const destDb = resolveSqlitePathForScope(toScope, sqlitePath, cwd, config, homeDir)
-  const srcMd = currentMdPathForScope(fromScope, config, cwd, homeDir)
-  const destMd = currentMdPathForScope(toScope, config, cwd, homeDir)
 
   if (!existsSync(srcDb)) {
     fail(`Source database not found at ${srcDb} (expected ${fromScope} scope) — nothing to move.`)
@@ -305,7 +276,7 @@ async function migrateScopeOnly(
   if (opts.dryRun) {
     log(
       pc.dim(
-        `[dry-run] Would copy ${srcDb} → ${destDb} (scope ${fromScope} → ${toScope}), and move current.md.`
+        `[dry-run] Would copy ${srcDb} → ${destDb} (scope ${fromScope} → ${toScope}).`
       )
     )
     return
@@ -314,17 +285,10 @@ async function migrateScopeOnly(
   copySqliteFile(srcDb, destDb)
   log(pc.green(`✓ Copied database ${srcDb} → ${destDb}`))
 
-  if (existsSync(srcMd)) {
-    mkdirSync(dirname(destMd), { recursive: true })
-    copyFileSync(srcMd, destMd)
-    log(pc.green(`✓ Copied current.md ${srcMd} → ${destMd}`))
-  }
-
   // Only remove the source AFTER the copy is verified in place.
   rmSync(srcDb, { force: true })
   rmSync(`${srcDb}-wal`, { force: true })
   rmSync(`${srcDb}-shm`, { force: true })
-  if (existsSync(srcMd) && srcMd !== destMd) rmSync(srcMd, { force: true })
 
   // Write storage-state ONLY after the move is confirmed successful.
   const db = await openDB(config, cwd, homeDir)

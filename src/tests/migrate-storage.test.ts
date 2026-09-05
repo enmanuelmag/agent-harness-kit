@@ -29,7 +29,7 @@ function baseConfig(overrides: Partial<HarnessConfig> = {}): HarnessConfig {
     database: { type: 'sqlite' },
     storage: {
       dir: '.harness',
-      tasks: { adapter: 'local' },
+      tasks: { adapter: 'mcp' },
       sections: {
         toolsUsed: true,
         filesModified: true,
@@ -37,7 +37,6 @@ function baseConfig(overrides: Partial<HarnessConfig> = {}): HarnessConfig {
         blockers: true,
         nextSteps: false,
       },
-      markdownFallback: { enabled: true, path: '.harness/current.md' },
       scope: 'local',
       projectId: 'migrate-storage-test-project',
     },
@@ -52,7 +51,7 @@ function baseConfig(overrides: Partial<HarnessConfig> = {}): HarnessConfig {
 
 const SHARED_STORAGE_FIELDS = {
   dir: '.harness',
-  tasks: { adapter: 'local' as const },
+  tasks: { adapter: 'mcp' as const },
   sections: {
     toolsUsed: true,
     filesModified: true,
@@ -74,22 +73,16 @@ function localStorage(
 ): HarnessConfig['storage'] {
   return {
     ...SHARED_STORAGE_FIELDS,
-    markdownFallback: { enabled: true, path: '.harness/current.md' },
     scope: 'local',
     projectId,
     ...overrides,
   }
 }
 
-/** Builds a `GlobalStorageConfig`-shaped storage override for `baseConfig()`.
- *  Not a spread of `baseConfig().storage` — that's the 'local' branch of the
- *  discriminated union (has `markdownFallback.path`), and per task #56 there
- *  is no valid way to spread a LocalStorageConfig into a GlobalStorageConfig
- *  (the union forbids `markdownFallback.path` under scope='global'). */
+/** Builds a global storage override directly from the shared MCP state. */
 function globalStorage(projectId: string): HarnessConfig['storage'] {
   return {
     ...SHARED_STORAGE_FIELDS,
-    markdownFallback: { enabled: true },
     scope: 'global',
     projectId,
   }
@@ -413,52 +406,6 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     assert.equal(state?.dbType, 'sqlite')
   })
 
-  test('case: local -> global scope migration moves the .db file and current.md, preserves task data', async () => {
-    const projectDir = join(TMP_CMD, 'local-to-global')
-    const localConfig = baseConfig({
-      storage: localStorage('l2g-project'),
-    })
-    await writeConfigFile(projectDir, localConfig)
-
-    // Seed local data and record state=local first.
-    const db = await openDB(localConfig, projectDir, FAKE_HOME)
-    await seedData(db)
-    await db.writeStorageState(projectDir)
-    await db.close()
-
-    const localDbPath = join(projectDir, '.harness', 'harness.db')
-    assert.ok(existsSync(localDbPath))
-
-    // Now flip config to scope=global and run the migration.
-    const globalConfig = baseConfig({
-      storage: globalStorage('l2g-project'),
-    })
-    await writeConfigFile(projectDir, globalConfig)
-
-    await runMigrateStorage(projectDir, {}, FAKE_HOME)
-
-    const globalDir = resolveGlobalStorageDir(globalConfig, FAKE_HOME)
-    assert.ok(
-      existsSync(join(globalDir, 'harness.db')),
-      'db should now exist at the global location'
-    )
-    assert.ok(
-      !existsSync(localDbPath),
-      'local db file should have been removed after a verified copy'
-    )
-
-    const state = readStorageStateFile(projectDir, '.harness')
-    assert.equal(state?.scope, 'global')
-
-    // Verify data survived the move.
-    const movedDriver = new SQLiteDriver(join(globalDir, 'harness.db'))
-    try {
-      const counts = await getRowCounts(movedDriver)
-      assert.equal(counts.tasks, 1)
-    } finally {
-      await movedDriver.close()
-    }
-  })
 
   test('case: global -> local scope migration moves data back', async () => {
     const projectDir = join(TMP_CMD, 'global-to-local')

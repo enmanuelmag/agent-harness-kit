@@ -74,8 +74,7 @@ export function defineHarness(config: HarnessConfig): HarnessConfig {
 }
 
 /** Detects and normalizes the legacy contradictory config shape: `scope:
- *  'global'` declared alongside now-meaningless local-only path fields
- *  (`database.path` / `storage.sqlitePath`, `storage.markdownFallback.path`).
+ *  'global'` declared alongside now-meaningless local-only path fields.
  *
  *  This is necessary IN ADDITION to the type-level redesign (not instead of
  *  it) because `loadConfig()` loads `agent-harness-kit.config.ts` via
@@ -105,11 +104,6 @@ function normalizeLegacyStorageShape(raw: Record<string, unknown>): Record<strin
   if (typeof storage.sqlitePath === 'string' && storage.sqlitePath) {
     offenders.push('storage.sqlitePath')
     normalizedStorage = omit(normalizedStorage, 'sqlitePath')
-  }
-  const markdownFallback = normalizedStorage.markdownFallback as Record<string, unknown> | undefined
-  if (markdownFallback && typeof markdownFallback.path === 'string' && markdownFallback.path) {
-    offenders.push('storage.markdownFallback.path')
-    normalizedStorage = { ...normalizedStorage, markdownFallback: omit(markdownFallback, 'path') }
   }
 
   if (offenders.length === 0) return raw
@@ -175,7 +169,7 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
   const projectId = c.storage?.projectId ?? randomUUID()
   const baseStorage = {
     dir: '.harness',
-    tasks: { adapter: 'local' as const },
+    tasks: { adapter: 'mcp' as const },
     sections: {
       toolsUsed: true,
       filesModified: true,
@@ -189,20 +183,8 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
 
   const storage: HarnessConfig['storage'] =
     scope === 'global'
-      ? ({
-          ...baseStorage,
-          markdownFallback: { enabled: true },
-          ...storageOverrides,
-          scope: 'global',
-          projectId,
-        } as HarnessConfig['storage'])
-      : ({
-          ...baseStorage,
-          markdownFallback: { enabled: true, path: '.harness/current.md' },
-          ...storageOverrides,
-          scope: 'local',
-          projectId,
-        } as HarnessConfig['storage'])
+      ? ({ ...baseStorage, ...storageOverrides, tasks: { adapter: 'mcp' }, scope: 'global', projectId } as HarnessConfig['storage'])
+      : ({ ...baseStorage, ...storageOverrides, tasks: { adapter: 'mcp' }, scope: 'local', projectId } as HarnessConfig['storage'])
 
   return {
     ...(normalized as unknown as HarnessConfig),

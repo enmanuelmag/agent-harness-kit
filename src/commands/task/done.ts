@@ -41,7 +41,6 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
     }
 
     await db.updateTaskStatus(task.id, 'done')
-    await db.writeFeatureList(cwd)
 
     console.log(pc.green(`✓ Task #${task.id} — ${task.slug} marked as done`))
   } finally {
