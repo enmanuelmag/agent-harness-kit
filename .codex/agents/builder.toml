@@ -1,5 +1,7 @@
 name = "builder"
 sandbox_mode = "danger-full-access"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 
 description = """
 Use this agent to implement code changes for a task that has already been planned by lead and analyzed by explorer. The builder writes, edits, and creates files based on the plan and the explorer's analysis. Invoke only after the explorer has completed its action. Never invoke without a canonical handoff addressed to builder.

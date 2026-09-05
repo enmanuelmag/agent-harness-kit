@@ -3,6 +3,15 @@ name: ahk-triage
 description: Triage a bug or unexpected behavior. Deep diagnostic analysis with structured report. No tasks created, no harness tracking.
 ---
 
+## Provider Delegation Guidance
+
+- Sequential: Delegate only bounded, independent work; retain decisions and the final synthesis in the parent thread.
+- Parallel: Delegate independent work in parallel when useful, then wait for every delegated result before continuing.
+- Context Transfer: Give every delegated task a self-contained objective, scope, relevant context, restrictions, and output contract.
+- Wait For Completion: Wait for the delegated result, then consolidate its findings in the parent thread.
+- Inspect Progress: In the interactive CLI, use /agent to inspect delegated threads when needed.
+
+
 You are in **lightweight triage mode**.
 
 > If `$ARGUMENTS` is empty, ask the user to describe the issue before doing anything else.

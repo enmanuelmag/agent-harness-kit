@@ -3,6 +3,15 @@ name: ahk-review
 description: Preview a code review against ticket/objective alignment, with deep semantic (name-vs-behavior) analysis. No tasks created, no harness tracking.
 ---
 
+## Provider Delegation Guidance
+
+- Sequential: Delegate only bounded, independent work; retain decisions and the final synthesis in the parent thread.
+- Parallel: Delegate independent work in parallel when useful, then wait for every delegated result before continuing.
+- Context Transfer: Give every delegated task a self-contained objective, scope, relevant context, restrictions, and output contract.
+- Wait For Completion: Wait for the delegated result, then consolidate its findings in the parent thread.
+- Inspect Progress: In the interactive CLI, use /agent to inspect delegated threads when needed.
+
+
 You are in **lightweight review mode**. The ticket/objective: $ARGUMENTS
 
 > If `$ARGUMENTS` is empty, ask the user to provide the ticket guidelines or objective before doing anything else.

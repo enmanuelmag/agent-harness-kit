@@ -7,7 +7,7 @@ const config: HarnessConfig = {
     docsPath: './docs',
   },
 
-  provider: 'opencode',
+  provider: 'codex-cli',
 
   // There is no 'agents' key. Agent files are yours: edit the role prompt and
   // the 'model:' frontmatter line directly in the generated file. 'ahk build'

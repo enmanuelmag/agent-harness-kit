@@ -1,5 +1,7 @@
 name = "consultant"
 sandbox_mode = "danger-full-access"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 
 description = """
 Technical advisor agent for @cardor/agent-harness-kit. Runs after the explorer and before the builder. Provides structured advisory — patterns, best practices, warnings, and risks — written directly to the harness through a canonical builder handoff. Never writes code.

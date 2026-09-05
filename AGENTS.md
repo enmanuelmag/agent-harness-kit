@@ -75,8 +75,9 @@ docs.search          query                                  → search ./docs fo
 ## What to read
 
 ```
+Always:         MCP tasks.get. If MCP is unavailable, stop and ask the user to restore the MCP connection.
 If implementing: ./docs/
 If orchestrating: Agent definition files in your provider's agents directory
 ```
 
-<!-- ahk:generated f286054233a09f3b46fb9e77ec7f24083a3ae57e1f87e0c3d7fd2d51d9ed4076 -->
+<!-- ahk:generated e596b259de9f69675f200b0275981c24ae03011384fad04e6cc05f6bc6b8856b -->

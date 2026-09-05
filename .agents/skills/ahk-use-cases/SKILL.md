@@ -3,6 +3,15 @@ name: ahk-use-cases
 description: Define or refine a feature, change, refactor, or user journey as an approved non-technical use-case specification.
 ---
 
+## Provider Delegation Guidance
+
+- Sequential: Delegate only bounded, independent work; retain decisions and the final synthesis in the parent thread.
+- Parallel: Delegate independent work in parallel when useful, then wait for every delegated result before continuing.
+- Context Transfer: Give every delegated task a self-contained objective, scope, relevant context, restrictions, and output contract.
+- Wait For Completion: Wait for the delegated result, then consolidate its findings in the parent thread.
+- Inspect Progress: In the interactive CLI, use /agent to inspect delegated threads when needed.
+
+
 ## Purpose
 
 Guide a lightweight, iterative product-discovery conversation. Do not choose a stack, library, API, architecture, or implementation plan.

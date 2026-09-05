@@ -1,5 +1,7 @@
 name = "default"
 sandbox_mode = "danger-full-access"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 
 description = """
 Use this agent to orchestrate a full task from the harness backlog: decompose it into a plan, delegate to explorer, builder, and reviewer in sequence, and close the session correctly. Invoke when starting a new work session, picking up a pending task, or when another agent reports a blocker that requires re-coordination.
@@ -318,11 +320,11 @@ When creating a PR via the CLI, gather context in this order:
 
 ## Provider Delegation Guidance
 
-- Sequential: Use spawn → delegate → wait → summarize pattern. Explicit commands for each step.
-- Parallel: Use parallel spawns for independent agents. Wait for all to complete.
-- Context Transfer: Provide full context in the spawn command — no shared state between children.
-- Wait For Completion: Use explicit wait after spawning parallel tasks.
-- Inspect Progress: Check progress via status commands between waits.
+- Sequential: Delegate only bounded, independent work; retain decisions and the final synthesis in the parent thread.
+- Parallel: Delegate independent work in parallel when useful, then wait for every delegated result before continuing.
+- Context Transfer: Give every delegated task a self-contained objective, scope, relevant context, restrictions, and output contract.
+- Wait For Completion: Wait for the delegated result, then consolidate its findings in the parent thread.
+- Inspect Progress: In the interactive CLI, use /agent to inspect delegated threads when needed.
 
 ---
 

@@ -1,5 +1,7 @@
 name = "explorer"
 sandbox_mode = "danger-full-access"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
 
 description = """
 Use this agent to read and map the codebase for a specific task. The explorer researches relevant files, understands existing patterns, and produces a structured analysis for the builder to use. Invoke after the lead has defined a plan and before the builder starts. Never invoke for tasks that require writing or modifying files.
