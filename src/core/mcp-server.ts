@@ -28,16 +28,126 @@ const VERSION = '0.1.0'
 // ─── Tool schemas ─────────────────────────────────────────────────────────────
 
 const SPEC_TOOLS = [
-  { name: 'specs.list', description: 'List specification headers from docs/specs without loading bodies.', inputSchema: { type: 'object', properties: { specKind: { type: 'string', enum: SPEC_KINDS }, status: { type: 'string' }, query: { type: 'string' }, offset: { type: 'number' }, limit: { type: 'number' } } } },
-  { name: 'specs.get', description: 'Read one specification body by slug with an explicit offset and limit.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, offset: { type: 'number' }, limit: { type: 'number' } }, required: ['slug'] } },
-  { name: 'specs.related', description: 'List related specification headers and edges without their bodies.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, relationships: { type: 'array', items: { type: 'string', enum: RELATIONSHIPS } } }, required: ['slug'] } },
-  { name: 'specs.create', description: 'Create a validated specification in docs/specs from structured fields.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' }, specKind: { type: 'string', enum: SPEC_KINDS }, status: { type: 'string' }, sourceSpec: { type: 'string' }, content: { type: 'string' } }, required: ['slug', 'title', 'description', 'specKind', 'content'] } },
-  { name: 'specs.update_metadata', description: 'Update validated metadata fields without hand-editing frontmatter.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' }, status: { type: 'string' }, sourceSpec: { type: 'string' } }, required: ['slug'] } },
-  { name: 'specs.update_content', description: 'Replace a specification body while preserving its validated frontmatter.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, content: { type: 'string' } }, required: ['slug', 'content'] } },
-  { name: 'specs.transition', description: 'Change a specification status while enforcing source approval rules.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, status: { type: 'string' } }, required: ['slug', 'status'] } },
-  { name: 'specs.link', description: 'Create a bidirectional validated relationship between two specifications.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, targetSlug: { type: 'string' }, relationship: { type: 'string', enum: RELATIONSHIPS } }, required: ['slug', 'targetSlug', 'relationship'] } },
-  { name: 'specs.unlink', description: 'Remove a relationship and its inverse from two specifications.', inputSchema: { type: 'object', properties: { slug: { type: 'string' }, targetSlug: { type: 'string' }, relationship: { type: 'string', enum: RELATIONSHIPS } }, required: ['slug', 'targetSlug', 'relationship'] } },
-  { name: 'specs.validate', description: 'Validate all docs/specs frontmatter, links, and source references.', inputSchema: { type: 'object', properties: {} } },
+  {
+    name: 'specs.list',
+    description: 'List specification headers from docs/specs without loading bodies.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        specKind: { type: 'string', enum: SPEC_KINDS },
+        status: { type: 'string' },
+        query: { type: 'string' },
+        offset: { type: 'number' },
+        limit: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'specs.get',
+    description: 'Read one specification body by slug with an explicit offset and limit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string' },
+        offset: { type: 'number' },
+        limit: { type: 'number' },
+      },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'specs.related',
+    description: 'List related specification headers and edges without their bodies.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string' },
+        relationships: { type: 'array', items: { type: 'string', enum: RELATIONSHIPS } },
+      },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'specs.create',
+    description: 'Create a validated specification in docs/specs from structured fields.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        specKind: { type: 'string', enum: SPEC_KINDS },
+        status: { type: 'string' },
+        sourceSpec: { type: 'string' },
+        content: { type: 'string' },
+      },
+      required: ['slug', 'title', 'description', 'specKind', 'content'],
+    },
+  },
+  {
+    name: 'specs.update_metadata',
+    description: 'Update validated metadata fields without hand-editing frontmatter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        status: { type: 'string' },
+        sourceSpec: { type: 'string' },
+      },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'specs.update_content',
+    description: 'Replace a specification body while preserving its validated frontmatter.',
+    inputSchema: {
+      type: 'object',
+      properties: { slug: { type: 'string' }, content: { type: 'string' } },
+      required: ['slug', 'content'],
+    },
+  },
+  {
+    name: 'specs.transition',
+    description: 'Change a specification status while enforcing source approval rules.',
+    inputSchema: {
+      type: 'object',
+      properties: { slug: { type: 'string' }, status: { type: 'string' } },
+      required: ['slug', 'status'],
+    },
+  },
+  {
+    name: 'specs.link',
+    description: 'Create a bidirectional validated relationship between two specifications.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string' },
+        targetSlug: { type: 'string' },
+        relationship: { type: 'string', enum: RELATIONSHIPS },
+      },
+      required: ['slug', 'targetSlug', 'relationship'],
+    },
+  },
+  {
+    name: 'specs.unlink',
+    description: 'Remove a relationship and its inverse from two specifications.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string' },
+        targetSlug: { type: 'string' },
+        relationship: { type: 'string', enum: RELATIONSHIPS },
+      },
+      required: ['slug', 'targetSlug', 'relationship'],
+    },
+  },
+  {
+    name: 'specs.validate',
+    description: 'Validate all docs/specs frontmatter, links, and source references.',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ] as const
 
 const TOOLS = [
@@ -505,16 +615,28 @@ export async function dispatch(
   switch (name) {
     case 'specs.list': {
       const specKind = optionalStr(args, 'specKind')
-      if (specKind && !SPEC_KINDS.includes(specKind as SpecKind)) throw new Error(`invalid specKind '${specKind}'`)
+      if (specKind && !SPEC_KINDS.includes(specKind as SpecKind))
+        throw new Error(`invalid specKind '${specKind}'`)
       const query = optionalStr(args, 'query')?.toLowerCase()
       const offset = boundedInt(args, 'offset', 0, 0, Number.MAX_SAFE_INTEGER)
       const limit = boundedInt(args, 'limit', 50, 1, 100)
-      const matches = specs.list().filter(({ metadata }) =>
-        (!specKind || metadata.specKind === specKind) &&
-        (!optionalStr(args, 'status') || metadata.status === optionalStr(args, 'status')) &&
-        (!query || `${metadata.slug} ${metadata.title} ${metadata.description}`.toLowerCase().includes(query))
+      const matches = specs
+        .list()
+        .filter(
+          ({ metadata }) =>
+            (!specKind || metadata.specKind === specKind) &&
+            (!optionalStr(args, 'status') || metadata.status === optionalStr(args, 'status')) &&
+            (!query ||
+              `${metadata.slug} ${metadata.title} ${metadata.description}`
+                .toLowerCase()
+                .includes(query))
+        )
+      return ok(
+        JSON.stringify({
+          items: matches.slice(offset, offset + limit).map((doc) => doc.metadata),
+          nextOffset: offset + limit < matches.length ? offset + limit : null,
+        })
       )
-      return ok(JSON.stringify({ items: matches.slice(offset, offset + limit).map((doc) => doc.metadata), nextOffset: offset + limit < matches.length ? offset + limit : null }))
     }
     case 'specs.get': {
       const document = specs.get(str(args, 'slug'))
@@ -522,26 +644,45 @@ export async function dispatch(
       const limit = boundedInt(args, 'limit', 8000, 1, 12000)
       const content = document.content.slice(offset, offset + limit)
       const nextOffset = offset + content.length
-      return ok(JSON.stringify({ metadata: document.metadata, content, truncated: nextOffset < document.content.length, nextOffset: nextOffset < document.content.length ? nextOffset : null }))
+      return ok(
+        JSON.stringify({
+          metadata: document.metadata,
+          content,
+          truncated: nextOffset < document.content.length,
+          nextOffset: nextOffset < document.content.length ? nextOffset : null,
+        })
+      )
     }
     case 'specs.related': {
       const slug = str(args, 'slug')
       specs.get(slug)
       const relationships = optionalStringArray(args, 'relationships')
-      if (relationships?.some((value) => !RELATIONSHIPS.includes(value as Relationship))) throw new Error('relationships contains an invalid relationship')
-      const related = specs.list().flatMap(({ metadata }) => metadata.relatedSpecs
-        .filter((relation) => relation.slug === slug || metadata.slug === slug)
-        .filter((relation) => !relationships || relationships.includes(relation.relationship))
-        .map((relation) => ({ metadata: metadata.slug === slug ? specs.get(relation.slug).metadata : metadata, relationship: relation.relationship, direction: metadata.slug === slug ? 'outgoing' : 'incoming' })))
+      if (relationships?.some((value) => !RELATIONSHIPS.includes(value as Relationship)))
+        throw new Error('relationships contains an invalid relationship')
+      const related = specs.list().flatMap(({ metadata }) =>
+        metadata.relatedSpecs
+          .filter((relation) => relation.slug === slug || metadata.slug === slug)
+          .filter((relation) => !relationships || relationships.includes(relation.relationship))
+          .map((relation) => ({
+            metadata: metadata.slug === slug ? specs.get(relation.slug).metadata : metadata,
+            relationship: relation.relationship,
+            direction: metadata.slug === slug ? 'outgoing' : 'incoming',
+          }))
+      )
       return ok(JSON.stringify({ slug, items: related }))
     }
     case 'specs.create': {
       const kind = str(args, 'specKind') as SpecKind
       if (!SPEC_KINDS.includes(kind)) throw new Error(`invalid specKind '${kind}'`)
       const document = specs.create({
-        slug: str(args, 'slug'), title: str(args, 'title'), description: str(args, 'description'),
-        specKind: kind, status: (optionalStr(args, 'status') ?? 'draft') as SpecMetadata['status'],
-        sourceSpec: optionalStr(args, 'sourceSpec'), relatedSpecs: [], content: str(args, 'content'),
+        slug: str(args, 'slug'),
+        title: str(args, 'title'),
+        description: str(args, 'description'),
+        specKind: kind,
+        status: (optionalStr(args, 'status') ?? 'draft') as SpecMetadata['status'],
+        sourceSpec: optionalStr(args, 'sourceSpec'),
+        relatedSpecs: [],
+        content: str(args, 'content'),
       })
       return ok(JSON.stringify({ metadata: document.metadata }))
     }
@@ -559,14 +700,25 @@ export async function dispatch(
       return ok(JSON.stringify({ metadata: document.metadata }))
     }
     case 'specs.transition': {
-      const document = specs.transition(str(args, 'slug'), str(args, 'status') as SpecMetadata['status'])
+      const document = specs.transition(
+        str(args, 'slug'),
+        str(args, 'status') as SpecMetadata['status']
+      )
       return ok(JSON.stringify({ metadata: document.metadata }))
     }
     case 'specs.link':
-      specs.link(str(args, 'slug'), str(args, 'targetSlug'), str(args, 'relationship') as Relationship)
+      specs.link(
+        str(args, 'slug'),
+        str(args, 'targetSlug'),
+        str(args, 'relationship') as Relationship
+      )
       return ok(JSON.stringify({ linked: true }))
     case 'specs.unlink':
-      specs.unlink(str(args, 'slug'), str(args, 'targetSlug'), str(args, 'relationship') as Relationship)
+      specs.unlink(
+        str(args, 'slug'),
+        str(args, 'targetSlug'),
+        str(args, 'relationship') as Relationship
+      )
       return ok(JSON.stringify({ unlinked: true }))
     case 'specs.validate':
       return ok(JSON.stringify({ valid: specs.validate().length === 0, errors: specs.validate() }))
@@ -1035,8 +1187,8 @@ function ok(text: string, isError = false): CallToolResult {
 
 function str(args: Record<string, unknown>, key: string): string {
   const v = args[key]
-  if (typeof v !== 'string') throw new Error(`${key} must be a string`)
-  return v
+  if (!v) throw new Error(`${key} is required`)
+  return String(v)
 }
 
 function num(args: Record<string, unknown>, key: string): number {
@@ -1048,8 +1200,7 @@ function num(args: Record<string, unknown>, key: string): number {
 function optionalStr(args: Record<string, unknown>, key: string): string | undefined {
   const value = args[key]
   if (value === undefined) return undefined
-  if (typeof value !== 'string') throw new Error(`${key} must be a string`)
-  return value
+  return String(value)
 }
 function boundedInt(
   args: Record<string, unknown>,
@@ -1067,9 +1218,11 @@ function boundedInt(
 function optionalStringArray(args: Record<string, unknown>, key: string): string[] | undefined {
   const value = args[key]
   if (value === undefined) return undefined
-  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.length === 0))
+  if (!Array.isArray(value)) {
     throw new Error(`${key} must be an array of non-empty strings`)
-  return value
+  }
+
+  return value.map((item) => String(item)).filter((item) => item.trim() !== '')
 }
 
 const RECIPIENTS = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
