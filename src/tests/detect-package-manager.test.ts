@@ -5,7 +5,9 @@ import { describe, test } from 'node:test'
 
 import {
   detectPackageManager,
+  getInstallCommandParts,
   getMcpCommandParts,
+  getRunOnceCommandParts,
 } from '@/core/materializer/detect-package-manager'
 import { pkg } from '@/core/package-data'
 
@@ -239,4 +241,53 @@ describe('getMcpCommandParts — self-dev (cwd IS the agent-harness-kit package)
     assert.notDeepEqual(parts, ['pnpm', 'exec', 'ahk', 'serve', '--port', '3456'])
     cleanTmp()
   })
+})
+
+describe('getInstallCommandParts', () => {
+  const TARGET = `${pkg.name}@2.11.3`
+
+  const localDev: Record<string, string[]> = {
+    npm: ['npm', 'install', '--save-dev', TARGET],
+    pnpm: ['pnpm', 'add', '-D', TARGET],
+    'yarn-classic': ['yarn', 'add', '--dev', TARGET],
+    'yarn-berry': ['yarn', 'add', '--dev', TARGET],
+    bun: ['bun', 'add', '-d', TARGET],
+  }
+
+  const globalInstall: Record<string, string[]> = {
+    npm: ['npm', 'install', '-g', TARGET],
+    pnpm: ['pnpm', 'add', '-g', TARGET],
+    'yarn-classic': ['yarn', 'global', 'add', TARGET],
+    'yarn-berry': ['yarn', 'global', 'add', TARGET],
+    bun: ['bun', 'add', '-g', TARGET],
+  }
+
+  for (const pm of ['npm', 'pnpm', 'yarn-classic', 'yarn-berry', 'bun'] as const) {
+    test(`${pm}: local dev install → ${localDev[pm].join(' ')}`, () => {
+      assert.deepEqual(getInstallCommandParts(pm, TARGET, { dev: true }), localDev[pm])
+    })
+
+    test(`${pm}: global install → ${globalInstall[pm].join(' ')} (dev flag ignored)`, () => {
+      assert.deepEqual(getInstallCommandParts(pm, TARGET, { global: true, dev: true }), globalInstall[pm])
+      assert.deepEqual(getInstallCommandParts(pm, TARGET, { global: true }), globalInstall[pm])
+    })
+  }
+})
+
+describe('getRunOnceCommandParts', () => {
+  const P = 'autoskills'
+
+  const expected: Record<string, string[]> = {
+    npm: ['npx', P],
+    pnpm: ['pnpx', P],
+    'yarn-classic': ['yarn', 'dlx', P],
+    'yarn-berry': ['yarn', 'dlx', P],
+    bun: ['bunx', P],
+  }
+
+  for (const pm of ['npm', 'pnpm', 'yarn-classic', 'yarn-berry', 'bun'] as const) {
+    test(`${pm} → ${expected[pm].join(' ')}`, () => {
+      assert.deepEqual(getRunOnceCommandParts(pm, P), expected[pm])
+    })
+  }
 })

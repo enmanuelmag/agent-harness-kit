@@ -157,7 +157,7 @@ npx ahk init
 >
 > **Existing projects are never converted.** If a config of any extension already exists, it keeps working and keeps its format — installing or removing the package locally will not silently rewrite it. `loadConfig()` reads all five formats, and `ahk init` stops when it finds any of them.
 >
-> **A local install is still recommended** even though it is no longer required: it pins the CLI version so behavior stays reproducible across your team and CI instead of drifting with whatever is installed globally on each machine. On a global-only install `ahk` prints a non-blocking warning suggesting it — the command runs and exits normally either way.
+> **A local install is still recommended** even though it is no longer required: it pins the CLI version so behavior stays reproducible across your team and CI instead of drifting with whatever is installed globally on each machine. A global-only install is fully supported — `ahk` does not print a local-install warning, and the command runs and exits normally either way.
 >
 > This check also works with **Yarn Berry (PnP)** projects, which never create a `node_modules` folder — `ahk` detects `.pnp.cjs`/`.pnp.loader.mjs` and falls back to checking that the package is declared in `package.json` instead of requiring a `node_modules` entry.
 

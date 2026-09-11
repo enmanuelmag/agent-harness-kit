@@ -14,7 +14,7 @@ import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
 import { runTaskAdd, runTaskDone, runTaskEdit, runTaskList } from '@/commands/task/index'
-import { isLocalInstallSatisfied, printLocalInstallWarning } from '@/core/local-install-guard'
+import { isLocalInstallSatisfied } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
 import { isExecutableOnPath, printMissingGlobalBinaryWarning } from '@/core/path-probe'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
@@ -241,17 +241,14 @@ program
     await runModels(cwd)
   })
 
-// Prints a non-blocking warning (but not for --version/--help, which
-// commander handles without invoking actions) when the package is only
-// installed globally and not available in the project's local
-// node_modules. This is purely informational — the command continues
-// its normal flow regardless of the check's result.
+// When the package is not available locally (and cwd is not the package's
+// own repo), the generated MCP config launches the bare `ahk serve`
+// command, so warn early (never block) if `ahk` is not resolvable on PATH
+// and would therefore fail later at spawn time. This is purely
+// informational — the command continues its normal flow regardless of the
+// check's result.
 program.hook('preAction', () => {
   if (!isLocalInstallSatisfied(cwd)) {
-    printLocalInstallWarning()
-    // Global-install path only: the generated MCP config launches the bare
-    // `ahk serve` command, so warn early (never block) if `ahk` is not
-    // resolvable on PATH and would therefore fail later at spawn time.
     if (!isExecutableOnPath('ahk')) {
       printMissingGlobalBinaryWarning()
     }
@@ -260,7 +257,7 @@ program.hook('preAction', () => {
 
 program.hook('postAction', async () => {
   const update = await updateCheck
-  if (update) printUpdateMessage(update)
+  if (update) printUpdateMessage(update, cwd)
 })
 
 // ─── backward-compat argv rewrite for `ahk migrate` ────────────────────────

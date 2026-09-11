@@ -49,14 +49,17 @@ describe('CLI local-install guard (integration)', { skip: !existsSync(CLI_PATH) 
     rmSync(TMP_BASE, { recursive: true, force: true })
   })
 
-  test('a project command prints a non-blocking warning when global-only, but still exits 0', () => {
-    const dir = join(TMP_BASE, 'status-warned')
+  test('a project command in a global-only project still exits 0, with no local-install warning', () => {
+    const dir = join(TMP_BASE, 'status-global-only')
     mkdirSync(dir, { recursive: true })
     writeMinimalConfig(dir)
     const result = runCli(['status'], dir)
     assert.equal(result.status, 0)
-    assert.match(result.stderr, /is not installed locally/)
-    assert.match(result.stderr, /npm install --save-dev @cardor\/agent-harness-kit/)
+    // The local-install warning was removed, so its unique text must be
+    // absent. The missing-global-binary warning may or may not fire
+    // depending on whether `ahk` is on PATH in the test env, so do not
+    // assert on its text — only on exit 0 and the warning's absence.
+    assert.doesNotMatch(result.stderr ?? '', /is not installed locally/)
     rmSync(TMP_BASE, { recursive: true, force: true })
   })
 
