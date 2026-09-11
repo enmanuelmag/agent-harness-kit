@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import pc from 'picocolors'
 
 import { pkg } from '@/core/package-data'
 
@@ -11,20 +10,22 @@ import { pkg } from '@/core/package-data'
  * this repo) — either is treated as "satisfied" here.
  *
  * This is the self-dev-inclusive, general-purpose check. It powers the
- * non-blocking install warning (`cli.ts`'s `preAction` hook) and the config
- * file format decision (`detectConfigExtension` in `init-helpers.ts`), where
- * self-dev genuinely behaves like a satisfied local install for those
- * purposes. Callers that need to distinguish a *real* local install from the
- * self-dev shortcut (e.g. `getMcpCommandParts`, which must not mediate
- * through a package manager that has nothing to resolve in self-dev) should
- * call {@link hasRealLocalInstall} directly instead.
+ * global-install path check in `cli.ts`'s `preAction` hook (which only
+ * warns when the global `ahk` binary is missing on PATH) and the config
+ * file format decision (`detectConfigExtension` in `init-helpers.ts`),
+ * where self-dev genuinely behaves like a satisfied local install for
+ * those purposes. Callers that need to distinguish a *real* local install
+ * from the self-dev shortcut (e.g. `getMcpCommandParts`, which must not
+ * mediate through a package manager that has nothing to resolve in
+ * self-dev) should call {@link hasRealLocalInstall} directly instead.
  *
  * The generated config no longer needs the package resolvable at runtime
  * (`import type` is erased at compile time, and the .mjs/.cjs templates
  * don't import the package at all), so this check is no longer required
- * for `loadConfig(cwd)` to succeed. It is kept as a non-blocking warning
- * so a team/CI can still pin an explicit local version of the CLI for
- * reproducibility — the command always continues regardless of the result.
+ * for `loadConfig(cwd)` to succeed. It is kept so the CLI can still tell
+ * a global-only install apart from a local one — a local install remains
+ * optional but recommended for pinning a reproducible version of the CLI
+ * across your team and CI.
  */
 export function isLocalInstallSatisfied(cwd: string): boolean {
   // Self-dev case: cwd is the agent-harness-kit repo itself, so there is
@@ -91,25 +92,4 @@ export function hasRealLocalInstall(cwd: string): boolean {
   }
 
   return false
-}
-
-/**
- * Prints a non-blocking warning recommending a local install, with the
- * exact command to fix it. This is informational only — the command
- * continues to run either way. A local install is no longer required for
- * config loading to work; it is still recommended so the version of the
- * package used stays reproducible and pinned across your team and CI,
- * instead of drifting with whatever is installed globally on each machine.
- */
-export function printLocalInstallWarning(): void {
-  console.error(pc.yellow(`⚠ ${pkg.name} is not installed locally in this project.`))
-  console.error(pc.dim('  This is only a recommendation for reproducibility: pinning a local'))
-  console.error(pc.dim('  version keeps behavior consistent across your team and CI, instead of'))
-  console.error(pc.dim('  drifting with whatever version is installed globally on each machine.'))
-  console.error(pc.dim(`  Run: npm install --save-dev ${pkg.name}`))
-  console.error(
-    pc.dim(
-      '  (or the equivalent for your package manager: pnpm add -D, yarn add --dev, bun add -d)'
-    )
-  )
 }

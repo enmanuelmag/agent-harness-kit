@@ -130,10 +130,9 @@ export function isExecutableOnPath(name: string): boolean {
  * no local install AND the bare `ahk` binary is not resolvable on PATH. On the
  * global-install path the generated MCP config launches `ahk serve` directly,
  * so without `ahk` on PATH that config would fail later at spawn time. This
- * moves the failure earlier and makes it actionable. Modeled on
- * `printLocalInstallWarning()`: yellow ⚠ header + dim guidance + exact install
- * commands, all to stderr. Never calls `process.exit`; never changes the exit
- * code.
+ * moves the failure earlier and makes it actionable. Yellow ⚠ header + dim
+ * guidance + exact install commands, all to stderr. Never calls
+ * `process.exit`; never changes the exit code.
  */
 export function printMissingGlobalBinaryWarning(): void {
   console.error(pc.yellow('⚠ `ahk` was not found on your PATH.'))

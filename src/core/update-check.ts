@@ -2,6 +2,11 @@
 import pc from 'picocolors'
 
 import { drawBox } from '@/commands/init-helpers'
+import { hasRealLocalInstall } from '@/core/local-install-guard'
+import {
+  detectPackageManager,
+  getInstallCommandParts,
+} from '@/core/materializer/detect-package-manager'
 
 import { pkg } from './package-data'
 
@@ -31,10 +36,20 @@ export function checkForUpdate(currentVersion: string): Promise<UpdateInfo | nul
   })
 }
 
-export function printUpdateMessage({ current, latest }: UpdateInfo): void {
+export function printUpdateMessage({ current, latest }: UpdateInfo, cwd: string): void {
+  // Self-dev repos (cwd IS this package's own root) deliberately get the
+  // global command form, consistent with getMcpCommandParts: there is no
+  // real local install for a package manager to mediate through.
+  const local = hasRealLocalInstall(cwd)
+  const pm = detectPackageManager(cwd)
+  const command = getInstallCommandParts(pm, `${pkg.name}@${latest}`, {
+    global: !local,
+    dev: true,
+  }).join(' ')
+
   const lines = [
     `  Update available ${pc.dim(current)} → ${pc.green(latest)}  `,
-    `  Run: ${pc.cyan(`pnpm i ${pkg.name}@${latest}`)}          `,
+    `  Run: ${pc.cyan(command)}  `,
   ]
 
   drawBox(lines)

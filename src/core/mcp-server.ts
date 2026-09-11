@@ -10,6 +10,7 @@ import {
 
 import { type HarnessDB, openDB } from './db'
 import { getDoctorStatus } from './doctor'
+import { detectPackageManager, getRunOnceCommandParts } from './materializer/detect-package-manager'
 import { slugify } from './materializer/scaffold-utils'
 import { checkPermissionsSync } from './permissions-check'
 import {
@@ -1076,8 +1077,10 @@ export async function dispatch(
       }
 
       const significant = added.length > 0 || removed.length > 0 || majorBumps.length > 0
+      const pm = detectPackageManager(cwd)
+      const runOnce = getRunOnceCommandParts(pm, 'autoskills').join(' ')
       const advisory = significant
-        ? 'Significant dependency changes detected. Consider running `pnpx autoskills` (or `npx autoskills` if pnpm is unavailable) to refresh agent skills. Clearing stale skills before re-running is recommended.'
+        ? `Significant dependency changes detected. Consider running \`${runOnce}\` to refresh agent skills. Clearing stale skills before re-running is recommended.`
         : 'No significant dependency changes detected.'
 
       return ok(
@@ -1226,7 +1229,24 @@ function boundedInt(
 }
 function optionalStringArray(args: Record<string, unknown>, key: string): string[] | undefined {
   const value = args[key]
+
+  if (value === null) return []
+
   if (value === undefined) return undefined
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item)).filter((item) => item.trim() !== '')
+      }
+    } catch {
+      throw new Error(
+        `${key} must be an array of non-empty strings or a JSON string representing such an array`
+      )
+    }
+  }
+
   if (!Array.isArray(value)) {
     throw new Error(`${key} must be an array of non-empty strings`)
   }
