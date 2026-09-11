@@ -1209,10 +1209,19 @@ function boundedInt(
   min: number,
   max: number
 ): number {
-  const value = args[key]
-  if (value === undefined) return fallback
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max)
+  const raw = args[key]
+  if (raw === undefined) return fallback
+
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw.trim() !== ''
+        ? Number(raw)
+        : Number.NaN
+
+  if (!Number.isInteger(value) || value < min || value > max) {
     throw new Error(`${key} must be an integer between ${min} and ${max}`)
+  }
   return value
 }
 function optionalStringArray(args: Record<string, unknown>, key: string): string[] | undefined {
@@ -1347,14 +1356,52 @@ function sectionIndex(section: {
  *  (task #74) — the single-entry top-level shape is no longer accepted, so
  *  every entry must be pulled from this array via str()/num() on each item. */
 function nonEmptyArray(args: Record<string, unknown>, key: string): Record<string, unknown>[] {
-  const v = args[key]
-  if (!Array.isArray(v) || v.length === 0) {
+  let v = args[key]
+
+  if (v === undefined) {
+    throw new Error(`${key} is required`)
+  }
+
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v)
+    } catch {
+      throw new Error(`${key} must be a valid JSON array`)
+    }
+  }
+
+  if (!Array.isArray(v)) {
+    throw new Error(`${key} must be an array of objects`)
+  }
+
+  if (v.length === 0) {
     throw new Error(`${key} must be a non-empty array`)
   }
-  for (const item of v) {
+
+  const normalizedArray = []
+
+  for (let item of v) {
+    if (item === null) {
+      throw new Error(`${key} entries must be objects, not null`)
+    }
+
+    if (typeof item === 'string') {
+      try {
+        item = JSON.parse(item)
+      } catch {
+        throw new Error(`${key} entries must be valid JSON objects`)
+      }
+    }
+
+    if (Array.isArray(item)) {
+      throw new Error(`${key} entries must be objects, not arrays`)
+    }
+
     if (typeof item !== 'object' || item === null) {
       throw new Error(`${key} entries must be objects`)
     }
+
+    normalizedArray.push(item)
   }
-  return v as Record<string, unknown>[]
+  return normalizedArray as Record<string, unknown>[]
 }
