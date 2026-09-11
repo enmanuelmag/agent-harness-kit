@@ -90,8 +90,9 @@ function detectFromPackageManagerField(cwd: string): PackageManager | null {
  * This deliberately uses {@link hasRealLocalInstall} rather than
  * {@link isLocalInstallSatisfied}: self-dev repos (where `cwd` IS this
  * package's own root) are treated as "no local install" here, even though
- * `isLocalInstallSatisfied` — used elsewhere for the non-blocking install
- * warning — still reports self-dev as satisfied. There is no real
+ * `isLocalInstallSatisfied` — used elsewhere for the config file format
+ * decision and the global-install path check in `cli.ts` — still reports
+ * self-dev as satisfied. There is no real
  * node_modules entry for a package manager to mediate through in self-dev,
  * so self-dev gets the same bare global command form as any other project
  * with no local install.
@@ -125,5 +126,84 @@ export function getMcpCommandParts(pm: PackageManager, port: number, cwd: string
     case 'npm':
     default:
       return ['npx', '--no', 'ahk', 'serve', '--port', portStr]
+  }
+}
+
+/**
+ * Returns the install command tokens for `target` (e.g.
+ * `@cardor/agent-harness-kit@2.11.3`) under the given package manager.
+ *
+ * | Manager      | Local (dev)                        | Global                        |
+ * | ------------ | ---------------------------------- | ----------------------------- |
+ * | npm          | `npm install --save-dev <target>`  | `npm install -g <target>`     |
+ * | pnpm         | `pnpm add -D <target>`             | `pnpm add -g <target>`        |
+ * | yarn classic | `yarn add --dev <target>`         | `yarn global add <target>`    |
+ * | yarn berry   | `yarn add --dev <target>`         | `yarn global add <target>`    |
+ * | bun          | `bun add -d <target>`              | `bun add -g <target>`         |
+ *
+ * `dev` only applies to local installs: global installs are never
+ * dev-scoped, so `dev` is ignored when `global` is true. With neither flag
+ * set, the plain install form is returned (e.g. `npm install <target>`).
+ */
+export function getInstallCommandParts(
+  pm: PackageManager,
+  target: string,
+  opts: { global?: boolean; dev?: boolean } = {}
+): string[] {
+  const { global, dev } = opts
+
+  if (global) {
+    switch (pm) {
+      case 'pnpm':
+        return ['pnpm', 'add', '-g', target]
+      case 'yarn-classic':
+      case 'yarn-berry':
+        return ['yarn', 'global', 'add', target]
+      case 'bun':
+        return ['bun', 'add', '-g', target]
+      case 'npm':
+      default:
+        return ['npm', 'install', '-g', target]
+    }
+  }
+
+  switch (pm) {
+    case 'pnpm':
+      return dev ? ['pnpm', 'add', '-D', target] : ['pnpm', 'add', target]
+    case 'yarn-classic':
+    case 'yarn-berry':
+      return dev ? ['yarn', 'add', '--dev', target] : ['yarn', 'add', target]
+    case 'bun':
+      return dev ? ['bun', 'add', '-d', target] : ['bun', 'add', target]
+    case 'npm':
+    default:
+      return dev ? ['npm', 'install', '--save-dev', target] : ['npm', 'install', target]
+  }
+}
+
+/**
+ * Returns the "run a package without installing it" command tokens for
+ * `pkgName` under the given package manager:
+ *
+ * | Manager      | Tokens                   |
+ * | ------------ | ------------------------ |
+ * | npm          | `npx <pkgName>`          |
+ * | pnpm         | `pnpx <pkgName>`        |
+ * | yarn classic | `yarn dlx <pkgName>`    |
+ * | yarn berry   | `yarn dlx <pkgName>`    |
+ * | bun          | `bunx <pkgName>`        |
+ */
+export function getRunOnceCommandParts(pm: PackageManager, pkgName: string): string[] {
+  switch (pm) {
+    case 'pnpm':
+      return ['pnpx', pkgName]
+    case 'yarn-classic':
+    case 'yarn-berry':
+      return ['yarn', 'dlx', pkgName]
+    case 'bun':
+      return ['bunx', pkgName]
+    case 'npm':
+    default:
+      return ['npx', pkgName]
   }
 }
