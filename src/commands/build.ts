@@ -7,9 +7,10 @@ import { getMaterializer } from '@/core/materializer/index'
 
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
+import { promptCursorAgentModels } from './cursor-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
-import type { CodexAgentModelChoice } from '@/types'
+import type { CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
 
 interface BuildOptions {
   watch?: boolean
@@ -73,6 +74,10 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
   if (force && config.provider === 'codex-cli') {
     codexAgentModels = await promptCodexAgentModels(config.provider)
   }
+  let cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>> | undefined
+  if (force && config.provider === 'cursor') {
+    cursorAgentModels = await promptCursorAgentModels(config.provider)
+  }
 
   const spinner = p.spinner()
   spinner.start('Rebuilding files...')
@@ -83,6 +88,7 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
       force,
       claudeAgentModels,
       codexAgentModels,
+      cursorAgentModels,
     })
     spinner.stop(pc.green('Build complete'))
 

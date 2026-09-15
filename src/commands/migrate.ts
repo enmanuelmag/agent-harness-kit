@@ -6,6 +6,7 @@ import { getMaterializer } from '@/core/materializer/index'
 
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
+import { promptCursorAgentModels } from './cursor-model-prompt'
 
 import type { Provider } from '@/types'
 
@@ -17,7 +18,7 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   const config = await loadConfig(cwd)
 
   let target: Provider
-  if (opts.to && ['claude-code', 'opencode', 'codex-cli', 'grok-cli'].includes(opts.to)) {
+  if (opts.to && ['claude-code', 'opencode', 'codex-cli', 'grok-cli', 'cursor'].includes(opts.to)) {
     target = opts.to as Provider
   } else {
     const val = await p.select({
@@ -27,6 +28,7 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
         { value: 'opencode', label: 'OpenCode' },
         { value: 'codex-cli', label: 'Codex CLI' },
         { value: 'grok-cli', label: 'Grok CLI' },
+        { value: 'cursor', label: 'Cursor' },
       ],
     })
     if (p.isCancel(val)) {
@@ -49,6 +51,7 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   // while a p.spinner is active.
   const claudeAgentModels = await promptClaudeAgentModels(target)
   const codexAgentModels = await promptCodexAgentModels(target)
+  const cursorAgentModels = await promptCursorAgentModels(target)
 
   const spinner = p.spinner()
   spinner.start(`Migrating from ${config.provider} to ${target}...`)
@@ -56,7 +59,11 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   try {
     // Scaffold the new provider's files
     const targetMaterializer = getMaterializer(target)
-    await targetMaterializer.build(config, cwd, { claudeAgentModels, codexAgentModels })
+    await targetMaterializer.build(config, cwd, {
+      claudeAgentModels,
+      codexAgentModels,
+      cursorAgentModels,
+    })
 
     spinner.stop(pc.green(`Migrated to ${target}`))
     p.log.warn(`Update agent-harness-kit.config.ts: set provider: '${target}'`)

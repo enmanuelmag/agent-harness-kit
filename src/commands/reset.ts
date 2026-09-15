@@ -22,6 +22,7 @@ const PROVIDER_AGENT_DIRS: Record<Provider, string> = {
   opencode: '.opencode/agents',
   'codex-cli': '.codex/agents',
   'grok-cli': '.grok/agents',
+  cursor: '.cursor/agents',
 }
 
 // codex-cli agent files are TOML (see codex-cli.ts materializer); every other
@@ -31,6 +32,7 @@ const PROVIDER_AGENT_EXT: Record<Provider, string> = {
   opencode: '.md',
   'codex-cli': '.toml',
   'grok-cli': '.md',
+  cursor: '.md',
 }
 
 async function resetAgentMds(cwd: string, provider: Provider): Promise<void> {

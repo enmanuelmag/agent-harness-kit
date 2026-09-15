@@ -13,6 +13,7 @@ import { cliFormWithRetry } from '@/utils/form'
 
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
+import { promptCursorAgentModels } from './cursor-model-prompt'
 import {
   applyConfigDefaults,
   detectConfigExtension,
@@ -95,7 +96,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   let provider: Provider
   if (
     flags.provider &&
-    ['claude-code', 'opencode', 'codex-cli', 'grok-cli'].includes(flags.provider)
+    ['claude-code', 'opencode', 'codex-cli', 'grok-cli', 'cursor'].includes(flags.provider)
   ) {
     provider = flags.provider as Provider
   } else {
@@ -106,6 +107,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         { value: 'claude-code', label: 'Claude Code' },
         { value: 'codex-cli', label: 'Codex CLI' },
         { value: 'grok-cli', label: 'Grok CLI' },
+        { value: 'cursor', label: 'Cursor (Agent Window and CLI)' },
       ],
     })
     if (p.isCancel(val)) {
@@ -139,6 +141,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // (codex-model-prompt.ts), mirroring `promptClaudeAgentModels`'s shape and
   // cancel-handling.
   const codexAgentModels = await promptCodexAgentModels(provider)
+  const cursorAgentModels = await promptCursorAgentModels(provider)
 
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string
@@ -281,11 +284,16 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       firstTask,
       claudeAgentModels,
       codexAgentModels,
+      cursorAgentModels,
     })
 
     if (firstTask) {
       await db.addTask({
-        slug: firstTask.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+        slug: firstTask.title
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, ''),
         title: firstTask.title,
         description: firstTask.description,
         acceptance: firstTask.acceptance,
@@ -308,6 +316,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     opencode: { agentsDir: '.opencode/agents/', mcpFile: './opencode.json' },
     'codex-cli': { agentsDir: '.codex/agents/', mcpFile: '.codex/config.toml' },
     'grok-cli': { agentsDir: '.grok/agents/', mcpFile: '.grok/config.toml' },
+    cursor: { agentsDir: '.cursor/agents/', mcpFile: '.cursor/mcp.json' },
   }
   const { agentsDir, mcpFile } = PROVIDER_SUMMARY_INFO[provider]
 

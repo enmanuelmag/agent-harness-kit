@@ -274,11 +274,7 @@ async function migrateScopeOnly(
   }
 
   if (opts.dryRun) {
-    log(
-      pc.dim(
-        `[dry-run] Would copy ${srcDb} → ${destDb} (scope ${fromScope} → ${toScope}).`
-      )
-    )
+    log(pc.dim(`[dry-run] Would copy ${srcDb} → ${destDb} (scope ${fromScope} → ${toScope}).`))
     return
   }
 
