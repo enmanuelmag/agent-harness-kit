@@ -1,6 +1,6 @@
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-export type Provider = 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli'
+export type Provider = 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
 
 // ─── Config types ─────────────────────────────────────────────────────────────
 
@@ -227,6 +227,13 @@ export interface CodexAgentModelChoice {
   effort?: CodexReasoningEffort
 }
 
+/** Cursor keeps model options in its single `model` frontmatter scalar. The
+ * value can be `inherit`, a model id, or a model id with parameters such as
+ * `claude-opus-5[effort=high]`. */
+export interface CursorAgentModelChoice {
+  model?: string
+}
+
 export interface ScaffoldOptions {
   cwd: string
   firstTask?: {
@@ -258,5 +265,8 @@ export interface ScaffoldOptions {
    *  never reads `claudeAgentModels`'s Codex counterpart. */
   codexAgentModels?: Partial<
     Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', CodexAgentModelChoice>
+  >
+  cursorAgentModels?: Partial<
+    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', CursorAgentModelChoice>
   >
 }

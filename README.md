@@ -200,6 +200,8 @@ Separately, `.codex/config.toml` always gets a project-wide top-level default �
 
 OpenCode and Grok Build are unaffected by either prompt — it never appears for those providers, since neither has a closed model enum to prompt against.
 
+Cursor only, init asks for a model for each core role. The initial picker includes `inherit`, Composer, Claude, Gemini, GPT-5.6, and Grok choices available in Cursor at release time. It then offers the model default or `[effort=high]`, written as one Cursor-native frontmatter value such as `model: claude-opus-5[effort=high]`. Cursor decides which model parameters are supported by the current account, plan, and team policy; `inherit` is the safe default. Cursor's non-builder roles receive `readonly: true`, not a tool allowlist, so available MCP tools do not need to be enumerated manually.
+
 
 - `local` (default) — `.harness/harness.db`, inside the project.
 - `global` — `~/.harness/dbs/<projectId>/harness.db`, outside the project tree (useful to keep the DB out of version control entirely, or to centralize storage for many projects). `<projectId>` is a UUID generated once at init and persisted in `agent-harness-kit.config.ts` — it's never regenerated on subsequent runs.
@@ -236,7 +238,7 @@ ahk build --sync     # kept for backwards compatibility — now a no-op on every
 
 ### Agent files are yours
 
-`ahk build` **creates agent files that are missing and never modifies ones that already exist.** Edit `.claude/agents/<role>.md` (or `.opencode/agents/<role>.md`, `.codex/agents/<role>.toml`, or `.grok/agents/<role>.md`) freely — change the role prompt, set a `model:` line, adjust the restriction fields. Rebuilding will not revert your work. `ahk doctor` does not report hand-edited files either; it checks existence only.
+`ahk build` **creates agent files that are missing and never modifies ones that already exist.** Edit `.claude/agents/<role>.md` (or `.opencode/agents/<role>.md`, `.codex/agents/<role>.toml`, `.grok/agents/<role>.md`, or `.cursor/agents/<role>.md`) freely — change the role prompt, set a `model:` line, adjust the restriction fields. Rebuilding will not revert your work. `ahk doctor` does not report hand-edited files either; it checks existence only.
 
 Everything else `build` writes — MCP config and skills — is derived from your config and **is** regenerated on every run.
 
@@ -461,7 +463,7 @@ ahk reset --provider grok-cli
 What it can reset:
 
 - The SQLite `.db` file (plus WAL and SHM files if present)
-- Agent definition files in `.claude/agents/`, `.opencode/agents/`, `.codex/agents/`, or `.grok/agents/`
+- Agent definition files in `.claude/agents/`, `.opencode/agents/`, `.codex/agents/`, `.grok/agents/`, or `.cursor/agents/`
 
 After a reset, run `ahk init` to scaffold a fresh harness.
 
@@ -603,6 +605,24 @@ your-project/
         └── reviewer.md
 ```
 
+**Cursor** (`provider: 'cursor'`):
+
+```
+your-project/
+├── agent-harness-kit.config.{json|ts|mjs|cjs}
+├── AGENTS.md
+├── health.sh
+├── .harness/
+└── .cursor/
+    ├── mcp.json                  ← project-scoped stdio MCP registration
+    └── agents/
+        ├── lead.md               ← readonly: true
+        ├── explorer.md           ← readonly: true
+        ├── consultant.md         ← readonly: true
+        ├── builder.md            ← unrestricted; no tools allowlist
+        └── reviewer.md           ← readonly: true
+```
+
 ### What each file does
 
 | File                          | Purpose                                                                               | Edit it?                                                    |
@@ -621,6 +641,8 @@ your-project/
 | `.codex/config.toml`          | MCP server registration for Codex CLI. Merged by `ahk build`                          | Yes, carefully                                              |
 | `.grok/agents/*.md`           | Agent role definitions (Grok Build). Created once, never overwritten (`ahk build --force` regenerates)                  | **Yes — customize agent behavior**                          |
 | `.grok/config.toml`           | MCP server registration for Grok Build. Merged by `ahk build`                         | Yes, carefully                                              |
+| `.cursor/agents/*.md`         | Cursor custom subagents. Non-builder roles use native `readonly: true`; no tools allowlist is generated. | **Yes — customize behavior/model** |
+| `.cursor/mcp.json`            | Project MCP registration for Cursor Agent Window and CLI. Merged by `ahk build`.      | Yes, carefully                                              |
 
 ---
 
@@ -646,7 +668,7 @@ const config: HarnessConfig = {
     docsPath: './docs', // where agents search for documentation
   },
 
-  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
 
   // There is no `agents` key. Per-agent settings live in the generated agent
   // file itself, which is yours to edit — see "Agent files are yours" below.

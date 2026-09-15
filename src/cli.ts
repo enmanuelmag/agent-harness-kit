@@ -61,7 +61,7 @@ program
   .option('--name <name>', 'Project name (skip prompt)')
   .option(
     '--provider <provider>',
-    'AI provider: claude-code | opencode | codex-cli | grok-cli (skip prompt)'
+    'AI provider: claude-code | opencode | codex-cli | grok-cli | cursor (skip prompt)'
   )
   .option('--docs <path>', 'Docs folder path (skip prompt)')
   .option('--storage-scope <scope>', 'Storage scope: local | global (skip prompt)')
@@ -178,7 +178,10 @@ const migrate = program
 migrate
   .command('provider')
   .description('Migrate provider-specific files to a different provider')
-  .option('--to <provider>', 'Target provider: claude-code | opencode | codex-cli | grok-cli')
+  .option(
+    '--to <provider>',
+    'Target provider: claude-code | opencode | codex-cli | grok-cli | cursor'
+  )
   .action(async (opts) => {
     await runMigrate(cwd, opts)
   })
@@ -216,7 +219,7 @@ program
   .description('Reset/clear harness data (DB, agent files)')
   .option('--force', 'Skip confirmation prompts')
   .option(
-    '--provider <claude-code|opencode|codex-cli|grok-cli>',
+    '--provider <claude-code|opencode|codex-cli|grok-cli|cursor>',
     'Reset agent MD files for specified provider'
   )
   .action(async (opts) => {
