@@ -39,8 +39,10 @@ export const PROVIDER_DELEGATION_GUIDANCE: Readonly<Record<Provider, ProviderDel
         'Delegate independent work in parallel when useful, then wait for every delegated result before continuing.',
       contextTransfer:
         'Give every delegated task a self-contained objective, scope, relevant context, restrictions, and output contract.',
-      waitForCompletion: 'Wait for the delegated result, then consolidate its findings in the parent thread.',
-      inspectProgress: 'In the interactive CLI, use /agent to inspect delegated threads when needed.',
+      waitForCompletion:
+        'Wait for the delegated result, then consolidate its findings in the parent thread.',
+      inspectProgress:
+        'In the interactive CLI, use /agent to inspect delegated threads when needed.',
     },
     'grok-cli': {
       invoke: ['project subagent', '/tasks'],
@@ -49,6 +51,17 @@ export const PROVIDER_DELEGATION_GUIDANCE: Readonly<Record<Provider, ProviderDel
       contextTransfer: 'Provide bounded context when delegating to subagents.',
       waitForCompletion: 'Wait for subagent completion before proceeding.',
       inspectProgress: 'Use /tasks to check progress of running subagents.',
+    },
+    cursor: {
+      invoke: ['custom subagent', '/<role-name>'],
+      sequential:
+        'Delegate to a named custom subagent with /<role-name>, or request that role naturally. Use a dependent role only after the prior result is available.',
+      parallel:
+        'Launch independent roles in parallel only when their scopes do not overlap. Give each role a distinct deliverable; consolidate every result before making the next shared decision.',
+      contextTransfer:
+        'Give every subagent a self-contained objective, scope, relevant context, restrictions, and output contract.',
+      waitForCompletion:
+        'Wait for a delegated result when the next step depends on it. For background parallel work, wait for all required results before synthesis or implementation.',
     },
   } satisfies Record<Provider, ProviderDelegationGuidance>
 

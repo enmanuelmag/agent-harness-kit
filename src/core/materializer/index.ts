@@ -1,5 +1,6 @@
 import { ClaudeCodeMaterializer } from './claude-code'
 import { CodexCliMaterializer } from './codex-cli'
+import { CursorMaterializer } from './cursor'
 import { GrokMaterializer } from './grok'
 import { OpenCodeMaterializer } from './opencode'
 
@@ -29,6 +30,7 @@ export interface BuildMaterializerOptions {
    *  read this field — this cuts both ways, since `codex-cli.ts` likewise
    *  never reads `claudeAgentModels`. */
   codexAgentModels?: ScaffoldOptions['codexAgentModels']
+  cursorAgentModels?: ScaffoldOptions['cursorAgentModels']
 }
 
 export interface BuildReport {
@@ -57,6 +59,8 @@ export function getMaterializer(provider: Provider): Materializer {
       return new CodexCliMaterializer()
     case 'grok-cli':
       return new GrokMaterializer()
+    case 'cursor':
+      return new CursorMaterializer()
     default:
       throw new Error(`Unknown provider: ${provider as string}`)
   }

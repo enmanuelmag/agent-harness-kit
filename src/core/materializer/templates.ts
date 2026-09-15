@@ -6,12 +6,13 @@ import {
   claudeDisallowedTools,
   codexRestrictionNotice,
   codexSandboxMode,
+  cursorReadonly,
   grokToolsAllowlist,
   opencodePermissions,
 } from './agent-restrictions'
 
 import type { AgentName } from './agent-restrictions'
-import type { CodexAgentModelChoice, HarnessConfig } from '@/types'
+import type { CodexAgentModelChoice, CursorAgentModelChoice, HarnessConfig } from '@/types'
 
 // ─── Agent template loader ────────────────────────────────────────────────────
 
@@ -211,7 +212,6 @@ interface ConfigTemplateParams {
  * each variant can control its own import/export shape around it.
  */
 function configObjectBody(params: ConfigTemplateParams): string {
-
   // scope='global' — the sqlite file lives under
   // ~/.harness/dbs/<projectId>/ (see resolveGlobalStorageDir in db.ts), so
   // there is no local path to declare for either. Emitting a `sqlitePath`
@@ -281,7 +281,6 @@ function configObjectBody(params: ConfigTemplateParams): string {
  * not resolve would trade a type error for a fetch error.
  */
 function configObject(params: ConfigTemplateParams): Record<string, unknown> {
-
   return {
     project: {
       name: params.name,
@@ -708,6 +707,35 @@ export function translateFrontmatterForOpenCode(md: string, agentName: AgentName
   let result = stripFrontmatterBlockSequence(md, 'tools')
   result = stripFrontmatterBlockSequence(result, 'disallowedTools')
   return appendFrontmatterMapping(result, 'permission', opencodePermissions(agentName))
+}
+
+/** Cursor custom subagents use Markdown/YAML frontmatter. `readonly: true`
+ * restricts writes without a brittle allowlist, while omission keeps Builder
+ * fully capable and lets every role inherit available MCP tools. */
+export function translateFrontmatterForCursor(
+  md: string,
+  agentName: AgentName,
+  opts?: CursorAgentModelChoice
+): string {
+  let result = stripFrontmatterBlockSequence(md, 'tools')
+  result = stripFrontmatterBlockSequence(result, 'disallowedTools')
+  result = result.replace(/^readonly:\s*.*\n/m, '')
+  result = result.replace(/^model:\s*.*\n/m, '')
+  result = result.replace(
+    /^description: >\n  Use proactively when this role's responsibility applies\.\n/m,
+    'description: >\n'
+  )
+  result = result.replace(
+    /^description: >\n/m,
+    "description: >\n  Use proactively when this role's responsibility applies.\n"
+  )
+  if (opts?.model && opts.model !== 'inherit') {
+    result = appendFrontmatterScalar(result, 'model', opts.model)
+  }
+  if (cursorReadonly(agentName)) {
+    result = appendFrontmatterScalar(result, 'readonly', 'true')
+  }
+  return result
 }
 
 // ─── Grok Build frontmatter translation ──────────────────────────────────────

@@ -54,6 +54,12 @@ export function restrictionFor(agentName: AgentName): AgentRestriction {
   return AGENT_RESTRICTIONS[agentName] ?? 'no-write'
 }
 
+/** Cursor's native read-only flag is a deny-style restriction: it does not
+ * require enumerating permitted tools or MCP servers. */
+export function cursorReadonly(agentName: AgentName): boolean {
+  return restrictionFor(agentName) === 'no-write'
+}
+
 // ─── Claude Code ─────────────────────────────────────────────────────────────
 
 /**

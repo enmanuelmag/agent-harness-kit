@@ -11,6 +11,7 @@ const capabilities: Record<Provider, ResearchCapabilities> = {
   opencode: { context7: true, mintlifyIndex: true, webSearch: true },
   'codex-cli': { context7: true, mintlifyIndex: false, webSearch: true },
   'grok-cli': { context7: true, mintlifyIndex: false, webSearch: true },
+  cursor: { context7: true, mintlifyIndex: true, webSearch: true },
 }
 
 export function getResearchCapabilities(provider: Provider): ResearchCapabilities {

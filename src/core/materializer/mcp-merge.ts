@@ -45,6 +45,18 @@ export function mergeClaudeMcpJson(
   writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n', 'utf8')
 }
 
+/** Cursor's project-scoped MCP schema is JSON and matches the stdio shape it
+ * documents for `.cursor/mcp.json`. Merge only our named server so user-owned
+ * servers and fields survive rebuilds. */
+export function mergeCursorMcpJson(
+  filePath: string,
+  port: number,
+  cwd: string,
+  pm: PackageManager = 'npm'
+): void {
+  mergeClaudeMcpJson(filePath, port, cwd, pm)
+}
+
 // Write `agent: "lead"` to .claude/settings.json — the correct Claude Code field
 // for setting which subagent runs as the main session thread.
 export function mergeClaudeSettingsJson(filePath: string): void {
