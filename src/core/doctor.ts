@@ -47,7 +47,15 @@ const TIMEOUT_MS = 2000
 const LIB_VERSION_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const AGENT_NAMES = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 export type AgentName = (typeof AGENT_NAMES)[number]
-const SKILL_NAMES = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test', 'ahk-use-cases', 'ahk-use-case-tech'] as const
+const SKILL_NAMES = [
+  'ahk-ask',
+  'ahk-consultant',
+  'ahk-triage',
+  'ahk-review',
+  'ahk-test',
+  'ahk-use-cases',
+  'ahk-use-case-tech',
+] as const
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -120,6 +128,8 @@ function getProviderAgentInfo(provider: string): {
       return { agentsDir: '.codex/agents', ext: '.toml' }
     case 'grok-cli':
       return { agentsDir: '.grok/agents', ext: '.md' }
+    case 'cursor':
+      return { agentsDir: '.cursor/agents', ext: '.md' }
     default:
       return { agentsDir: '.claude/agents', ext: '.md' }
   }
@@ -155,6 +165,8 @@ function getProviderSkillsDir(provider: string): string {
       return '.agents/skills'
     case 'grok-cli':
       return '.grok/skills'
+    case 'cursor':
+      return '.cursor/skills'
     default:
       return '.claude/skills'
   }

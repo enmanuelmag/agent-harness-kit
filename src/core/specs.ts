@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs'
 import { join, resolve } from 'node:path'
 
 export const SPEC_KINDS = ['use-case', 'technical'] as const
@@ -61,7 +68,8 @@ const inverse: Record<Relationship, Relationship> = {
 }
 
 function ensureSlug(value: string, field = 'slug'): string {
-  if (!SLUG.test(value)) throw new Error(`${field} must be lowercase letters, numbers, and single hyphens`)
+  if (!SLUG.test(value))
+    throw new Error(`${field} must be lowercase letters, numbers, and single hyphens`)
   return value
 }
 
@@ -87,7 +95,8 @@ function parseScalar(value: string): string {
 
 function statusFor(kind: SpecKind, status: string): SpecStatus {
   const permitted = kind === 'use-case' ? USE_CASE_STATUSES : TECHNICAL_STATUSES
-  if (!permitted.includes(status as never)) throw new Error(`status '${status}' is invalid for ${kind}`)
+  if (!permitted.includes(status as never))
+    throw new Error(`status '${status}' is invalid for ${kind}`)
   return status as SpecStatus
 }
 
@@ -100,7 +109,8 @@ function parseMetadata(header: string): SpecMetadata {
     if (!raw.trim()) continue
     const relationStart = raw.match(/^\s{2}-\s+slug:\s*(.+)$/)
     if (relationStart) {
-      if (pending?.slug || pending?.relationship) throw new Error('related_specs entry is incomplete')
+      if (pending?.slug || pending?.relationship)
+        throw new Error('related_specs entry is incomplete')
       pending = { slug: parseScalar(relationStart[1]) }
       continue
     }
@@ -108,7 +118,8 @@ function parseMetadata(header: string): SpecMetadata {
     if (relationField) {
       if (!pending?.slug) throw new Error('related_specs relationship must follow a slug')
       const relationship = parseScalar(relationField[1]) as Relationship
-      if (!RELATIONSHIPS.includes(relationship)) throw new Error(`invalid relationship '${relationship}'`)
+      if (!RELATIONSHIPS.includes(relationship))
+        throw new Error(`invalid relationship '${relationship}'`)
       relations.push({ slug: ensureSlug(pending.slug, 'related_specs.slug'), relationship })
       pending = null
       continue
@@ -131,13 +142,16 @@ function parseMetadata(header: string): SpecMetadata {
     'last_updated',
     'source_spec',
   ])
-  for (const field of values.keys()) if (!known.has(field)) throw new Error(`unsupported frontmatter field '${field}'`)
+  for (const field of values.keys())
+    if (!known.has(field)) throw new Error(`unsupported frontmatter field '${field}'`)
 
   const specKind = asString(values.get('spec_kind'), 'spec_kind') as SpecKind
   if (!SPEC_KINDS.includes(specKind)) throw new Error(`invalid spec_kind '${specKind}'`)
   const sourceSpec = values.get('source_spec')
-  if (specKind === 'technical' && !sourceSpec) throw new Error('source_spec is required for technical specs')
-  if (specKind === 'use-case' && sourceSpec) throw new Error('source_spec is only valid for technical specs')
+  if (specKind === 'technical' && !sourceSpec)
+    throw new Error('source_spec is required for technical specs')
+  if (specKind === 'use-case' && sourceSpec)
+    throw new Error('source_spec is only valid for technical specs')
   return {
     slug: ensureSlug(asString(values.get('slug'), 'slug')),
     title: asString(values.get('title'), 'title'),
@@ -211,7 +225,8 @@ export class SpecStore {
     const path = this.path(slug)
     if (!existsSync(path)) throw new Error(`spec '${slug}' was not found`)
     const document = parseDocument(readFileSync(path, 'utf8'))
-    if (document.metadata.slug !== slug) throw new Error(`spec filename and slug disagree for '${slug}'`)
+    if (document.metadata.slug !== slug)
+      throw new Error(`spec filename and slug disagree for '${slug}'`)
     return document
   }
 
@@ -223,7 +238,9 @@ export class SpecStore {
       .map((file) => this.get(file.slice(0, -3)))
   }
 
-  create(input: Omit<SpecMetadata, 'createdAt' | 'lastUpdated'> & { content: string }): SpecDocument {
+  create(
+    input: Omit<SpecMetadata, 'createdAt' | 'lastUpdated'> & { content: string }
+  ): SpecDocument {
     ensureSlug(input.slug)
     if (existsSync(this.path(input.slug))) throw new Error(`spec '${input.slug}' already exists`)
     if (input.specKind === 'technical') this.requireApprovedSource(input.sourceSpec)
@@ -236,7 +253,10 @@ export class SpecStore {
     return document
   }
 
-  updateMetadata(slug: string, changes: Partial<Omit<SpecMetadata, 'slug' | 'createdAt'>>): SpecDocument {
+  updateMetadata(
+    slug: string,
+    changes: Partial<Omit<SpecMetadata, 'slug' | 'createdAt'>>
+  ): SpecDocument {
     const document = this.get(slug)
     const metadata = { ...document.metadata, ...changes, lastUpdated: now() }
     if (metadata.specKind === 'technical') this.requireApprovedSource(metadata.sourceSpec)
@@ -271,7 +291,8 @@ export class SpecStore {
     const source = this.get(slug)
     const target = this.get(targetSlug)
     if (slug === targetSlug) throw new Error('a spec cannot relate to itself')
-    if (!RELATIONSHIPS.includes(relationship)) throw new Error(`invalid relationship '${relationship}'`)
+    if (!RELATIONSHIPS.includes(relationship))
+      throw new Error(`invalid relationship '${relationship}'`)
     this.addRelation(source, { slug: targetSlug, relationship })
     this.addRelation(target, { slug, relationship: inverse[relationship] })
     source.metadata.lastUpdated = now()
@@ -301,16 +322,22 @@ export class SpecStore {
     const errors: string[] = []
     for (const document of documents) {
       const { metadata } = document
-      if (metadata.sourceSpec && !known.has(metadata.sourceSpec)) errors.push(`${metadata.slug}: source_spec is missing`)
+      if (metadata.sourceSpec && !known.has(metadata.sourceSpec))
+        errors.push(`${metadata.slug}: source_spec is missing`)
       for (const relation of metadata.relatedSpecs) {
-        if (!known.has(relation.slug)) errors.push(`${metadata.slug}: related spec '${relation.slug}' is missing`)
+        if (!known.has(relation.slug))
+          errors.push(`${metadata.slug}: related spec '${relation.slug}' is missing`)
       }
     }
     return errors
   }
 
   private addRelation(document: SpecDocument, relation: SpecRelation): void {
-    if (!document.metadata.relatedSpecs.some((entry) => entry.slug === relation.slug && entry.relationship === relation.relationship)) {
+    if (
+      !document.metadata.relatedSpecs.some(
+        (entry) => entry.slug === relation.slug && entry.relationship === relation.relationship
+      )
+    ) {
       document.metadata.relatedSpecs.push(relation)
     }
   }
@@ -326,7 +353,10 @@ export class SpecStore {
   private invalidateTechnicalSpecs(changed: SpecMetadata): void {
     if (changed.specKind !== 'use-case' || changed.status !== 'approved') return
     for (const candidate of this.list()) {
-      if (candidate.metadata.specKind === 'technical' && candidate.metadata.sourceSpec === changed.slug) {
+      if (
+        candidate.metadata.specKind === 'technical' &&
+        candidate.metadata.sourceSpec === changed.slug
+      ) {
         candidate.metadata.status = 'needs-reconciliation'
         candidate.metadata.lastUpdated = now()
         this.write(candidate)

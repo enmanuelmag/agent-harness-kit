@@ -183,8 +183,20 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
 
   const storage: HarnessConfig['storage'] =
     scope === 'global'
-      ? ({ ...baseStorage, ...storageOverrides, tasks: { adapter: 'mcp' }, scope: 'global', projectId } as HarnessConfig['storage'])
-      : ({ ...baseStorage, ...storageOverrides, tasks: { adapter: 'mcp' }, scope: 'local', projectId } as HarnessConfig['storage'])
+      ? ({
+          ...baseStorage,
+          ...storageOverrides,
+          tasks: { adapter: 'mcp' },
+          scope: 'global',
+          projectId,
+        } as HarnessConfig['storage'])
+      : ({
+          ...baseStorage,
+          ...storageOverrides,
+          tasks: { adapter: 'mcp' },
+          scope: 'local',
+          projectId,
+        } as HarnessConfig['storage'])
 
   return {
     ...(normalized as unknown as HarnessConfig),
