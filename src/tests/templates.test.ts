@@ -6,7 +6,7 @@ import { describe, test } from 'node:test'
 
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { getDoctorStatus } from '@/core/doctor'
-import { grokToolsAllowlist } from '@/core/materializer/agent-restrictions'
+import { cursorReadonly, grokToolsAllowlist } from '@/core/materializer/agent-restrictions'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { getMaterializer } from '@/core/materializer/index'
 import {
@@ -14,6 +14,7 @@ import {
   mergeClaudeMcpJson,
   mergeClaudeSettingsLocalJson,
   mergeCodexConfigToml,
+  mergeCursorMcpJson,
   mergeGrokConfigToml,
   mergeOpencodeJson,
 } from '@/core/materializer/mcp-merge'
@@ -38,6 +39,7 @@ import {
   configMjs,
   configTs,
   translateFrontmatterForClaudeCode,
+  translateFrontmatterForCursor,
   translateFrontmatterForGrok,
   translateFrontmatterForOpenCode,
 } from '@/core/materializer/templates'
@@ -125,6 +127,24 @@ describe('mergeClaudeMcpJson', () => {
     const entry = parsed.mcpServers['agent-harness-kit']
     assert.equal(entry.command, 'bunx')
     assert.deepEqual(entry.args, ['--no-install', 'ahk', 'serve', '--port', '3456'])
+    teardown()
+  })
+})
+
+describe('mergeCursorMcpJson', () => {
+  test('creates Cursor project MCP config and preserves other servers', () => {
+    setupLocalInstall()
+    const path = join(TMP, '.cursor/mcp.json')
+    mkdirSync(join(TMP, '.cursor'), { recursive: true })
+    writeFileSync(path, JSON.stringify({ mcpServers: { other: { command: 'other' } } }))
+    mergeCursorMcpJson(path, 3456, TMP)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    assert.ok(parsed.mcpServers.other)
+    assert.deepEqual(parsed.mcpServers['agent-harness-kit'], {
+      type: 'stdio',
+      command: 'npx',
+      args: ['--no', 'ahk', 'serve', '--port', '3456'],
+    })
     teardown()
   })
 })
@@ -494,10 +514,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
   })
 })
 
-describe('featureListJson', () => {
-
-
-})
+describe('featureListJson', () => {})
 
 describe('translateFrontmatterForOpenCode — permission translation', () => {
   test('restricted role emits permission: { edit: deny } and no tools key', () => {
@@ -541,6 +558,32 @@ describe('translateFrontmatterForOpenCode — permission translation', () => {
     assert.ok(result.includes('name: explorer'))
     assert.ok(result.includes('description: some desc'))
     assert.ok(result.includes('# Body content'))
+  })
+})
+
+describe('translateFrontmatterForCursor — readonly deny-style translation', () => {
+  test('sets readonly without a tools allowlist for no-write roles', () => {
+    const result = translateFrontmatterForCursor(
+      '---\nname: explorer\ndescription: >\n  Explore the codebase.\n---\n\n# Body\n',
+      'explorer',
+      { model: 'claude-opus-5[effort=high]' }
+    )
+    assert.ok(result.includes('readonly: true'))
+    assert.ok(result.includes('model: claude-opus-5[effort=high]'))
+    assert.ok(result.includes("Use proactively when this role's responsibility applies."))
+    assert.ok(!result.includes('tools:'))
+  })
+  test('keeps builder unrestricted', () => {
+    const result = translateFrontmatterForCursor(
+      '---\nname: builder\nreadonly: true\n---\n\n# Body\n',
+      'builder'
+    )
+    assert.ok(!result.includes('readonly:'))
+    assert.ok(!result.includes('tools:'))
+  })
+  test('matches role restriction policy', () => {
+    assert.equal(cursorReadonly('lead'), true)
+    assert.equal(cursorReadonly('builder'), false)
   })
 })
 
@@ -657,8 +700,6 @@ describe('configTs', () => {
 
   // ─── scope-conditional shape (task #56) ────────────────────────────────
 
-
-
   test('never emits database.path, regardless of scope', () => {
     for (const scope of ['local', 'global'] as const) {
       const out = configTs({ ...base, scope })
@@ -677,9 +718,7 @@ describe('configTs', () => {
   })
 })
 
-describe('configTs — loads without the package resolvable in node_modules', () => {
-
-})
+describe('configTs — loads without the package resolvable in node_modules', () => {})
 
 describe('defineHarness — retrocompatibility with the value-import shape', () => {
   test('a hand-written config using `import { defineHarness }` still loads via loadConfig()', async () => {
@@ -724,8 +763,6 @@ describe('configCjs', () => {
   })
 
   // ─── scope-conditional shape (task #56) ────────────────────────────────
-
-
 
   test('description with apostrophe produces valid JS', () => {
     const desc = "it's a playground"
@@ -803,8 +840,6 @@ describe('configJson', () => {
     assert.equal(cfg.storage.projectId, 'abc-123')
   })
 
-
-
   test('never emits database.path, regardless of scope', () => {
     for (const scope of ['local', 'global'] as const) {
       const cfg = parse(configJson({ ...base, scope }))
@@ -872,9 +907,6 @@ describe('configJson', () => {
 })
 
 describe('configJson — loaded by loadConfig()', () => {
-
-
-
   test('a malformed .json config fails with a message naming the file', async () => {
     const dir = join(TMP, 'json-config-malformed')
     mkdirSync(dir, { recursive: true })
@@ -889,7 +921,6 @@ describe('configJson — loaded by loadConfig()', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
-
 })
 
 // ─── no generated model line by default (replaces the task-43 model-
@@ -1017,11 +1048,7 @@ describe('agent*Toml — per-role model + effort injection', () => {
 // task #81: codexAgentFiles (exported from codex-cli.ts, mirroring
 // claudeAgentFiles) is the pure entry point `ahk init`/tests use — no
 // @clack/prompts mocking anywhere in this repo (see models.test.ts).
-describe('codexAgentFiles — direct export, per-role model+effort map', () => {
-
-
-
-})
+describe('codexAgentFiles — direct export, per-role model+effort map', () => {})
 
 describe('translateFrontmatterForClaudeCode — no model line by default', () => {
   const input = `---\nname: explorer\ndescription: some desc\n---\n\n# Body content\n`
@@ -1677,10 +1704,13 @@ describe('ahk-test — doctor states', () => {
     const dir = makeTmp('resource-missing')
     try {
       await buildProject(dir, 'opencode')
-      rmSync(resourcePathForProvider(dir, 'opencode', 'ahk-use-cases/resources/discovery-workflow.md'))
+      rmSync(
+        resourcePathForProvider(dir, 'opencode', 'ahk-use-cases/resources/discovery-workflow.md')
+      )
       const status = await getDoctorStatus(dir)
       assert.equal(
-        status.skills.find((s) => s.name === 'ahk-use-cases/resources/discovery-workflow.md')?.status,
+        status.skills.find((s) => s.name === 'ahk-use-cases/resources/discovery-workflow.md')
+          ?.status,
         'missing'
       )
     } finally {
@@ -1700,15 +1730,14 @@ describe('ahk-test — doctor states', () => {
       writeFileSync(resource, readFileSync(resource, 'utf8') + '\n<!-- tampered -->\n', 'utf8')
       const status = await getDoctorStatus(dir)
       assert.equal(
-        status.skills.find((s) => s.name === 'ahk-use-case-tech/resources/technical-template.md')?.status,
+        status.skills.find((s) => s.name === 'ahk-use-case-tech/resources/technical-template.md')
+          ?.status,
         'outdated'
       )
     } finally {
       cleanup()
     }
   })
-
-
 })
 
 describe('ahk-test — content assertions on essential contract phrases', () => {
@@ -1791,7 +1820,15 @@ describe('ahk-test — regression: four existing skills still present and matchi
     rmSync(TMP_REG, { recursive: true, force: true })
   }
 
-  const ALL_SKILLS = ['ahk-ask', 'ahk-consultant', 'ahk-triage', 'ahk-review', 'ahk-test', 'ahk-use-cases', 'ahk-use-case-tech']
+  const ALL_SKILLS = [
+    'ahk-ask',
+    'ahk-consultant',
+    'ahk-triage',
+    'ahk-review',
+    'ahk-test',
+    'ahk-use-cases',
+    'ahk-use-case-tech',
+  ]
 
   for (const skillName of ALL_SKILLS) {
     test(`${skillName}: materialized by all four providers`, () => {

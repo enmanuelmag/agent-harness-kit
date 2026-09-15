@@ -32,10 +32,7 @@ test('generated agent instructions require MCP repair when unavailable', () => {
 
 test('init, build, and storage migration contain no task/session mirror writers', () => {
   const root = process.cwd()
-  const forbidden = [
-    'feature' + '_list.json',
-    'current' + '.md',
-  ]
+  const forbidden = ['feature' + '_list.json', 'current' + '.md']
   const files = [
     'src/commands/init.ts',
     'src/core/materializer/claude-code.ts',

@@ -59,6 +59,14 @@ describe('delegation guidance', () => {
       assert.ok(result.includes('Inspect Progress'))
     })
 
+    it('uses Cursor custom-subagent guidance without invented status commands', () => {
+      const result = renderDelegationGuidance('cursor', 'lead')
+      assert.ok(result.includes('/<role-name>'))
+      assert.ok(result.includes('scopes do not overlap'))
+      assert.ok(!result.includes('/tasks'))
+      assert.ok(!result.includes('/agent'))
+    })
+
     it('returns empty string for unknown provider', () => {
       // @ts-expect-error - testing invalid provider
       const result = renderDelegationGuidance('unknown-provider', 'lead')
@@ -226,7 +234,10 @@ describe('coordination skill injection', () => {
         'ahk-use-case-tech',
       ]) {
         const result = readFileSync(join(tmpDir, '.skills', skillName, 'SKILL.md'), 'utf8')
-        assert.ok(result.includes('## Provider Delegation Guidance'), `${skillName} should contain guidance`)
+        assert.ok(
+          result.includes('## Provider Delegation Guidance'),
+          `${skillName} should contain guidance`
+        )
         assert.ok(result.includes(guidance), `${skillName} should contain rendered guidance`)
       }
 

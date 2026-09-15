@@ -268,7 +268,10 @@ describe('getInstallCommandParts', () => {
     })
 
     test(`${pm}: global install → ${globalInstall[pm].join(' ')} (dev flag ignored)`, () => {
-      assert.deepEqual(getInstallCommandParts(pm, TARGET, { global: true, dev: true }), globalInstall[pm])
+      assert.deepEqual(
+        getInstallCommandParts(pm, TARGET, { global: true, dev: true }),
+        globalInstall[pm]
+      )
       assert.deepEqual(getInstallCommandParts(pm, TARGET, { global: true }), globalInstall[pm])
     })
   }

@@ -11,7 +11,11 @@ import { getMaterializer } from '@/core/materializer'
 test('init/build lifecycle stores a task in the MCP database without task/session mirror files', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'ahk-mcp-only-'))
   const config = applyConfigDefaults({
-    name: 'test', description: 'test', provider: 'claude-code', docsPath: './docs', tasksAdapter: 'mcp',
+    name: 'test',
+    description: 'test',
+    provider: 'claude-code',
+    docsPath: './docs',
+    tasksAdapter: 'mcp',
   })
   const forbidden = ['feature' + '_list.json', 'current' + '.md']
   try {

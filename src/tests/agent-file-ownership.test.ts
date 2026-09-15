@@ -84,6 +84,11 @@ const PROVIDERS: { provider: Provider; dir: string; files: string[] }[] = [
     dir: '.grok/agents',
     files: ['lead.md', 'explorer.md', 'consultant.md', 'builder.md', 'reviewer.md'],
   },
+  {
+    provider: 'cursor',
+    dir: '.cursor/agents',
+    files: ['lead.md', 'explorer.md', 'consultant.md', 'builder.md', 'reviewer.md'],
+  },
 ]
 
 for (const { provider, dir, files } of PROVIDERS) {

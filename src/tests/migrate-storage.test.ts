@@ -406,7 +406,6 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     assert.equal(state?.dbType, 'sqlite')
   })
 
-
   test('case: global -> local scope migration moves data back', async () => {
     const projectDir = join(TMP_CMD, 'global-to-local')
     const globalConfig = baseConfig({

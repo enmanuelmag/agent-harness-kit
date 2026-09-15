@@ -30,8 +30,7 @@ function writeRawConfig(dir: string, objectLiteral: string): void {
 // with a console.warn, rather than crashing or silently keeping the
 // contradictory fields.
 
-describe('loadConfig — legacy contradictory storage shape (scope=global + local-only path fields)', () => {
-})
+describe('loadConfig — legacy contradictory storage shape (scope=global + local-only path fields)', () => {})
 
 // ─── applyDefaults() removed agent path fields (task #59) ──────────────────
 //
@@ -69,7 +68,6 @@ function captureWarnings(
  * the old path fields on purpose, so the same legacy config that motivated the
  * original suite is still exercised end to end. */
 describe('loadConfig — removed `agents` key', () => {
-
   /* Rewritten, not deleted. This test used to assert that `model` and `custom`
    * SURVIVED the per-field strip. With the whole key removed the assertion
    * inverts: nothing under `agents` survives. Keeping the test (and its

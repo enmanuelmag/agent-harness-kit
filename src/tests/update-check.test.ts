@@ -55,7 +55,10 @@ describe('printUpdateMessage', () => {
     const dir = makeTmp('global-only')
 
     const out = captureLog(() => printUpdateMessage(INFO, dir))
-    assert.ok(out.includes(`npm install -g ${TARGET}`), `expected "npm install -g ${TARGET}" in:\n${out}`)
+    assert.ok(
+      out.includes(`npm install -g ${TARGET}`),
+      `expected "npm install -g ${TARGET}" in:\n${out}`
+    )
     cleanTmp()
   })
 
@@ -64,7 +67,10 @@ describe('printUpdateMessage', () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: pkg.name }))
 
     const out = captureLog(() => printUpdateMessage(INFO, dir))
-    assert.ok(out.includes(`npm install -g ${TARGET}`), `expected "npm install -g ${TARGET}" in:\n${out}`)
+    assert.ok(
+      out.includes(`npm install -g ${TARGET}`),
+      `expected "npm install -g ${TARGET}" in:\n${out}`
+    )
     cleanTmp()
   })
 
