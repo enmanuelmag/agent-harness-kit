@@ -119,7 +119,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
 - **Health gate** — agents must run `health.sh` and get a green exit before starting or closing any task. You define what "healthy" means.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
-- **Specification discovery** — `ahk-use-cases` turns an agreed product conversation into an iterative, non-technical Markdown spec in `docs/specs/`; `ahk-use-case-tech` creates a linked technical spec only after the source use case is approved.
+- **Specification discovery** — `ahk-use-cases`, `ahk-feature`, and `ahk-fix` turn product requests, Jira ideas, and defects into reviewable drafts in `docs/specs/`. `ahk-use-case-tech` creates a linked technical draft only after an approved use case, feature, or fix; MCP can search, read, edit, relate, validate, and approve the documents.
 - **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
 - **Global installation** — `ahk init` can scaffold the harness into your home directory (`~/.claude` or `~/.config/opencode`) to share it across all projects.
 - **Input validation** — CLI prompts validate all inputs (name length, path format, task title, etc.) and retry with the error message instead of silently accepting bad values.
