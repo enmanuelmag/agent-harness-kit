@@ -8,7 +8,8 @@ import {
 } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-export const SPEC_KINDS = ['use-case', 'technical'] as const
+export const SPEC_KINDS = ['use-case', 'feature', 'fix', 'technical'] as const
+export const PRODUCT_SPEC_KINDS = ['use-case', 'feature', 'fix'] as const
 export const USE_CASE_STATUSES = ['draft', 'needs-decision', 'approved', 'superseded'] as const
 export const TECHNICAL_STATUSES = [
   'draft',
@@ -54,6 +55,11 @@ export interface SpecDocument {
   content: string
 }
 
+export interface SpecSearchResult {
+  document: SpecDocument
+  excerpt: string
+}
+
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const inverse: Record<Relationship, Relationship> = {
   'depends-on': 'required-by',
@@ -94,7 +100,9 @@ function parseScalar(value: string): string {
 }
 
 function statusFor(kind: SpecKind, status: string): SpecStatus {
-  const permitted = kind === 'use-case' ? USE_CASE_STATUSES : TECHNICAL_STATUSES
+  const permitted = PRODUCT_SPEC_KINDS.includes(kind as (typeof PRODUCT_SPEC_KINDS)[number])
+    ? USE_CASE_STATUSES
+    : TECHNICAL_STATUSES
   if (!permitted.includes(status as never))
     throw new Error(`status '${status}' is invalid for ${kind}`)
   return status as SpecStatus
@@ -150,7 +158,7 @@ function parseMetadata(header: string): SpecMetadata {
   const sourceSpec = values.get('source_spec')
   if (specKind === 'technical' && !sourceSpec)
     throw new Error('source_spec is required for technical specs')
-  if (specKind === 'use-case' && sourceSpec)
+  if (specKind !== 'technical' && sourceSpec)
     throw new Error('source_spec is only valid for technical specs')
   return {
     slug: ensureSlug(asString(values.get('slug'), 'slug')),
@@ -236,6 +244,20 @@ export class SpecStore {
       .filter((file) => file.endsWith('.md'))
       .sort()
       .map((file) => this.get(file.slice(0, -3)))
+  }
+
+  search(query: string): SpecSearchResult[] {
+    const needle = asString(query, 'query').toLowerCase()
+    return this.list().flatMap((document) => {
+      const haystack = `${document.metadata.slug}\n${document.metadata.title}\n${document.metadata.description}\n${document.content}`
+      const index = haystack.toLowerCase().indexOf(needle)
+      if (index < 0) return []
+      const excerpt = haystack
+        .slice(Math.max(0, index - 80), Math.min(haystack.length, index + needle.length + 160))
+        .replace(/\s+/g, ' ')
+        .trim()
+      return [{ document, excerpt }]
+    })
   }
 
   create(
@@ -345,13 +367,20 @@ export class SpecStore {
   private requireApprovedSource(sourceSpec: string | undefined): void {
     if (!sourceSpec) throw new Error('source_spec is required for technical specs')
     const source = this.get(sourceSpec)
-    if (source.metadata.specKind !== 'use-case' || source.metadata.status !== 'approved') {
-      throw new Error(`source_spec '${sourceSpec}' must be an approved use-case spec`)
+    if (
+      !PRODUCT_SPEC_KINDS.includes(source.metadata.specKind as (typeof PRODUCT_SPEC_KINDS)[number]) ||
+      source.metadata.status !== 'approved'
+    ) {
+      throw new Error(`source_spec '${sourceSpec}' must be an approved use-case, feature, or fix spec`)
     }
   }
 
   private invalidateTechnicalSpecs(changed: SpecMetadata): void {
-    if (changed.specKind !== 'use-case' || changed.status !== 'approved') return
+    if (
+      !PRODUCT_SPEC_KINDS.includes(changed.specKind as (typeof PRODUCT_SPEC_KINDS)[number]) ||
+      changed.status !== 'approved'
+    )
+      return
     for (const candidate of this.list()) {
       if (
         candidate.metadata.specKind === 'technical' &&

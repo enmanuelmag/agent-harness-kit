@@ -344,6 +344,8 @@ export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?:
     'ahk-test',
     'ahk-use-cases',
     'ahk-use-case-tech',
+    'ahk-feature',
+    'ahk-fix',
   ]
   for (const skillName of skillNames) {
     const srcDir = join(__dirname, 'skills', skillName)

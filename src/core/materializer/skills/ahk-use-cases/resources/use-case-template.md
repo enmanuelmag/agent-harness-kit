@@ -1,13 +1,14 @@
 # Use-case template
 
 ```md
+## Origin and initial request
 ## Problem and value
-## Actors and context
+## Actors and project context evidence
 ## Scope and exclusions
 ## Current and desired flows
 ## Main flow, alternatives, and failures
-## Rules, assumptions, risks, and dependencies
+## Rules, risks, and dependencies
 ## Acceptance criteria
-## Open decisions
+## Confirmed decisions, assumptions, and open questions
 ## Change log
 ```

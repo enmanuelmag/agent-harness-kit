@@ -1,11 +1,11 @@
 ---
 name: ahk-use-case-tech
-description: Turn an approved use-case specification into a linked, evidence-backed technical specification.
+description: Turn an approved use-case, feature, or fix into a linked, evidence-backed technical specification.
 ---
 
 ## Entry gate
 
-Start by locating the requested use-case with `specs.list` and reading it with `specs.get`. Stop if it is not an `approved` `use-case`; help resolve it with `ahk-use-cases` first.
+Start by locating the requested source with `specs.list` or `specs.search` and reading it with `specs.get`. Stop unless it is an approved `use-case`, `feature`, or `fix`; help resolve it with the corresponding discovery skill first.
 
 Read [the technical workflow](resources/technical-workflow.md) before analysis and [the technical template](resources/technical-template.md) before saving.
 
@@ -17,4 +17,4 @@ Inspect the relevant codebase before proposing technical work. For every library
 
 Define affected boundaries, contracts and data flow, alternatives and rationale, compatibility findings, dependencies, rollout or migration, risks, validation, and a phased implementation plan. Link related specifications with `specs.link`; use `depends-on`, `extends`, `supersedes`, `conflicts-with`, or `informs` precisely.
 
-Present the technical proposal for user approval before writing it. Once approved, create or update a `technical` specification through structured MCP tools with `sourceSpec` pointing to the approved use-case, then run `specs.validate`. A technical spec that is `needs-reconciliation` must not be used as an implementation plan until reconciled and approved again.
+After the technical investigation produces a complete first synthesis, create or update a `technical` draft through structured MCP tools with `sourceSpec` pointing to the approved source, then run `specs.validate`. Keep the draft reviewable and editable through MCP; transition it to `approved` only after explicit user confirmation. A technical spec that is `needs-reconciliation` must not be used as an implementation plan until reconciled and approved again.

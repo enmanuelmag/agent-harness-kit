@@ -57,6 +57,21 @@ const SPEC_TOOLS = [
     },
   },
   {
+    name: 'specs.search',
+    description: 'Search specification metadata and body content with bounded excerpts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        specKind: { type: 'string', enum: SPEC_KINDS },
+        status: { type: 'string' },
+        offset: { type: 'number' },
+        limit: { type: 'number' },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'specs.related',
     description: 'List related specification headers and edges without their bodies.',
     inputSchema: {
@@ -651,6 +666,30 @@ export async function dispatch(
           content,
           truncated: nextOffset < document.content.length,
           nextOffset: nextOffset < document.content.length ? nextOffset : null,
+        })
+      )
+    }
+    case 'specs.search': {
+      const specKind = optionalStr(args, 'specKind')
+      if (specKind && !SPEC_KINDS.includes(specKind as SpecKind))
+        throw new Error(`invalid specKind '${specKind}'`)
+      const status = optionalStr(args, 'status')
+      const offset = boundedInt(args, 'offset', 0, 0, Number.MAX_SAFE_INTEGER)
+      const limit = boundedInt(args, 'limit', 50, 1, 100)
+      const matches = specs
+        .search(str(args, 'query'))
+        .filter(
+          ({ document }) =>
+            (!specKind || document.metadata.specKind === specKind) &&
+            (!status || document.metadata.status === status)
+        )
+      return ok(
+        JSON.stringify({
+          items: matches.slice(offset, offset + limit).map(({ document, excerpt }) => ({
+            metadata: document.metadata,
+            excerpt,
+          })),
+          nextOffset: offset + limit < matches.length ? offset + limit : null,
         })
       )
     }

@@ -15,7 +15,7 @@ Ask one follow-up question at a time. Establish the user and their goal, current
 
 ## Save and iterate
 
-When the user explicitly asks to save the agreed result, use the specification MCP tools. Create or update `docs/specs/<slug>.md` through structured tools only. Use `specs.list` before creating, `specs.get` for the selected specification, and `specs.validate` after every write. A use-case becomes `approved` only after the user explicitly approves it.
+After the required questions and project evidence produce a complete first synthesis, create or update a `use-case` draft through structured specification MCP tools. Use `specs.list` and `specs.search` to find related documents, `specs.get` for the selected specification, and `specs.validate` after every write. Keep the draft reviewable and editable through MCP; it becomes `approved` only after the user explicitly approves it.
 
 If the user changes an approved use-case, explain the affected technical specifications, update the use-case, and let the MCP transition linked technical specs to `needs-reconciliation`. Keep the conversation iterative; later messages refine the same specification unless the user clearly starts another initiative.
 

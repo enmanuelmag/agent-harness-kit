@@ -55,6 +55,8 @@ const SKILL_NAMES = [
   'ahk-test',
   'ahk-use-cases',
   'ahk-use-case-tech',
+  'ahk-feature',
+  'ahk-fix',
 ] as const
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
