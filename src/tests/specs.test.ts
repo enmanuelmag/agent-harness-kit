@@ -27,6 +27,22 @@ function createUseCase(
     content: '# Goal\nExport.',
   })
 }
+function createProductSpec(
+  specs: SpecStore,
+  specKind: 'feature' | 'fix',
+  slug: string,
+  status: 'draft' | 'approved' = 'approved'
+) {
+  return specs.create({
+    slug,
+    title: `${specKind} specification`,
+    description: `${specKind} context`,
+    specKind,
+    status,
+    relatedSpecs: [],
+    content: `# ${specKind}\nBody-only searchable evidence.`,
+  })
+}
 afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true })
 })
@@ -83,5 +99,50 @@ describe('filesystem specifications', () => {
     specs.updateContent('source', 'changed')
     assert.equal(specs.get('source').metadata.status, 'needs-decision')
     assert.equal(specs.get('source-tech').metadata.status, 'needs-reconciliation')
+  })
+
+  test('accepts approved feature and fix sources, invalidates their technical work, and searches bodies', () => {
+    const specs = store()
+    for (const kind of ['feature', 'fix'] as const) {
+      const slug = `${kind}-source`
+      createProductSpec(specs, kind, slug)
+      specs.create({
+        slug: `${slug}-tech`,
+        title: `${kind} technical`,
+        description: 'Technical design',
+        specKind: 'technical',
+        status: 'draft',
+        sourceSpec: slug,
+        relatedSpecs: [],
+        content: '',
+      })
+      specs.updateContent(slug, 'updated body')
+      assert.equal(specs.get(slug).metadata.status, 'needs-decision')
+      assert.equal(specs.get(`${slug}-tech`).metadata.status, 'needs-reconciliation')
+    }
+    createProductSpec(specs, 'feature', 'searchable-feature')
+    assert.deepEqual(
+      specs.search('searchable evidence').map(({ document }) => document.metadata.slug),
+      ['searchable-feature']
+    )
+  })
+
+  test('rejects a technical specification sourced from an unapproved feature', () => {
+    const specs = store()
+    createProductSpec(specs, 'feature', 'unapproved-feature', 'draft')
+    assert.throws(
+      () =>
+        specs.create({
+          slug: 'unapproved-feature-tech',
+          title: 'Technical design',
+          description: 'Technical design',
+          specKind: 'technical',
+          status: 'draft',
+          sourceSpec: 'unapproved-feature',
+          relatedSpecs: [],
+          content: '',
+        }),
+      /must be an approved/
+    )
   })
 })

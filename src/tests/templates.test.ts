@@ -1518,6 +1518,10 @@ describe('ahk-test — skill materialization across all providers', () => {
     'ahk-use-cases/resources/use-case-template.md',
     'ahk-use-case-tech/resources/technical-template.md',
     'ahk-use-case-tech/resources/technical-workflow.md',
+    'ahk-feature/resources/feature-workflow.md',
+    'ahk-feature/resources/feature-template.md',
+    'ahk-fix/resources/fix-workflow.md',
+    'ahk-fix/resources/fix-template.md',
   ]
 
   function setup(): void {
@@ -1828,6 +1832,8 @@ describe('ahk-test — regression: four existing skills still present and matchi
     'ahk-test',
     'ahk-use-cases',
     'ahk-use-case-tech',
+    'ahk-feature',
+    'ahk-fix',
   ]
 
   for (const skillName of ALL_SKILLS) {

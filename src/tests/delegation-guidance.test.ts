@@ -232,6 +232,8 @@ describe('coordination skill injection', () => {
         'ahk-test',
         'ahk-use-cases',
         'ahk-use-case-tech',
+        'ahk-feature',
+        'ahk-fix',
       ]) {
         const result = readFileSync(join(tmpDir, '.skills', skillName, 'SKILL.md'), 'utf8')
         assert.ok(
@@ -246,6 +248,10 @@ describe('coordination skill injection', () => {
         'ahk-use-cases/resources/use-case-template.md',
         'ahk-use-case-tech/resources/technical-template.md',
         'ahk-use-case-tech/resources/technical-workflow.md',
+        'ahk-feature/resources/feature-workflow.md',
+        'ahk-feature/resources/feature-template.md',
+        'ahk-fix/resources/fix-workflow.md',
+        'ahk-fix/resources/fix-template.md',
       ]) {
         assert.deepEqual(
           readFileSync(join(tmpDir, '.skills', resourcePath)),
