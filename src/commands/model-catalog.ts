@@ -51,11 +51,31 @@ export function parseCursorModels(output: string): CursorModel[] {
     .map((match) => ({ id: match[1], label: match[2] }))
 
   const seen = new Set<string>()
-  return models.filter(({ id }) => {
+  return models
+    .filter(({ id }) => {
     if (seen.has(id)) return false
     seen.add(id)
     return true
-  })
+    })
+    .sort((left, right) => compareCursorModels(left.id, right.id))
+}
+
+/** Keep the interactive Cursor picker useful when an account exposes many
+ * provider families. Provider discovery stays dynamic; this only presents the
+ * exact IDs in the requested, stable family order. */
+function compareCursorModels(left: string, right: string): number {
+  const familyDifference = cursorModelFamilyRank(left) - cursorModelFamilyRank(right)
+  if (familyDifference !== 0) return familyDifference
+
+  return left.localeCompare(right, undefined, { sensitivity: 'base' }) || left.localeCompare(right)
+}
+
+function cursorModelFamilyRank(id: string): number {
+  const normalized = id.toLowerCase()
+  if (normalized.startsWith('gpt-') || normalized.startsWith('openai-')) return 0
+  if (normalized.startsWith('claude-')) return 1
+  if (normalized.startsWith('grok-') || normalized.startsWith('cursor-grok-')) return 2
+  return 3
 }
 
 export async function discoverCursorModels(

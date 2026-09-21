@@ -87,12 +87,23 @@ describe('runtime model catalogs', () => {
     assert.notEqual(validateManualReasoningEffort('high\nmodel = "other'), undefined)
   })
 
-  test('parses Cursor CLI IDs, including auto, without relying on a static catalog', () => {
+  test('parses and orders Cursor CLI IDs by preferred provider family', () => {
     assert.deepEqual(
-      parseCursorModels('Available models\n\nauto - Auto (default)\ngpt-5.6-terra-medium - GPT-5.6 Terra\n'),
+      parseCursorModels(
+        'Available models\n\n' +
+          'muse-spark-1.3-minimal - Muse Spark\n' +
+          'cursor-grok-4.5-medium - Cursor Grok\n' +
+          'claude-fable-5-medium - Claude Fable\n' +
+          'gpt-5.6-terra-medium - GPT-5.6 Terra\n' +
+          'auto - Auto (default)\n' +
+          'gpt-5.6-terra-medium - Duplicate GPT-5.6 Terra\n'
+      ),
       [
-        { id: 'auto', label: 'Auto (default)' },
         { id: 'gpt-5.6-terra-medium', label: 'GPT-5.6 Terra' },
+        { id: 'claude-fable-5-medium', label: 'Claude Fable' },
+        { id: 'cursor-grok-4.5-medium', label: 'Cursor Grok' },
+        { id: 'auto', label: 'Auto (default)' },
+        { id: 'muse-spark-1.3-minimal', label: 'Muse Spark' },
       ]
     )
   })
