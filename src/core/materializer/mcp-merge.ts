@@ -57,10 +57,20 @@ export function mergeCursorMcpJson(
   mergeClaudeMcpJson(filePath, port, cwd, pm)
 }
 
-/** Cursor keeps project-scoped tool approval rules separately from MCP server
+/** Cursor keeps project-scoped MCP approvals separately from MCP server
  * registration. Allow every tool from this project's harness server only: do
  * not grant access to other MCP servers, shell commands, or user-global rules. */
-export const CURSOR_HARNESS_MCP_ALLOW = 'Mcp(agent-harness-kit:*)'
+export const CURSOR_HARNESS_MCP_ALLOW = 'agent-harness-kit:*'
+
+function legacyCursorMcpAllowlist(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((entry) => {
+    if (typeof entry !== 'string') return []
+    const match = /^Mcp\(([^()]+)\)$/.exec(entry)
+    return match ? [match[1]] : []
+  })
+}
 
 export function mergeCursorPermissionsJson(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true })
@@ -74,18 +84,18 @@ export function mergeCursorPermissionsJson(filePath: string): void {
     }
   }
 
-  const existingPermissions = (existing.permissions as Record<string, unknown>) ?? {}
-  const existingAllow = Array.isArray(existingPermissions.allow)
-    ? existingPermissions.allow.filter((value): value is string => typeof value === 'string')
+  const existingMcpAllowlist = Array.isArray(existing.mcpAllowlist)
+    ? existing.mcpAllowlist.filter((value): value is string => typeof value === 'string')
     : []
-
-  const merged = {
+  const legacyPermissions = existing.permissions as Record<string, unknown> | undefined
+  const legacyMcpAllowlist = legacyCursorMcpAllowlist(legacyPermissions?.allow)
+  const merged: Record<string, unknown> = {
     ...existing,
-    permissions: {
-      ...existingPermissions,
-      allow: Array.from(new Set([...existingAllow, CURSOR_HARNESS_MCP_ALLOW])),
-    },
+    mcpAllowlist: Array.from(
+      new Set([...existingMcpAllowlist, ...legacyMcpAllowlist, CURSOR_HARNESS_MCP_ALLOW])
+    ),
   }
+  delete merged.permissions
 
   writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n', 'utf8')
 }

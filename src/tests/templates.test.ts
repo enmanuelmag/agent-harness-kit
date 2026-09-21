@@ -155,28 +155,43 @@ describe('mergeCursorPermissionsJson', () => {
     const path = join(TMP, '.cursor/permissions.json')
     mergeCursorPermissionsJson(path)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
-    assert.deepEqual(parsed.permissions.allow, ['Mcp(agent-harness-kit:*)'])
+    assert.deepEqual(parsed, { mcpAllowlist: ['agent-harness-kit:*'] })
     teardown()
   })
 
-  test('preserves existing rules and does not duplicate the harness permission', () => {
+  test('preserves current allowlist entries and does not duplicate the harness permission', () => {
     const path = join(TMP, '.cursor/permissions.json')
     mkdirSync(join(TMP, '.cursor'), { recursive: true })
     writeFileSync(
       path,
       JSON.stringify({
         keep: true,
+        mcpAllowlist: ['other-server:read', 'agent-harness-kit:*'],
+      })
+    )
+    mergeCursorPermissionsJson(path)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    assert.equal(parsed.keep, true)
+    assert.deepEqual(parsed.mcpAllowlist, ['other-server:read', 'agent-harness-kit:*'])
+    teardown()
+  })
+
+  test('migrates legacy MCP entries and removes the invalid permissions property', () => {
+    const path = join(TMP, '.cursor/permissions.json')
+    mkdirSync(join(TMP, '.cursor'), { recursive: true })
+    writeFileSync(
+      path,
+      JSON.stringify({
         permissions: {
-          allow: ['Read(src/**)', 'Mcp(agent-harness-kit:*)'],
+          allow: ['Read(src/**)', 'Mcp(other-server:read)', 'Mcp(agent-harness-kit:*)'],
           deny: ['Shell(rm)'],
         },
       })
     )
     mergeCursorPermissionsJson(path)
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
-    assert.equal(parsed.keep, true)
-    assert.deepEqual(parsed.permissions.allow, ['Read(src/**)', 'Mcp(agent-harness-kit:*)'])
-    assert.deepEqual(parsed.permissions.deny, ['Shell(rm)'])
+    assert.equal('permissions' in parsed, false)
+    assert.deepEqual(parsed.mcpAllowlist, ['other-server:read', 'agent-harness-kit:*'])
     teardown()
   })
 
@@ -191,7 +206,7 @@ describe('mergeCursorPermissionsJson', () => {
     })
     await getMaterializer('cursor').build(config, TMP)
     const parsed = JSON.parse(readFileSync(join(TMP, '.cursor/permissions.json'), 'utf8'))
-    assert.ok(parsed.permissions.allow.includes('Mcp(agent-harness-kit:*)'))
+    assert.ok(parsed.mcpAllowlist.includes('agent-harness-kit:*'))
     teardown()
   })
 })

@@ -644,7 +644,7 @@ your-project/
 | `.grok/config.toml`           | MCP server registration for Grok Build. Merged by `ahk build`                         | Yes, carefully                                              |
 | `.cursor/agents/*.md`         | Cursor custom subagents. Non-builder roles use native `readonly: true`; no tools allowlist is generated. | **Yes — customize behavior/model** |
 | `.cursor/mcp.json`            | Project MCP registration for Cursor Agent Window and CLI. Merged by `ahk build`.      | Yes, carefully                                              |
-| `.cursor/permissions.json`    | Allows `Mcp(agent-harness-kit:*)` without per-call Cursor approvals. Other user rules are preserved. | Yes, carefully |
+| `.cursor/permissions.json`    | Allows `agent-harness-kit:*` through Cursor's `mcpAllowlist` without per-call approvals. Existing MCP allowlist entries are preserved. | Yes, carefully |
 
 ---
 
