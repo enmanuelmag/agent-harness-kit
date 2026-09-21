@@ -3,11 +3,19 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
-import { CODEX_AGENT_DEFAULTS, CODEX_MODEL_CHOICES } from '@/commands/codex-model-prompt'
 import { applyConfigDefaults } from '@/commands/init-helpers'
+import {
+  codexInitializedNotification,
+  collectCodexModels,
+  discoverCursorModels,
+  parseCursorModels,
+  validateManualModelId,
+  validateManualReasoningEffort,
+} from '@/commands/model-catalog'
 import { resolveModelsContext } from '@/commands/models'
 import { claudeAgentFiles } from '@/core/materializer/claude-code'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
+import { cursorAgentFiles } from '@/core/materializer/cursor'
 import { getMaterializer } from '@/core/materializer/index'
 
 import type { BuildMaterializerOptions } from '@/core/materializer/index'
@@ -66,32 +74,108 @@ function writeRealConfig(dir: string, provider: Provider): void {
   )
 }
 
-describe('Codex model picker', () => {
-  test('offers gpt-6-astra without changing the existing catalog order', () => {
-    assert.deepEqual(CODEX_MODEL_CHOICES, [
-      'gpt-6-astra',
-      'gpt-5.6-sol',
-      'gpt-5.6-terra',
-      'gpt-5.6-luna',
-      'gpt-5.5',
-      'gpt-5.4',
-      'gpt-5.4-mini',
-      'gpt-5.3-codex-spark',
+describe('runtime model catalogs', () => {
+  test('sends the required initialized notification after App Server initialization', () => {
+    assert.deepEqual(codexInitializedNotification(), { method: 'initialized', params: {} })
+  })
+
+  test('rejects manual values that could break generated YAML or TOML', () => {
+    assert.equal(validateManualModelId('gpt-5.6-terra[effort=high]'), undefined)
+    assert.notEqual(validateManualModelId('gpt-safe\nreadonly: false'), undefined)
+    assert.notEqual(validateManualModelId('gpt-safe"\nmodel = "other'), undefined)
+    assert.equal(validateManualReasoningEffort('high'), undefined)
+    assert.notEqual(validateManualReasoningEffort('high\nmodel = "other'), undefined)
+  })
+
+  test('parses Cursor CLI IDs, including auto, without relying on a static catalog', () => {
+    assert.deepEqual(
+      parseCursorModels('Available models\n\nauto - Auto (default)\ngpt-5.6-terra-medium - GPT-5.6 Terra\n'),
+      [
+        { id: 'auto', label: 'Auto (default)' },
+        { id: 'gpt-5.6-terra-medium', label: 'GPT-5.6 Terra' },
+      ]
+    )
+  })
+
+  test('reports a Cursor command failure instead of silently falling back', async () => {
+    const result = await discoverCursorModels(async () => {
+      throw new Error('agent is not installed')
+    })
+    assert.deepEqual(result, { ok: false, error: 'agent is not installed' })
+  })
+
+  test('collects every Codex App Server page and keeps each model effort metadata', async () => {
+    const calls: unknown[] = []
+    const models = await collectCodexModels(async (_method, params) => {
+      calls.push(params)
+      return params.cursor
+        ? {
+            data: [
+              {
+                model: 'gpt-5.6-luna',
+                displayName: 'GPT-5.6 Luna',
+                defaultReasoningEffort: 'low',
+                supportedReasoningEfforts: [{ reasoningEffort: 'low' }],
+              },
+            ],
+            nextCursor: null,
+          }
+        : {
+            data: [
+              {
+                model: 'gpt-5.6-terra',
+                displayName: 'GPT-5.6 Terra',
+                defaultReasoningEffort: 'medium',
+                supportedReasoningEfforts: [
+                  { reasoningEffort: 'low' },
+                  { reasoningEffort: 'medium' },
+                  { reasoningEffort: 'high' },
+                ],
+              },
+            ],
+            nextCursor: 'page-2',
+          }
+    })
+    assert.deepEqual(calls, [{}, { cursor: 'page-2' }])
+    assert.deepEqual(models, [
+      {
+        id: 'gpt-5.6-terra',
+        label: 'GPT-5.6 Terra',
+        defaultReasoningEffort: 'medium',
+        supportedReasoningEfforts: ['low', 'medium', 'high'],
+      },
+      {
+        id: 'gpt-5.6-luna',
+        label: 'GPT-5.6 Luna',
+        defaultReasoningEffort: 'low',
+        supportedReasoningEfforts: ['low'],
+      },
     ])
   })
 
-  test('uses Terra/medium for every role except Explorer, which uses Luna/medium', () => {
-    assert.deepEqual(CODEX_AGENT_DEFAULTS, {
-      lead: { model: 'gpt-5.6-terra', effort: 'medium' },
-      explorer: { model: 'gpt-5.6-luna', effort: 'medium' },
-      consultant: { model: 'gpt-5.6-terra', effort: 'medium' },
-      builder: { model: 'gpt-5.6-terra', effort: 'medium' },
-      reviewer: { model: 'gpt-5.6-terra', effort: 'medium' },
-    })
+  test('rejects a malformed Codex App Server result and a repeated pagination cursor', async () => {
+    await assert.rejects(() => collectCodexModels(async () => ({ data: [] })), /returned no models/)
+    await assert.rejects(
+      () =>
+        collectCodexModels(async () => ({
+          data: [
+            {
+              model: 'gpt-test',
+              supportedReasoningEfforts: [],
+            },
+          ],
+          nextCursor: 'again',
+        })),
+      /repeated model-list cursor/
+    )
   })
 
   test('uses the lead choice unchanged for Codex default.toml', () => {
-    const entries = codexAgentFiles(configFor('codex-cli'), CODEX_AGENT_DEFAULTS)
+    const models = {
+      lead: { model: 'gpt-5.6-terra', effort: 'medium' },
+      explorer: { model: 'gpt-5.6-luna', effort: 'low' },
+    }
+    const entries = codexAgentFiles(configFor('codex-cli'), models)
     const byPath = Object.fromEntries(entries.map((entry) => [entry.relPath, entry.content]))
     const roleConfig = (content: string) =>
       content.match(/^(?:model|model_reasoning_effort) = .+$/gm)?.join('\n')
@@ -101,6 +185,20 @@ describe('Codex model picker', () => {
       roleConfig(byPath['.codex/agents/lead.toml'])
     )
     assert.match(byPath['.codex/agents/explorer.toml'], /^model = "gpt-5\.6-luna"$/m)
+  })
+})
+
+describe('Cursor model persistence', () => {
+  test('writes auto and exact discovered IDs literally while inherit omits the field', () => {
+    const entries = cursorAgentFiles(configFor('cursor'), {
+      lead: { model: 'auto' },
+      explorer: {},
+      builder: { model: 'gpt-5.6-terra-medium' },
+    })
+    const files = Object.fromEntries(entries.map((entry) => [entry.relPath, entry.content]))
+    assert.match(files['.cursor/agents/lead.md'], /^model: auto$/m)
+    assert.doesNotMatch(files['.cursor/agents/explorer.md'], /^model:/m)
+    assert.match(files['.cursor/agents/builder.md'], /^model: gpt-5\.6-terra-medium$/m)
   })
 })
 
