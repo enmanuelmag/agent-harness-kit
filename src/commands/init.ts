@@ -32,6 +32,37 @@ interface InitOptions {
   storageScope?: string
 }
 
+type StorageScope = 'local' | 'global'
+
+const STORAGE_SCOPE_PROMPT: {
+  message: string
+  options: { value: StorageScope; label: string }[]
+  initialValue: StorageScope
+} = {
+  message: 'Storage scope',
+  options: [
+    { value: 'local', label: 'Local — .harness/harness.db lives in this project' },
+    {
+      value: 'global',
+      label: 'Global — DB lives under ~/.harness/dbs/<projectId>/, outside the project',
+    },
+  ],
+  initialValue: 'global',
+}
+
+export type StorageScopeSelect = (options: typeof STORAGE_SCOPE_PROMPT) => Promise<StorageScope | symbol>
+
+export async function resolveStorageScope(
+  requestedScope: string | undefined,
+  select: StorageScopeSelect
+): Promise<StorageScope | symbol> {
+  if (requestedScope && ['local', 'global'].includes(requestedScope)) {
+    return requestedScope as StorageScope
+  }
+
+  return select(STORAGE_SCOPE_PROMPT)
+}
+
 export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   const existingConfig = findConfigFile(cwd)
   if (existingConfig) {
@@ -162,27 +193,12 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   }
 
   // ─── Storage scope ────────────────────────────────────────────────────────
-  let storageScope: 'local' | 'global'
-  if (flags.storageScope && ['local', 'global'].includes(flags.storageScope)) {
-    storageScope = flags.storageScope as 'local' | 'global'
-  } else {
-    const val = await p.select({
-      message: 'Storage scope',
-      options: [
-        { value: 'local', label: 'Local — .harness/harness.db lives in this project' },
-        {
-          value: 'global',
-          label: 'Global — DB lives under ~/.harness/dbs/<projectId>/, outside the project',
-        },
-      ],
-      initialValue: 'local',
-    })
-    if (p.isCancel(val)) {
-      p.cancel('Cancelled.')
-      process.exit(0)
-    }
-    storageScope = val as 'local' | 'global'
+  const storageScopeResult = await resolveStorageScope(flags.storageScope, p.select)
+  if (p.isCancel(storageScopeResult)) {
+    p.cancel('Cancelled.')
+    process.exit(0)
   }
+  const storageScope = storageScopeResult as StorageScope
 
   // ─── Optional first task ──────────────────────────────────────────────────
   const addFirstTask = await p.confirm({ message: 'Add your first task now?', initialValue: false })
