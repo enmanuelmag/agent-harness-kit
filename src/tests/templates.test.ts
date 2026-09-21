@@ -15,6 +15,7 @@ import {
   mergeClaudeSettingsLocalJson,
   mergeCodexConfigToml,
   mergeCursorMcpJson,
+  mergeCursorPermissionsJson,
   mergeGrokConfigToml,
   mergeOpencodeJson,
 } from '@/core/materializer/mcp-merge'
@@ -145,6 +146,52 @@ describe('mergeCursorMcpJson', () => {
       command: 'npx',
       args: ['--no', 'ahk', 'serve', '--port', '3456'],
     })
+    teardown()
+  })
+})
+
+describe('mergeCursorPermissionsJson', () => {
+  test('adds only the harness MCP wildcard permission', () => {
+    const path = join(TMP, '.cursor/permissions.json')
+    mergeCursorPermissionsJson(path)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    assert.deepEqual(parsed.permissions.allow, ['Mcp(agent-harness-kit:*)'])
+    teardown()
+  })
+
+  test('preserves existing rules and does not duplicate the harness permission', () => {
+    const path = join(TMP, '.cursor/permissions.json')
+    mkdirSync(join(TMP, '.cursor'), { recursive: true })
+    writeFileSync(
+      path,
+      JSON.stringify({
+        keep: true,
+        permissions: {
+          allow: ['Read(src/**)', 'Mcp(agent-harness-kit:*)'],
+          deny: ['Shell(rm)'],
+        },
+      })
+    )
+    mergeCursorPermissionsJson(path)
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    assert.equal(parsed.keep, true)
+    assert.deepEqual(parsed.permissions.allow, ['Read(src/**)', 'Mcp(agent-harness-kit:*)'])
+    assert.deepEqual(parsed.permissions.deny, ['Shell(rm)'])
+    teardown()
+  })
+
+  test('Cursor materializer writes the project allowlist on build', async () => {
+    setupLocalInstall()
+    const config = applyConfigDefaults({
+      name: 'cursor-demo',
+      description: 'demo',
+      provider: 'cursor',
+      docsPath: './docs',
+      tasksAdapter: 'mcp',
+    })
+    await getMaterializer('cursor').build(config, TMP)
+    const parsed = JSON.parse(readFileSync(join(TMP, '.cursor/permissions.json'), 'utf8'))
+    assert.ok(parsed.permissions.allow.includes('Mcp(agent-harness-kit:*)'))
     teardown()
   })
 })

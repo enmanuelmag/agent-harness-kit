@@ -57,6 +57,39 @@ export function mergeCursorMcpJson(
   mergeClaudeMcpJson(filePath, port, cwd, pm)
 }
 
+/** Cursor keeps project-scoped tool approval rules separately from MCP server
+ * registration. Allow every tool from this project's harness server only: do
+ * not grant access to other MCP servers, shell commands, or user-global rules. */
+export const CURSOR_HARNESS_MCP_ALLOW = 'Mcp(agent-harness-kit:*)'
+
+export function mergeCursorPermissionsJson(filePath: string): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+
+  let existing: Record<string, unknown> = {}
+  if (existsSync(filePath)) {
+    try {
+      existing = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>
+    } catch {
+      // Unreadable JSON — start fresh to avoid corrupting a partial file.
+    }
+  }
+
+  const existingPermissions = (existing.permissions as Record<string, unknown>) ?? {}
+  const existingAllow = Array.isArray(existingPermissions.allow)
+    ? existingPermissions.allow.filter((value): value is string => typeof value === 'string')
+    : []
+
+  const merged = {
+    ...existing,
+    permissions: {
+      ...existingPermissions,
+      allow: Array.from(new Set([...existingAllow, CURSOR_HARNESS_MCP_ALLOW])),
+    },
+  }
+
+  writeFileSync(filePath, JSON.stringify(merged, null, 2) + '\n', 'utf8')
+}
+
 // Write `agent: "lead"` to .claude/settings.json — the correct Claude Code field
 // for setting which subagent runs as the main session thread.
 export function mergeClaudeSettingsJson(filePath: string): void {

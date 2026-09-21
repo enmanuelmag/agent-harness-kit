@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 
 import { renderDelegationGuidance } from './delegation-guidance'
 import { detectPackageManager } from './detect-package-manager'
-import { mergeCursorMcpJson } from './mcp-merge'
+import { mergeCursorMcpJson, mergeCursorPermissionsJson } from './mcp-merge'
 import { buildCapabilityHints } from './provider-research-capabilities'
 import {
   appendGitignore,
@@ -95,6 +95,7 @@ export class CursorMaterializer implements Materializer {
       cwd,
       detectPackageManager(cwd)
     )
+    mergeCursorPermissionsJson(join(cwd, '.cursor/permissions.json'))
     appendGitignore(cwd)
     writeSkills(cwd, '.cursor/skills', renderDelegationGuidance('cursor', 'coordination-skill'))
   }
@@ -120,6 +121,7 @@ export class CursorMaterializer implements Materializer {
       cwd,
       detectPackageManager(cwd)
     )
+    mergeCursorPermissionsJson(join(cwd, '.cursor/permissions.json'))
     writeSkills(cwd, '.cursor/skills', renderDelegationGuidance('cursor', 'coordination-skill'))
     return { agents, derived }
   }
