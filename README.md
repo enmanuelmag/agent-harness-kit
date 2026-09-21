@@ -194,17 +194,17 @@ Interactive scaffold. Asks for your project name, description, AI provider, docs
 
 Claude Code only, init asks you to pick a model for each of the 5 core roles (lead, explorer, consultant, builder, reviewer) one at a time: `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable`. Each choice is written straight into that role's generated `.claude/agents/<role>.md` frontmatter as a `model:` line at scaffold time — it is never persisted to the config file. Picking `inherit` (the default) emits no `model:` line at all, leaving Claude Code to apply its own default. Agent files are user-owned once generated (see [Agent files are yours](#agent-files-are-yours) below), so after init the model can be changed three ways: hand-editing the `model:` frontmatter line directly, running [`ahk models`](#ahk-models) to re-prompt and regenerate just the 5 agent files, or running `ahk build --force` (which re-prompts too, then regenerates everything `--force` regenerates).
 
-Codex CLI only, init asks you to pick a **model and a reasoning effort** for each of the 5 core roles, one role at a time: model choices are `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra` (default), `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex-spark`; effort choices are `minimal`, `low`, `medium` (default), `high`, `xhigh`. Not every model supports every effort level — Codex applies its own per-model behavior for an unsupported combination, so pick deliberately rather than assuming universal compatibility. Both choices are written straight into that role's generated `.codex/agents/<role>.toml` as `model = "..."` / `model_reasoning_effort = "..."` lines at scaffold time — never persisted to config.toml. Agent files are user-owned once generated, so after init the model/effort can only be changed by hand-editing the TOML directly (there is no Codex equivalent of `ahk models` yet) or running `ahk build --force` (which re-prompts, then regenerates everything `--force` regenerates).
+Codex CLI only, init asks for a **model and a reasoning effort** for each of the 5 core roles. The picker queries the installed, signed-in Codex CLI through its App Server, so it shows the models currently available to that account and only the selected model's supported effort levels. Both choices are written straight into that role's generated `.codex/agents/<role>.toml` as `model = "..."` / `model_reasoning_effort = "..."` lines at scaffold time — never persisted to config.toml. Choose `inherit` to omit both role overrides and use the project default. If live discovery is unavailable, the CLI reports it and offers `inherit` or manual model/effort entry; manual entries reject whitespace, quotes, control characters, and other syntax that could alter TOML. It never silently substitutes a model. Agent files are user-owned once generated, so after init the model/effort can only be changed by hand-editing the TOML directly or running `ahk build --force` (which re-prompts, then regenerates everything `--force` regenerates).
 
 Separately, `.codex/config.toml` always gets a project-wide top-level default — `model = "gpt-5.6-terra"` and `model_reasoning_effort = "medium"` — written once and preserved across every subsequent `ahk build`/`ahk init --force`: if you hand-edit either value in config.toml, your edit is never overwritten. Per-role `model`/`model_reasoning_effort` lines in `.codex/agents/<role>.toml` (above) act as overrides of this baseline for that one role.
 
 OpenCode and Grok Build are unaffected by either prompt — it never appears for those providers, since neither has a closed model enum to prompt against.
 
-Cursor only, init asks for a model for each core role. The initial picker includes `inherit`, Composer, Claude, Gemini, GPT-5.6, and Grok choices available in Cursor at release time. It then offers the model default or `[effort=high]`, written as one Cursor-native frontmatter value such as `model: claude-opus-5[effort=high]`. Cursor decides which model parameters are supported by the current account, plan, and team policy; `inherit` is the safe default. Cursor's non-builder roles receive `readonly: true`, not a tool allowlist, so available MCP tools do not need to be enumerated manually.
+Cursor only, init asks for a model for each core role. It runs `agent models` and presents the IDs available to the current Cursor account, plan, and team policy. `auto` is an explicit choice and writes `model: auto`; `inherit` is separate and omits the `model:` line so the subagent uses its parent model. Every other selected ID is persisted verbatim in `.cursor/agents/<role>.md`, without adding a generic effort suffix. If live discovery is unavailable, the CLI reports it and offers `inherit` or a manual model ID; manual IDs reject whitespace, quotes, control characters, and other YAML-breaking syntax. It never silently falls back to `auto`. Cursor's non-builder roles receive `readonly: true`, not a tool allowlist, so available MCP tools do not need to be enumerated manually.
 
 
-- `local` (default) — `.harness/harness.db`, inside the project.
-- `global` — `~/.harness/dbs/<projectId>/harness.db`, outside the project tree (useful to keep the DB out of version control entirely, or to centralize storage for many projects). `<projectId>` is a UUID generated once at init and persisted in `agent-harness-kit.config.ts` — it's never regenerated on subsequent runs.
+- `global` (interactive default) — `~/.harness/dbs/<projectId>/harness.db`, outside the project tree (useful to keep the DB out of version control entirely, or to centralize storage for many projects). `<projectId>` is a UUID generated once at init and persisted in `agent-harness-kit.config.ts` — it's never regenerated on subsequent runs.
+- `local` — `.harness/harness.db`, inside the project. Use `--storage-scope local` to select it non-interactively. Existing configurations that omit `storage.scope` retain their legacy local fallback.
 
 Regardless of scope, `.harness/storage-state.json` is always written to the project — it records the *actual* current storage state (`scope`, `projectId`, `dbType`, `migratedAt`), separate from the *desired* state declared in the config file.
 
@@ -685,8 +685,10 @@ const config: HarnessConfig = {
   // MySQL — uncomment to use instead:
   // database: { type: 'mysql', connectionString: process.env.DATABASE_URL },
 
-  // ── Storage — scope: 'local' (default) ─────────────────────────────────────
-  // `scope: 'local'`.
+  // ── Storage — explicit local scope ─────────────────────────────────────────
+  // Interactive `ahk init` defaults to global; this explicit `scope: 'local'`
+  // keeps the database in the project. Existing configs that omit scope also
+  // retain the legacy local fallback.
   storage: {
     dir: '.harness',
     sections: {

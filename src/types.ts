@@ -202,34 +202,25 @@ export interface McpToolResult {
 
 // ─── Materializer interface ───────────────────────────────────────────────────
 
-/** Codex's real reasoning-effort wire enum is wider (none|minimal|low|medium|
- *  high|xhigh|max|ultra|Custom — see `openai_models.rs`), but this type is
- *  narrowed to the intersection Codex's own per-agent-role-file writer
- *  accepts (`subagents.rs::map_agent_reasoning_effort`). Codex performs no
- *  client-side validation of this field (any unrecognized non-empty string
- *  is silently accepted as a `Custom` value and only fails later, at request
- *  time), so this closed TS union is the only real guard the prompt has —
- *  keep it a literal union, unlike `CodexAgentModelChoice.model` below. */
-export type CodexReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+/** Codex returns the supported effort names for each available model at
+ * runtime. Keep this open so a newly supported effort can be persisted
+ * verbatim instead of being rejected by a stale compile-time catalog. */
+export type CodexReasoningEffort = string
 
 /** A single role's Codex CLI model + reasoning-effort choice, collected by
  *  `ahk init`'s Codex-conditional prompt (`promptCodexAgentModels`) and
  *  written into that role's generated `.codex/agents/<role>.toml`.
  *
- *  `model` is a plain `string`, not a literal union, deliberately — model
- *  catalogs go stale with every provider release, and a hardcoded compile-time
- *  union would turn a stale/renamed slug into a build-breaking type error for
- *  someone hand-editing a newer model into their TOML. `effort` is a closed,
- *  stable union (see `CodexReasoningEffort`) because Codex does not validate
- *  it client-side. This model/effort asymmetry is intentional. */
+ *  `model` and `effort` are plain strings because the live App Server catalog
+ *  is the source of truth and both values are persisted exactly as selected. */
 export interface CodexAgentModelChoice {
   model?: string
   effort?: CodexReasoningEffort
 }
 
-/** Cursor keeps model options in its single `model` frontmatter scalar. The
- * value can be `inherit`, a model id, or a model id with parameters such as
- * `claude-opus-5[effort=high]`. */
+/** Cursor keeps model options in its single `model` frontmatter scalar. `auto`
+ * and every discovered model ID must be written literally; `inherit` omits the
+ * scalar altogether. */
 export interface CursorAgentModelChoice {
   model?: string
 }
