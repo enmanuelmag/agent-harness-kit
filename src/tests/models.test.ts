@@ -8,6 +8,7 @@ import {
   codexInitializedNotification,
   collectCodexModels,
   discoverCursorModels,
+  groupCursorModels,
   parseCursorModels,
   validateManualModelId,
   validateManualReasoningEffort,
@@ -104,6 +105,41 @@ describe('runtime model catalogs', () => {
         { id: 'cursor-grok-4.5-medium', label: 'Cursor Grok' },
         { id: 'auto', label: 'Auto (default)' },
         { id: 'muse-spark-1.3-minimal', label: 'Muse Spark' },
+      ]
+    )
+  })
+
+  test('groups live Cursor IDs by provider, keeps auto special, and retains unknown prefixes in Others', () => {
+    const models = parseCursorModels(
+      'auto - Auto\n' +
+        'gpt-z - GPT Z\n' +
+        'gpt-a - GPT A\n' +
+        'claude-a - Claude A\n' +
+        'cursor-grok-a - Cursor Grok A\n' +
+        'grok-b - Grok B\n' +
+        'gemini-a - Gemini A\n' +
+        'composer-a - Composer A\n' +
+        'muse-a - Muse A\n' +
+        'kimi-a - Kimi A\n' +
+        'glm-a - GLM A\n' +
+        'future-a - Future A\n'
+    )
+
+    assert.deepEqual(
+      groupCursorModels(models).map(({ id, models: groupModels }) => ({
+        id,
+        models: groupModels.map((model) => model.id),
+      })),
+      [
+        { id: 'openai', models: ['gpt-a', 'gpt-z'] },
+        { id: 'claude', models: ['claude-a'] },
+        { id: 'grok', models: ['cursor-grok-a', 'grok-b'] },
+        { id: 'gemini', models: ['gemini-a'] },
+        { id: 'composer', models: ['composer-a'] },
+        { id: 'muse', models: ['muse-a'] },
+        { id: 'kimi', models: ['kimi-a'] },
+        { id: 'glm', models: ['glm-a'] },
+        { id: 'others', models: ['future-a'] },
       ]
     )
   })

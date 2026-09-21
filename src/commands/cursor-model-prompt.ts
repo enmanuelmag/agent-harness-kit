@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts'
 
-import { discoverCursorModels, validateManualModelId } from './model-catalog'
+import { discoverCursorModels, groupCursorModels, validateManualModelId } from './model-catalog'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { CursorAgentModelChoice, Provider } from '@/types'
@@ -13,6 +13,7 @@ const AGENTS: { key: AgentName; label: string }[] = [
   { key: 'reviewer', label: 'Reviewer' },
 ]
 const MANUAL_MODEL = '__ahk_manual_model__'
+const MODEL_GROUP_PREFIX = '__ahk_cursor_model_group__:'
 
 export async function promptCursorAgentModels(
   provider: Provider
@@ -26,17 +27,11 @@ export async function promptCursorAgentModels(
     p.log.info('Choose inherit or enter a model ID supported by your Cursor CLI.')
   }
 
+  const autoModel = catalog.ok ? catalog.data.find(({ id }) => id === 'auto') : undefined
+  const modelGroups = catalog.ok ? groupCursorModels(catalog.data) : []
+
   for (const agent of AGENTS) {
-    const model = await p.select({
-      message: `Model for ${agent.label}`,
-      options: [
-        { value: 'inherit', label: 'inherit (use parent model)' },
-        ...(catalog.ok
-          ? catalog.data.map(({ id, label }) => ({ value: id, label: `${id} — ${label}` }))
-          : [{ value: MANUAL_MODEL, label: 'Enter model ID manually' }]),
-      ],
-      initialValue: 'inherit',
-    })
+    const model = await promptCursorModel(agent.label, autoModel, modelGroups, catalog.ok)
     if (p.isCancel(model)) cancel()
 
     const selected = model as string
@@ -59,6 +54,40 @@ export async function promptCursorAgentModels(
     choices[agent.key] = { model: selected }
   }
   return choices
+}
+
+async function promptCursorModel(
+  agentLabel: string,
+  autoModel: { id: string; label: string } | undefined,
+  modelGroups: ReturnType<typeof groupCursorModels>,
+  hasCatalog: boolean
+): Promise<symbol | string> {
+  const model = await p.select({
+    message: `Model for ${agentLabel}`,
+    options: [
+      { value: 'inherit', label: 'inherit (use parent model)' },
+      ...(autoModel ? [{ value: autoModel.id, label: `${autoModel.id} — ${autoModel.label}` }] : []),
+      ...(hasCatalog
+        ? modelGroups.map(({ id, label, models }) => ({
+            value: `${MODEL_GROUP_PREFIX}${id}`,
+            label: `${label} (${models.length})`,
+          }))
+        : [{ value: MANUAL_MODEL, label: 'Enter model ID manually' }]),
+    ],
+    initialValue: 'inherit',
+  })
+  if (p.isCancel(model) || !hasCatalog || typeof model !== 'string' || !model.startsWith(MODEL_GROUP_PREFIX)) {
+    return model
+  }
+
+  const groupId = model.slice(MODEL_GROUP_PREFIX.length)
+  const group = modelGroups.find(({ id }) => id === groupId)
+  if (!group) return model
+
+  return p.select({
+    message: `Model for ${agentLabel} — ${group.label}`,
+    options: group.models.map(({ id, label }) => ({ value: id, label: `${id} — ${label}` })),
+  })
 }
 
 async function manualModelId(label: string): Promise<string> {

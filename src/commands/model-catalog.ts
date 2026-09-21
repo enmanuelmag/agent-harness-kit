@@ -6,6 +6,12 @@ export interface CursorModel {
   label: string
 }
 
+export interface CursorModelGroup {
+  id: string
+  label: string
+  models: CursorModel[]
+}
+
 export interface CodexModel {
   id: string
   label: string
@@ -53,11 +59,45 @@ export function parseCursorModels(output: string): CursorModel[] {
   const seen = new Set<string>()
   return models
     .filter(({ id }) => {
-    if (seen.has(id)) return false
-    seen.add(id)
-    return true
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
     })
     .sort((left, right) => compareCursorModels(left.id, right.id))
+}
+
+const CURSOR_MODEL_FAMILIES: Omit<CursorModelGroup, 'models'>[] = [
+  { id: 'openai', label: 'OpenAI' },
+  { id: 'claude', label: 'Claude' },
+  { id: 'grok', label: 'Grok' },
+  { id: 'gemini', label: 'Gemini' },
+  { id: 'composer', label: 'Composer' },
+  { id: 'muse', label: 'Muse' },
+  { id: 'kimi', label: 'Kimi' },
+  { id: 'glm', label: 'GLM' },
+]
+
+/** Groups the live Cursor catalog for a compact, two-step picker. `auto` is
+ * deliberately excluded: it is a special selection, not a model provider. */
+export function groupCursorModels(models: CursorModel[]): CursorModelGroup[] {
+  const grouped = new Map(CURSOR_MODEL_FAMILIES.map((family) => [family.id, [] as CursorModel[]]))
+  const others: CursorModel[] = []
+
+  for (const model of models) {
+    if (model.id === 'auto') continue
+    const familyId = cursorModelFamilyId(model.id)
+    if (familyId) grouped.get(familyId)!.push(model)
+    else others.push(model)
+  }
+
+  const knownGroups = CURSOR_MODEL_FAMILIES.flatMap((family) => {
+    const familyModels = grouped.get(family.id)!
+    return familyModels.length === 0 ? [] : [{ ...family, models: familyModels.sort(compareCursorModel) }]
+  })
+
+  return others.length === 0
+    ? knownGroups
+    : [...knownGroups, { id: 'others', label: 'Others', models: others.sort(compareCursorModel) }]
 }
 
 /** Keep the interactive Cursor picker useful when an account exposes many
@@ -67,15 +107,32 @@ function compareCursorModels(left: string, right: string): number {
   const familyDifference = cursorModelFamilyRank(left) - cursorModelFamilyRank(right)
   if (familyDifference !== 0) return familyDifference
 
-  return left.localeCompare(right, undefined, { sensitivity: 'base' }) || left.localeCompare(right)
+  return compareCursorModel({ id: left, label: '' }, { id: right, label: '' })
+}
+
+function compareCursorModel(left: CursorModel, right: CursorModel): number {
+  return left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id)
 }
 
 function cursorModelFamilyRank(id: string): number {
-  const normalized = id.toLowerCase()
-  if (normalized.startsWith('gpt-') || normalized.startsWith('openai-')) return 0
-  if (normalized.startsWith('claude-')) return 1
-  if (normalized.startsWith('grok-') || normalized.startsWith('cursor-grok-')) return 2
+  const familyId = cursorModelFamilyId(id)
+  if (familyId === 'openai') return 0
+  if (familyId === 'claude') return 1
+  if (familyId === 'grok') return 2
   return 3
+}
+
+function cursorModelFamilyId(id: string): string | undefined {
+  const normalized = id.toLowerCase()
+  if (normalized.startsWith('gpt-') || normalized.startsWith('openai-')) return 'openai'
+  if (normalized.startsWith('claude-')) return 'claude'
+  if (normalized.startsWith('grok-') || normalized.startsWith('cursor-grok-')) return 'grok'
+  if (normalized.startsWith('gemini-')) return 'gemini'
+  if (normalized.startsWith('composer-')) return 'composer'
+  if (normalized.startsWith('muse-')) return 'muse'
+  if (normalized.startsWith('kimi-')) return 'kimi'
+  if (normalized.startsWith('glm-')) return 'glm'
+  return undefined
 }
 
 export async function discoverCursorModels(
