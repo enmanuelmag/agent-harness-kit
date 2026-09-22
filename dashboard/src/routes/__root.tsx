@@ -49,8 +49,6 @@ const NAV = [
   { to: '/', label: 'Overview', exact: true },
   { to: '/tasks', label: 'Tasks', exact: false },
   { to: '/agents', label: 'Agents', exact: false },
-  { to: '/tools', label: 'Tools', exact: false },
-  { to: '/files', label: 'Files', exact: false },
 ] as const
 
 function RootLayout() {

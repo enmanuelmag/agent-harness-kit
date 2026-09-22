@@ -9,23 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ToolsRouteImport } from './routes/tools'
-import { Route as FilesRouteImport } from './routes/files'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TasksIndexRouteImport } from './routes/tasks.index'
 import { Route as TasksIdRouteImport } from './routes/tasks.$id'
 
-const ToolsRoute = ToolsRouteImport.update({
-  id: '/tools',
-  path: '/tools',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FilesRoute = FilesRouteImport.update({
-  id: '/files',
-  path: '/files',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AgentsRoute = AgentsRouteImport.update({
   id: '/agents',
   path: '/agents',
@@ -50,16 +38,12 @@ const TasksIdRoute = TasksIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
-  '/files': typeof FilesRoute
-  '/tools': typeof ToolsRoute
   '/tasks/$id': typeof TasksIdRoute
   '/tasks/': typeof TasksIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
-  '/files': typeof FilesRoute
-  '/tools': typeof ToolsRoute
   '/tasks/$id': typeof TasksIdRoute
   '/tasks': typeof TasksIndexRoute
 }
@@ -67,51 +51,26 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
-  '/files': typeof FilesRoute
-  '/tools': typeof ToolsRoute
   '/tasks/$id': typeof TasksIdRoute
   '/tasks/': typeof TasksIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agents' | '/files' | '/tools' | '/tasks/$id' | '/tasks/'
+  fullPaths: '/' | '/agents' | '/tasks/$id' | '/tasks/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agents' | '/files' | '/tools' | '/tasks/$id' | '/tasks'
-  id:
-    | '__root__'
-    | '/'
-    | '/agents'
-    | '/files'
-    | '/tools'
-    | '/tasks/$id'
-    | '/tasks/'
+  to: '/' | '/agents' | '/tasks/$id' | '/tasks'
+  id: '__root__' | '/' | '/agents' | '/tasks/$id' | '/tasks/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentsRoute: typeof AgentsRoute
-  FilesRoute: typeof FilesRoute
-  ToolsRoute: typeof ToolsRoute
   TasksIdRoute: typeof TasksIdRoute
   TasksIndexRoute: typeof TasksIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/tools': {
-      id: '/tools'
-      path: '/tools'
-      fullPath: '/tools'
-      preLoaderRoute: typeof ToolsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/files': {
-      id: '/files'
-      path: '/files'
-      fullPath: '/files'
-      preLoaderRoute: typeof FilesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/agents': {
       id: '/agents'
       path: '/agents'
@@ -146,8 +105,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsRoute: AgentsRoute,
-  FilesRoute: FilesRoute,
-  ToolsRoute: ToolsRoute,
   TasksIdRoute: TasksIdRoute,
   TasksIndexRoute: TasksIndexRoute,
 }

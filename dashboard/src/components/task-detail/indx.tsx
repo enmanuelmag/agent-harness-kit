@@ -22,16 +22,6 @@ export function ActionCard({ action }: { action: ActionDetail }) {
           <div className="flex items-center gap-2">
             <StatusBadge status={action.status} size="xs" />
             <span className="font-mono text-xs text-[var(--color-text-faint)]">{duration}</span>
-            {action.tools.length > 0 && (
-              <span className="font-mono text-[10px] text-[var(--color-text-faint)]">
-                {action.tools.length} tool{action.tools.length !== 1 ? 's' : ''}
-              </span>
-            )}
-            {action.files.length > 0 && (
-              <span className="font-mono text-[10px] text-[var(--color-text-faint)]">
-                {action.files.length} file{action.files.length !== 1 ? 's' : ''}
-              </span>
-            )}
           </div>
           {action.summary && (
             <div className="text-xs text-[var(--color-text-secondary)] mt-1">{action.summary}</div>

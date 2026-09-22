@@ -44,7 +44,7 @@ function AgentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-border)]">
-                  {['Agent', 'Total Actions', 'Completed', 'Blocked', 'Tasks', 'Files'].map((h) => (
+                  {['Agent', 'Total Actions', 'Completed', 'Blocked', 'Tasks'].map((h) => (
                     <th
                       key={h}
                       className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-4 py-2"
@@ -69,7 +69,6 @@ function AgentsPage() {
                       {a.actions_blocked}
                     </td>
                     <td className="px-4 py-3 font-mono text-sm">{a.tasks_worked}</td>
-                    <td className="px-4 py-3 font-mono text-sm">{a.files_touched}</td>
                   </tr>
                 ))}
               </tbody>
@@ -105,7 +104,6 @@ function AgentCard({ stat }: { stat: AgentStat }) {
           value={stat.actions_blocked}
           color={stat.actions_blocked > 0 ? 'text-red-400' : undefined}
         />
-        <Stat label="Files touched" value={stat.files_touched} />
         <Stat
           label="In progress"
           value={stat.actions_total - stat.actions_done - stat.actions_blocked}

@@ -53,11 +53,9 @@ function Overview() {
         </div>
 
         {/* Mini stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           {[
             { label: 'Total Actions', value: s?.totalActions },
-            { label: 'Files Touched', value: s?.totalFiles },
-            { label: 'Unique Tools', value: s?.uniqueTools },
           ].map(({ label, value }) => (
             <div
               key={label}

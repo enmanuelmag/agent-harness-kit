@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react'
 import { AgentBadge } from '@/components/shared/agent-badge'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingState } from '@/components/shared/loading-state'
-import { OperationBadge } from '@/components/shared/operation-badge'
 import { PageHeader } from '@/components/shared/page-header'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { ActionCard, SectionTitle, TimestampItem } from '@/components/task-detail/indx'
@@ -284,46 +283,6 @@ function TaskDetailPage() {
           </div>
         )}
 
-        {/* Files touched */}
-        {task.actions.some((a) => a.files.length > 0) && (
-          <div>
-            <SectionTitle>Files Touched</SectionTitle>
-            <table className="w-full mt-2 text-sm">
-              <thead>
-                <tr className="border-b border-[var(--color-border)]">
-                  {['Operation', 'File Path', 'Agent', 'Notes'].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left font-mono text-[10px] text-[var(--color-text-faint)] uppercase tracking-wider px-3 py-2"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {task.actions.flatMap((action) =>
-                  action.files.map((f) => (
-                    <tr key={f.id} className="border-b border-[var(--color-border)]">
-                      <td className="px-3 py-2">
-                        <OperationBadge op={f.operation} />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-[var(--color-text-secondary)]">
-                        {f.file_path}
-                      </td>
-                      <td className="px-3 py-2">
-                        <AgentBadge agent={action.agent} size="xs" />
-                      </td>
-                      <td className="px-3 py-2 text-xs text-[var(--color-text-faint)]">
-                        {f.notes ?? '—'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   )

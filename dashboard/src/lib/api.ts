@@ -2,14 +2,10 @@
 
 import type {
   AgentStat,
-  RecentFile,
-  RecentTool,
   StatsOverview,
   TaskDetail,
   TaskSummary,
   TimelineEntry,
-  TopFile,
-  TopTool,
 } from '@/schema/api'
 
 // ─── Fetch helpers ────────────────────────────────────────────────────────────
@@ -29,10 +25,6 @@ export const api = {
   allTasks: (includeArchived = false) =>
     get<TaskSummary[]>('/tasks', { includeArchived: String(includeArchived) }),
   task: (id: number) => get<TaskDetail>(`/tasks/${id}`),
-  topTools: (limit = 20) => get<TopTool[]>('/tools/top', { limit: String(limit) }),
-  recentTools: (limit = 50) => get<RecentTool[]>('/tools/recent', { limit: String(limit) }),
-  topFiles: (limit = 20) => get<TopFile[]>('/files/top', { limit: String(limit) }),
-  recentFiles: (limit = 50) => get<RecentFile[]>('/files/recent', { limit: String(limit) }),
   agentStats: () => get<AgentStat[]>('/agents/stats'),
   timeline: (limit = 50) => get<TimelineEntry[]>('/timeline', { limit: String(limit) }),
   updateTask: (
@@ -57,10 +49,6 @@ export const qk = {
   tasks: ['tasks'] as const,
   allTasks: (includeArchived: boolean) => ['tasks', { includeArchived }] as const,
   task: (id: number) => ['tasks', id] as const,
-  topTools: ['tools', 'top'] as const,
-  recentTools: ['tools', 'recent'] as const,
-  topFiles: ['files', 'top'] as const,
-  recentFiles: ['files', 'recent'] as const,
   agentStats: ['agents', 'stats'] as const,
   timeline: ['timeline'] as const,
 }
