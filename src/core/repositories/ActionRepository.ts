@@ -1,10 +1,8 @@
 import type { DBDriver } from '../drivers/types'
-import type { ActionFileRow, ActionRow, ActionSectionRow, ActionToolRow, AgentName } from '@/types'
+import type { ActionRow, ActionSectionRow, AgentName } from '@/types'
 
 export interface ActionWithDetails extends ActionRow {
   sections: ActionSectionRow[]
-  files: ActionFileRow[]
-  tools: ActionToolRow[]
 }
 
 export interface ActionListRow extends ActionRow {
@@ -103,8 +101,6 @@ export class ActionRepository {
       actions.map(async (action) => ({
         ...action,
         sections: await this.getSections(action.id),
-        files: await this.getFiles(action.id),
-        tools: await this.getTools(action.id),
       }))
     )
   }
@@ -174,71 +170,4 @@ export class ActionRepository {
     return this.driver.query<ActionSectionRow>(`SELECT * FROM action_sections ORDER BY created_at`)
   }
 
-  // ─── Files ────────────────────────────────────────────────────────────────
-
-  async addFile(
-    actionId: number,
-    filePath: string,
-    operation: ActionFileRow['operation'],
-    notes: string | null
-  ): Promise<void> {
-    await this.driver.exec(
-      `INSERT INTO action_files (action_id, file_path, operation, notes) VALUES (?, ?, ?, ?)`,
-      [actionId, filePath, operation, notes]
-    )
-  }
-
-  async getFiles(actionId: number): Promise<ActionFileRow[]> {
-    return this.driver.query<ActionFileRow>(`SELECT * FROM action_files WHERE action_id = ?`, [
-      actionId,
-    ])
-  }
-
-  async getFilesForTask(taskId: number): Promise<(ActionFileRow & { agent: AgentName })[]> {
-    return this.driver.query<ActionFileRow & { agent: AgentName }>(
-      `SELECT af.*, a.agent FROM action_files af JOIN actions a ON af.action_id = a.id WHERE a.task_id = ? ORDER BY a.agent, af.operation`,
-      [taskId]
-    )
-  }
-
-  /** Returns ALL action_files rows regardless of action — used by full DB
-   *  exports (e.g. `ahk migrate storage`) so file-touch records aren't lost. */
-  async getAllFiles(): Promise<ActionFileRow[]> {
-    return this.driver.query<ActionFileRow>(`SELECT * FROM action_files ORDER BY id`)
-  }
-
-  // ─── Tools ────────────────────────────────────────────────────────────────
-
-  async addTool(
-    actionId: number,
-    toolName: string,
-    argsJson: string | null,
-    resultSummary: string | null,
-    now: string
-  ): Promise<void> {
-    await this.driver.exec(
-      `INSERT INTO action_tools (action_id, tool_name, args_json, result_summary, called_at) VALUES (?, ?, ?, ?, ?)`,
-      [actionId, toolName, argsJson, resultSummary, now]
-    )
-  }
-
-  async getTools(actionId: number): Promise<ActionToolRow[]> {
-    return this.driver.query<ActionToolRow>(
-      `SELECT * FROM action_tools WHERE action_id = ? ORDER BY called_at`,
-      [actionId]
-    )
-  }
-
-  /** Returns ALL action_tools rows regardless of action — used by full DB
-   *  exports (e.g. `ahk migrate storage`) so tool-call records aren't lost. */
-  async getAllTools(): Promise<ActionToolRow[]> {
-    return this.driver.query<ActionToolRow>(`SELECT * FROM action_tools ORDER BY id`)
-  }
-
-  async getTopTools(limit: number): Promise<{ tool_name: string; uses: number }[]> {
-    return this.driver.query<{ tool_name: string; uses: number }>(
-      `SELECT tool_name, COUNT(*) as uses FROM action_tools GROUP BY tool_name ORDER BY uses DESC LIMIT ?`,
-      [limit]
-    )
-  }
 }

@@ -8,10 +8,8 @@ import { TaskRepository } from './repositories/TaskRepository'
 
 import type { DBDriver } from './drivers/types'
 import type {
-  ActionFileRow,
   ActionRow,
   ActionSectionRow,
-  ActionToolRow,
   AgentName,
   HarnessConfig,
   StorageState,
@@ -20,17 +18,12 @@ import type {
   TaskStatus,
 } from '@/types'
 
-/** Full relational export of every table — used by `ahk migrate storage` and
- *  `ahk export --json`. MUST include all 6 tables (tasks, task_acceptance,
- *  actions, action_sections, action_files, action_tools); omitting any of
- *  them silently drops user data during a migration. */
+/** Full relational export of persistent task workflow data. */
 export interface FullExport {
   tasks: TaskRow[]
   taskAcceptance: TaskAcceptanceRow[]
   actions: ActionRow[]
   sections: ActionSectionRow[]
-  actionFiles: ActionFileRow[]
-  actionTools: ActionToolRow[]
 }
 
 /** Tables with an integer autoincrement/serial primary key, in FK-safe
@@ -44,20 +37,16 @@ const AUTOINCREMENT_TABLES = [
   'task_acceptance',
   'actions',
   'action_sections',
-  'action_files',
-  'action_tools',
 ] as const
 
-/** Full insertion order across all 6 tables, respecting FK constraints
+/** Full insertion order across the four workflow tables, respecting FK constraints
  *  (parent before child): tasks -> task_acceptance -> actions ->
- *  action_sections/action_files/action_tools. */
+ *  action_sections. */
 const TABLE_INSERT_ORDER = [
   'tasks',
   'task_acceptance',
   'actions',
   'action_sections',
-  'action_files',
-  'action_tools',
 ] as const
 
 /** Reverse of TABLE_INSERT_ORDER — used to TRUNCATE a non-empty destination
@@ -264,57 +253,6 @@ export class HarnessDB {
     return this.actions.getCompletedHandoffSections(taskId)
   }
 
-  /** Batch-only (task #74) — records N files in one atomic transaction. There
-   *  is no single-entry variant; callers pass a one-element array to log a
-   *  single file. Mirrors the driver.transaction() pattern from claimTask()
-   *  above: a fresh ActionRepository is bound to the tx driver so every
-   *  insert in the loop participates in the same transaction and any failure
-   *  rolls back the whole batch. Returns the number of files recorded. */
-  async recordFiles(
-    actionId: number,
-    files: Array<{ filePath: string; operation: ActionFileRow['operation']; notes?: string }>
-  ): Promise<number> {
-    return this.driver.transaction(async (tx) => {
-      const txActions = new ActionRepository(tx)
-      for (const f of files) {
-        await txActions.addFile(actionId, f.filePath, f.operation, f.notes ?? null)
-      }
-      return files.length
-    })
-  }
-
-  /** Batch-only (task #74) — records N tool calls in one atomic transaction.
-   *  See recordFiles() above for the pattern; a one-element array is the
-   *  only way to log a single tool call. Returns the number of calls
-   *  recorded. */
-  async recordTools(
-    actionId: number,
-    calls: Array<{ toolName: string; argsJson?: string; resultSummary?: string }>
-  ): Promise<number> {
-    const now = new Date().toISOString()
-    return this.driver.transaction(async (tx) => {
-      const txActions = new ActionRepository(tx)
-      for (const c of calls) {
-        await txActions.addTool(
-          actionId,
-          c.toolName,
-          c.argsJson ?? null,
-          c.resultSummary ?? null,
-          now
-        )
-      }
-      return calls.length
-    })
-  }
-
-  async getFilesForTask(taskId: number): Promise<(ActionFileRow & { agent: AgentName })[]> {
-    return this.actions.getFilesForTask(taskId)
-  }
-
-  async getTopTools(limit = 10): Promise<{ tool_name: string; uses: number }[]> {
-    return this.actions.getTopTools(limit)
-  }
-
   // ─── Raw query escape hatch ───────────────────────────────────────────────
 
   async queryRaw<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]> {
@@ -323,22 +261,17 @@ export class HarnessDB {
 
   // ─── Export helpers ───────────────────────────────────────────────────────
 
-  /** Full relational export of ALL 6 tables (tasks, task_acceptance, actions,
-   *  action_sections, action_files, action_tools). Extended for task #47 —
-   *  the previous version (tasks/actions/sections only) silently dropped
-   *  acceptance criteria and file/tool records on export/migrate. */
+  /** Full relational export of tasks, acceptance criteria, actions, and sections. */
   async exportJson(): Promise<FullExport> {
     return {
       tasks: await this.tasks.getAll(undefined, true),
       taskAcceptance: await this.tasks.getAllAcceptance(),
       actions: await this.actions.getAll(),
       sections: await this.actions.getAllSections(),
-      actionFiles: await this.actions.getAllFiles(),
-      actionTools: await this.actions.getAllTools(),
     }
   }
 
-  /** Row counts for all 6 tables against THIS db's driver — used to decide
+  /** Row counts for all four workflow tables against THIS db's driver — used to decide
    *  whether a destination is "empty" (safe to import into directly) before
    *  a migration. Counts are queried directly (COUNT(*)), never inferred
    *  from storage-state.json. */
@@ -384,7 +317,7 @@ export class HarnessDB {
 
 // ─── Full DB migration helpers (task #47 — `ahk migrate storage`) ─────────
 
-/** Row counts for all 6 tables, queried directly (never inferred). Used to
+/** Row counts for all four workflow tables, queried directly (never inferred). Used to
  *  decide whether a destination DB is "empty" before an sqlite↔remote
  *  migration. */
 export async function getRowCounts(
@@ -398,13 +331,13 @@ export async function getRowCounts(
   return counts
 }
 
-/** True if every table is empty (COUNT(*) = 0 for all 6 tables). */
+/** True if every workflow table is empty. */
 export async function isEmptyDatabase(driver: DBDriver): Promise<boolean> {
   const counts = await getRowCounts(driver)
   return Object.values(counts).every((n) => n === 0)
 }
 
-/** Deletes all rows from all 6 tables, children-before-parents, so FK
+/** Deletes all workflow rows, children-before-parents, so FK
  *  constraints never block the delete. Only ever called immediately before
  *  a `--force` import, inside the same transaction as the import itself —
  *  never on its own. */
@@ -446,7 +379,7 @@ export async function resetAutoincrementSequences(
   }
 }
 
-/** Imports a full export (all 6 tables) into `destDriver`, preserving
+/** Imports a full workflow export into `destDriver`, preserving
  *  original ids (required to keep foreign keys intact — see task #47
  *  consultant advisory). The ENTIRE import (and, when `truncateFirst` is
  *  set, the pre-import wipe) runs inside a single `destDriver.transaction()`
@@ -526,27 +459,6 @@ export async function importFullExport(
       await tx.exec(
         `INSERT INTO action_sections (id, action_id, section_type, content, created_at) VALUES (?, ?, ?, ?, ?)`,
         [section.id, section.action_id, section.section_type, section.content, section.created_at]
-      )
-    }
-
-    for (const file of data.actionFiles) {
-      await tx.exec(
-        `INSERT INTO action_files (id, action_id, file_path, operation, notes) VALUES (?, ?, ?, ?, ?)`,
-        [file.id, file.action_id, file.file_path, file.operation, file.notes]
-      )
-    }
-
-    for (const tool of data.actionTools) {
-      await tx.exec(
-        `INSERT INTO action_tools (id, action_id, tool_name, args_json, result_summary, called_at) VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          tool.id,
-          tool.action_id,
-          tool.tool_name,
-          tool.args_json,
-          tool.result_summary,
-          tool.called_at,
-        ]
       )
     }
 

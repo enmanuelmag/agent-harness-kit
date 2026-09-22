@@ -200,34 +200,6 @@ export async function startDashboardServer(
     return c.json(updated)
   })
 
-  // ─── Tools top ────────────────────────────────────────────────────────────
-  app.get('/api/tools/top', async (c) => {
-    await db.reconnect()
-    const limit = parseInt(c.req.query('limit') ?? '20')
-    return c.json(await actions.getTopTools(limit))
-  })
-
-  // ─── Tools recent ─────────────────────────────────────────────────────────
-  app.get('/api/tools/recent', async (c) => {
-    await db.reconnect()
-    const limit = parseInt(c.req.query('limit') ?? '50')
-    return c.json(await stats.getRecentTools(limit))
-  })
-
-  // ─── Files top ────────────────────────────────────────────────────────────
-  app.get('/api/files/top', async (c) => {
-    await db.reconnect()
-    const limit = parseInt(c.req.query('limit') ?? '20')
-    return c.json(await stats.getTopFiles(limit))
-  })
-
-  // ─── Files recent ─────────────────────────────────────────────────────────
-  app.get('/api/files/recent', async (c) => {
-    await db.reconnect()
-    const limit = parseInt(c.req.query('limit') ?? '50')
-    return c.json(await stats.getRecentFiles(limit))
-  })
-
   // ─── Agents stats ─────────────────────────────────────────────────────────
   app.get('/api/agents/stats', async (c) => {
     await db.reconnect()

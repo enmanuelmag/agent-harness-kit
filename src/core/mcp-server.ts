@@ -22,7 +22,7 @@ import {
   SpecStore,
 } from './specs'
 
-import type { ActionFileRow, ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types'
+import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types'
 
 const VERSION = '0.1.0'
 
@@ -186,16 +186,14 @@ const TOOLS = [
   },
   {
     name: 'actions.write',
-    description:
-      'Record a section in an action. Standard sections: result, tools_used, blockers, next_steps.',
+    description: 'Record a free-form section in an action.',
     inputSchema: {
       type: 'object',
       properties: {
         actionId: { type: 'number', description: 'The actionId returned by actions.start' },
         sectionType: {
           type: 'string',
-          description:
-            'Section name: result | tools_used | blockers | next_steps | <custom>. Do NOT use files_modified to track files — it is stored as plain text only. Use actions.record_file instead.',
+          description: 'Section name, such as result, blockers, next_steps, or a custom name.',
         },
         content: {
           type: 'string',
@@ -401,39 +399,6 @@ const TOOLS = [
     },
   },
   {
-    name: 'actions.record_file',
-    description:
-      'Record one or more files touched during an action, atomically (all-or-nothing). This is the only way to populate the files-touched count shown in the dashboard. Batch every file from a step of work into a single call — a single-element array is correct when only one file was touched.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        actionId: { type: 'number', description: 'The actionId returned by actions.start' },
-        files: {
-          type: 'array',
-          minItems: 1,
-          description: 'Files touched, recorded atomically in one transaction.',
-          items: {
-            type: 'object',
-            properties: {
-              filePath: {
-                type: 'string',
-                description: 'Absolute or repo-relative path of the file',
-              },
-              operation: {
-                type: 'string',
-                enum: ['read', 'created', 'modified', 'deleted'],
-                description: 'What was done to the file',
-              },
-              notes: { type: 'string', description: 'Optional short note about the change' },
-            },
-            required: ['filePath', 'operation'],
-          },
-        },
-      },
-      required: ['actionId', 'files'],
-    },
-  },
-  {
     name: 'tasks.acceptance.update',
     description: 'Mark an acceptance criterion as met. Use the criterion id from tasks.get.',
     inputSchema: {
@@ -485,41 +450,6 @@ const TOOLS = [
         },
       },
       required: ['title'],
-    },
-  },
-  {
-    name: 'actions.record_tool',
-    description:
-      'Record one or more tool calls made during an action, atomically (all-or-nothing). This is the only way to populate the Tools dashboard. Batch every tool call from a step of work into a single call — a single-element array is correct when only one call was made.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        actionId: { type: 'number', description: 'The actionId returned by actions.start' },
-        calls: {
-          type: 'array',
-          minItems: 1,
-          description: 'Tool calls made, recorded atomically in one transaction.',
-          items: {
-            type: 'object',
-            properties: {
-              toolName: {
-                type: 'string',
-                description: 'Name of the tool that was called (e.g. Read, Bash, Edit)',
-              },
-              argsJson: {
-                type: 'string',
-                description: 'Optional JSON string of the arguments passed to the tool',
-              },
-              resultSummary: {
-                type: 'string',
-                description: 'Optional short summary of the tool result',
-              },
-            },
-            required: ['toolName'],
-          },
-        },
-      },
-      required: ['actionId', 'calls'],
     },
   },
   {
@@ -969,17 +899,6 @@ export async function dispatch(
       return ok(JSON.stringify(results))
     }
 
-    case 'actions.record_file': {
-      const actionId = num(args, 'actionId')
-      const files = nonEmptyArray(args, 'files').map((f) => ({
-        filePath: str(f, 'filePath'),
-        operation: str(f, 'operation') as ActionFileRow['operation'],
-        notes: f['notes'] as string | undefined,
-      }))
-      const recorded = await db.recordFiles(actionId, files)
-      return ok(JSON.stringify({ recorded }))
-    }
-
     case 'tasks.acceptance.update': {
       const criterionId = num(args, 'criterionId')
       await db.markAcceptanceMet(criterionId)
@@ -990,17 +909,6 @@ export async function dispatch(
       const taskId = num(args, 'taskId')
       const criteria = await db.getTaskAcceptance(taskId)
       return ok(JSON.stringify(criteria))
-    }
-
-    case 'actions.record_tool': {
-      const actionId = num(args, 'actionId')
-      const calls = nonEmptyArray(args, 'calls').map((c) => ({
-        toolName: str(c, 'toolName'),
-        argsJson: c['argsJson'] as string | undefined,
-        resultSummary: c['resultSummary'] as string | undefined,
-      }))
-      const recorded = await db.recordTools(actionId, calls)
-      return ok(JSON.stringify({ recorded }))
     }
 
     case 'tasks.edit': {
@@ -1408,59 +1316,4 @@ function sectionIndex(section: {
     chars: Number(section.chars),
     createdAt: section.created_at,
   }
-}
-
-/** Validates that `args[key]` is a non-empty array of plain objects, as
- *  required by the batch-only shapes of actions.record_file/record_tool
- *  (task #74) — the single-entry top-level shape is no longer accepted, so
- *  every entry must be pulled from this array via str()/num() on each item. */
-function nonEmptyArray(args: Record<string, unknown>, key: string): Record<string, unknown>[] {
-  let v = args[key]
-
-  if (v === undefined) {
-    throw new Error(`${key} is required`)
-  }
-
-  if (typeof v === 'string') {
-    try {
-      v = JSON.parse(v)
-    } catch {
-      throw new Error(`${key} must be a valid JSON array`)
-    }
-  }
-
-  if (!Array.isArray(v)) {
-    throw new Error(`${key} must be an array of objects`)
-  }
-
-  if (v.length === 0) {
-    throw new Error(`${key} must be a non-empty array`)
-  }
-
-  const normalizedArray = []
-
-  for (let item of v) {
-    if (item === null) {
-      throw new Error(`${key} entries must be objects, not null`)
-    }
-
-    if (typeof item === 'string') {
-      try {
-        item = JSON.parse(item)
-      } catch {
-        throw new Error(`${key} entries must be valid JSON objects`)
-      }
-    }
-
-    if (Array.isArray(item)) {
-      throw new Error(`${key} entries must be objects, not arrays`)
-    }
-
-    if (typeof item !== 'object' || item === null) {
-      throw new Error(`${key} entries must be objects`)
-    }
-
-    normalizedArray.push(item)
-  }
-  return normalizedArray as Record<string, unknown>[]
 }
