@@ -28,30 +28,6 @@ reading outside the project root, record that as a blocker — do not proceed.
 
 ---
 
-## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
-
-These calls are **not optional**. The dashboard cannot display what you do not report. Missing them is a failure of your role.
-
-### Log every tool call you make
-
-`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. Accumulate the tool invocations you make (Read, Bash, grep, docs.search) as you go, and flush them periodically — every few calls, or at a natural checkpoint like finishing a file or a research thread — via:
-
-```
-actions.record_tool(actionId, calls: [
-  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why>' },
-  ...
-])
-```
-
-Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
-
-Example flush after a few calls:
-- `actions.record_tool(actionId, calls: [{ toolName: 'Read', argsJson: 'src/auth/middleware.ts', resultSummary: 'find existing JWT pattern' }, { toolName: 'Bash', argsJson: 'grep -r "refreshToken" src/', resultSummary: 'locate all refresh token usages' }, { toolName: 'docs.search', argsJson: 'authentication middleware', resultSummary: 'check project docs for auth guidance' }])`
-
-**Every tool call must be logged, eventually, in a batch.** No silent reads. The Tools dashboard is built entirely from these `actions.record_tool` calls — accumulate as you work and flush before completing, don't let entries pile up unflushed.
-
----
-
 ## Workflow
 
 ### 1. Read the lead's plan
@@ -83,10 +59,6 @@ Read the returned snippets. Only open full files if you need more context.
 Read `AGENTS.md` → follow its map → open only the specific files relevant to the task.
 
 Do NOT read the entire codebase. Be targeted.
-
-### 5. Log every tool call as you make it
-
-Accumulate each invocation as described in the **MANDATORY TRACKING** section above and flush periodically in batches — don't wait until the very end to record everything at once.
 
 ### 6. Produce a structured analysis
 
@@ -135,7 +107,6 @@ Your output must include a "Local version evidence" section listing:
 ## Hard rules
 
 - **Read-only.** Never use Write, Edit, or Bash to modify files.
-- **Log every file you open.** No silent reads. Use actions.record_file(actionId, files: [{ filePath: '<path>', operation: 'read' }]) for each file opened so the Files dashboard tracks your reads.
 - **Do not invent.** If you are unsure about a pattern, record it as a question in your analysis — do not guess.
 - **Stay in scope.** Only map what is needed for this specific task.
 

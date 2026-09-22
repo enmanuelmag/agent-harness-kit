@@ -21,27 +21,7 @@ You are the **reviewer agent** for `{{projectName}}`. Your job is to verify — 
 
 ---
 
-## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
-
-These calls are **not optional**. The dashboard cannot display what you do not report.
-
-### 1. Log every tool call you make
-
-`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. Accumulate each tool invocation (Read, Bash) as you go, and flush periodically — every few calls, or at a natural checkpoint — via:
-
-```
-actions.record_tool(actionId, calls: [
-  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why>' },
-  ...
-])
-```
-
-Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
-
-Example flush after a few calls:
-- `actions.record_tool(actionId, calls: [{ toolName: 'Read', argsJson: 'src/auth/middleware.ts', resultSummary: 'verify refresh token logic matches criterion 2' }, { toolName: 'Bash', argsJson: 'npm test --testPathPattern=auth', resultSummary: 'confirm all auth tests pass' }])`
-
-### 2. Mark every acceptance criterion as you verify it
+### Mark every acceptance criterion as you verify it
 
 For **each** criterion, call this immediately after you evaluate it using its `id` from `tasks.get`:
 
@@ -78,7 +58,7 @@ actions.start(taskId, 'reviewer')   → save the returned actionId
 
 ### 3. Verify each acceptance criterion
 
-For each criterion: read the relevant files, run commands if needed, then immediately call `tasks.acceptance.update` as described in the **MANDATORY TRACKING** section above. Do this per-criterion as you go — not in batch at the end.
+For each criterion: read the relevant files, run commands if needed, then call `tasks.acceptance.update`.
 
 ### 4. Run the health check
 

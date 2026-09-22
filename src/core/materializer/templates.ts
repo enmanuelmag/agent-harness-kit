@@ -94,7 +94,7 @@ If it exits non-zero, stop and report the issue. Do not proceed with codebase ch
 
 | File | Purpose |
 |------|---------|
-| \`.harness/harness.db\` | SQLite: all tasks, actions, file changes, tool calls |
+| \`.harness/harness.db\` | SQLite: tasks, actions, and action sections |
 
 ## MCP tools (preferred)
 
@@ -103,8 +103,6 @@ The harness exposes tools via MCP server on port ${port}. Use these instead of r
 \`\`\`
 actions.start        taskId agent                           → start an action, returns a numeric actionId
 actions.write        actionId section text                  → record a section (result, blockers, ...)
-actions.record_tool  actionId calls[]                        → batch-log tool calls to the Tools dashboard (array, min 1)
-actions.record_file  actionId files[]                        → batch-log file touches to the Files dashboard (array, min 1)
 actions.complete     actionId summary                       → close the action
 actions.list         taskId [agent] [status] [limit] [cursor] → compact newest-first action index with pagination
 actions.get_by_id    actionId                               → single action with section index (no content)
@@ -130,7 +128,6 @@ docs.search          query                                  → search ${docsPat
 ${extraInitLines ? '\n' : ''}${extraInitLines}
 2. WORK  (lead → explorer → consultant → builder → reviewer)
      - Each agent calls actions.start(taskId, agentName) → numeric actionId
-     - Accumulate tool calls / file touches as you work; flush periodically (every few calls or at a phase boundary) via actions.record_tool(actionId, calls: [...]) and actions.record_file(actionId, files: [...]) — both are batch-only, even a single entry goes through as a one-element array
      - Closes with actions.complete(actionId, summary)
 
 3. CLOSE

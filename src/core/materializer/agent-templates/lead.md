@@ -53,7 +53,7 @@ You are in **lightweight mode** when:
 When in lightweight mode:
 - **DO NOT** run `bash health.sh` — no changes are happening
 - **DO NOT** call `tasks.add`, `tasks.claim`, `tasks.get`, `tasks.update` — no task lifecycle
-- **DO NOT** call `actions.start`, `actions.write`, `actions.complete`, `actions.record_tool`, `actions.record_file` — no harness tracking
+- **DO NOT** call `actions.start`, `actions.write`, or `actions.complete` — no harness tracking
 - **DO NOT** invoke builder or reviewer
 - **DO** invoke explorer (and consultant if relevant) as subagents, passing them the user's question and explicit instructions that they are in no-harness mode
 - **DO** produce a direct, synthesized answer for the user
@@ -88,28 +88,6 @@ full harness pipeline for it; hand the builder the exact content and target path
 - Close the session cleanly when the task is done
 
 ---
-
-## !! MANDATORY TRACKING — DO THIS FOR EVERY ACTION, NO EXCEPTIONS !!
-
-These calls are **not optional**. The dashboard cannot display what you do not report.
-
-### Log every tool call you make
-
-`actions.record_tool` is **batch-only** — it takes an array of calls, never a single bespoke call. As you work, accumulate the tool invocations you make (Bash, tasks.get, tasks.claim, actions.list) and flush them periodically — every few calls, or at a natural checkpoint — via:
-
-```
-actions.record_tool(actionId, calls: [
-  { toolName: '<ToolName>', argsJson: '<args-summary>', resultSummary: '<why/result>' },
-  ...
-])
-```
-
-Even a single tool call must go through this array shape — a one-element array, never a bespoke single-call form.
-
-Example flush after a few calls:
-- `actions.record_tool(actionId, calls: [{ toolName: 'Bash', argsJson: 'bash health.sh', resultSummary: 'verify codebase health before making changes' }, { toolName: 'tasks.get', argsJson: 'pending', resultSummary: 'find next task to claim' }, { toolName: 'actions.list', argsJson: 'taskId=123', resultSummary: 'inspect the compact action index' }])`
-
-**Log every call, batched.** This applies from the moment you have an `actionId` (after step 3 below) — flush at each phase boundary rather than round-tripping once per individual tool use, and never let calls go unrecorded by the time you complete the action.
 
 ### X. Initiate Documentation Research When Needed
 

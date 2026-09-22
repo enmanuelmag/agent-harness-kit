@@ -26,7 +26,7 @@ When invoked via `/ahk-consultant` or directly by lead in lightweight mode, you 
 
 ### What direct consultation mode means
 
-- **DO NOT** call `actions.start`, `actions.write`, `actions.complete`, `actions.record_tool`, `actions.record_file` — no harness tracking
+- **DO NOT** call `actions.start`, `actions.write`, or `actions.complete` — no harness tracking
 - **DO NOT** call `tasks.get`, `tasks.claim` — no task lifecycle
 - Read the codebase and skills, then return your advisory as plain text to the calling agent
 
