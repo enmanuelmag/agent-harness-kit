@@ -318,10 +318,8 @@ The dashboard includes:
 | --------------- | --------------------------------------------------------------------------- |
 | **Overview**    | Status counts, active tasks with acceptance progress, recent agent activity |
 | **Tasks**       | Full task list, filterable by status, with acceptance progress bars         |
-| **Task detail** | Acceptance criteria, action timeline per agent, files touched, tools used   |
-| **Agents**      | Per-role breakdown: actions, tasks worked, files touched, completion rate   |
-| **Tools**       | Top tools bar chart + full log of recent tool calls with args and results   |
-| **Files**       | Most-touched files with operation breakdown + recent file operation log     |
+| **Task detail** | Acceptance criteria and action timeline per agent                           |
+| **Agents**      | Per-role breakdown: actions, tasks worked, completion rate                  |
 
 ![Dashboard](./assets/ahk-dashboard.png)
 
@@ -491,7 +489,7 @@ Migrating always regenerates the target provider's agent files from scratch, so 
 
 #### `ahk migrate storage` — ⚠️ sensitive, reads/writes real harness data
 
-Migrates the harness database between storage backends: **local↔global scope** (moving `.harness/harness.db` in/out of `~/.harness/dbs/<projectId>/`) and **sqlite↔postgres/mysql** (dumping and reloading all 6 tables — tasks, task_acceptance, actions, action_sections, action_files, action_tools — inside a single transaction). It is **not interactive** — `agent-harness-kit.config.ts` (`storage.scope`, `storage.sqlitePath` (local scope only), `database.type`/`connectionString`) is the only source of truth for the desired target, compared against the real current state recorded in `.harness/storage-state.json`.
+Migrates the harness database between storage backends: **local↔global scope** (moving `.harness/harness.db` in/out of `~/.harness/dbs/<projectId>/`) and **sqlite↔postgres/mysql** (dumping and reloading tasks, acceptance criteria, actions, and action sections inside a single transaction). It is **not interactive** — `agent-harness-kit.config.ts` (`storage.scope`, `storage.sqlitePath` (local scope only), `database.type`/`connectionString`) is the only source of truth for the desired target, compared against the real current state recorded in `.harness/storage-state.json`.
 
 ```bash
 ahk migrate storage             # migrate to whatever agent-harness-kit.config.ts declares
@@ -504,7 +502,7 @@ What it does, case by case:
 | Situation | Behavior |
 |---|---|
 | Config and real storage state already match | No-op — reports "nothing to migrate" |
-| Only `database.type` differs (sqlite → postgres/mysql) | Full export/import of all 6 tables inside one transaction; on failure, the destination is rolled back exactly as it was found |
+| Only `database.type` differs (sqlite → postgres/mysql) | Full export/import of the four workflow tables inside one transaction; on failure, the destination is rolled back exactly as it was found |
 | Destination already has data | **Requires `--force`.** Without it, the command aborts and touches nothing. With it, the destination's current content is backed up to `.harness/backups/pre-migrate-<timestamp>.json` **before** anything is overwritten — if the backup can't be written, the whole command aborts |
 | Both source and destination have diverging data (not just empty vs. full) | Same as above (`--force` + backup required) — the command never attempts to auto-merge two independent histories |
 | `.harness/storage-state.json` is missing | Never assumed to mean "safe, empty destination." Both the local and global sqlite candidate locations are inspected for real data first; if both have data, the command refuses to guess and asks for manual resolution |
@@ -930,11 +928,9 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `tasks.add`               | `title, slug?, description?, acceptance?`       | Create a new task directly from MCP (agents can queue work on the fly)                                                                                                              |
 | `tasks.acceptance.update` | `criterionId`                                   | Mark an acceptance criterion as met. Criterion IDs come from `tasks.acceptance_get`                                                                                                 |
 | `actions.start`           | `taskId, agent`                                 | Start a new action, returns `actionId`                                                                                                                                              |
-| `actions.write`           | `actionId, sectionType, content`                | Record a text section: `result \| tools_used \| blockers \| next_steps`. Does **not** populate the Files dashboard — use `actions.record_file` for that                             |
+| `actions.write`           | `actionId, sectionType, content`                | Record a free-form text section, such as `result`, `blockers`, or `next_steps`                                                                                                      |
 | `actions.complete`        | `actionId, summary`                             | Close an action with a one-line summary                                                                                                                                             |
 | `actions.get`             | `taskId`                                        | Full action history for a task (all agents, all sections)                                                                                                                           |
-| `actions.record_file`     | `actionId, files: [{ filePath, operation, notes? }, ...]` | Batch-register one or more file touches, atomically. The **only** way to populate the Files dashboard. `operation`: `read \| created \| modified \| deleted`. Batch-only — `files` requires at least one entry; a single touch is still a one-element array                             |
-| `actions.record_tool`     | `actionId, calls: [{ toolName, argsJson?, resultSummary? }, ...]` | Batch-register one or more tool calls, atomically. The **only** way to populate the Tools dashboard. Batch-only — `calls` requires at least one entry; a single call is still a one-element array                                                              |
 | `docs.search`             | `query`                                         | Search the `docsPath` folder for content matching the query                                                                                                                         |
 | `tasks.acceptance_get`    | `taskId`                                        | Returns all acceptance criteria for a task with their `id`, `task_id`, `criterion` text, and `met` status. Use the returned `id` values with `tasks.acceptance.update`              |
 | `deps.snapshot`           | _(none)_                                        | Snapshot current `package.json` dependencies to `.harness/deps-lock.json`                                                                                                           |
@@ -973,7 +969,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `tasks.archive` / `unarchive` |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
 | `tasks.acceptance_get`        |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
 | `tasks.acceptance.update`     |  ❌  |    ❌    |     ❌     |   ❌    |    ✅    |
-| `actions.*` (all 6)           |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
+| `actions.*`                   |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
 | `docs.search`                 |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
 | `permissions.check`           |  ✅  |    ✅    |     ❌     |   ✅    |    ✅    |
 | `deps.snapshot`               |  ❌  |    ❌    |     ✅     |   ❌    |    ❌    |
@@ -1107,7 +1103,6 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability reporting process, suppor
 - ✅ **`ahk dashboard`** — local web UI with real-time WebSocket updates. Shows tasks, action timelines, file activity, tool usage, and per-agent breakdowns.
 - ✅ **`ahk reset`** — interactively clear the SQLite DB and agent files to start a project fresh.
 - ✅ **PostgreSQL + MySQL drivers** — remote database support via `postgres` and `mysql2` packages. Configure with `database: { type: 'postgres', connectionString: '...' }`.
-- ✅ **`actions.record_file` + `actions.record_tool`** — dedicated MCP tools for populating the Files and Tools dashboard views.
 - ✅ **`tasks.add` via MCP** — agents can create new tasks on the fly without leaving the conversation.
 - ✅ **Global installation** — `ahk init` can install the harness to your home directory, shared across projects.
 - ✅ **Input validation** — all CLI prompts validate and retry on bad values.
