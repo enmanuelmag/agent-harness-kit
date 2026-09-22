@@ -8,7 +8,7 @@ import { type HarnessDB, openDB, readStorageStateFile, resolveGlobalStorageDir }
 import { SQLiteDriver } from '@/core/drivers/sqlite'
 import { ActionRepository } from '@/core/repositories/ActionRepository'
 
-import type { ActionFileRow, HarnessConfig, StorageState } from '@/types'
+import type { HarnessConfig, StorageState } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-test')
 
@@ -166,89 +166,6 @@ describe('HarnessDB', () => {
     assert.equal(actions.length, 2)
   })
 
-  test('recordFiles stores a file operation from a single-element array', async () => {
-    const task = await db.addTask({ slug: 'file-task', title: 'File Task' })
-    const action = await db.startAction(task.id, 'builder')
-    const recorded = await db.recordFiles(action.id, [
-      { filePath: 'src/index.ts', operation: 'modified', notes: 'refactored' },
-    ])
-    assert.equal(recorded, 1)
-    const files = await db.getFilesForTask(task.id)
-    assert.equal(files.length, 1)
-    assert.equal(files[0].file_path, 'src/index.ts')
-    assert.equal(files[0].operation, 'modified')
-    assert.equal(files[0].notes, 'refactored')
-  })
-
-  test('recordFiles stores every entry in a multi-element batch atomically', async () => {
-    const task = await db.addTask({ slug: 'file-batch-task', title: 'File Batch Task' })
-    const action = await db.startAction(task.id, 'builder')
-    const recorded = await db.recordFiles(action.id, [
-      { filePath: 'src/a.ts', operation: 'created' },
-      { filePath: 'src/b.ts', operation: 'modified' },
-      { filePath: 'src/c.ts', operation: 'deleted' },
-    ])
-    assert.equal(recorded, 3)
-    const files = await db.getFilesForTask(task.id)
-    assert.equal(files.length, 3)
-    assert.deepEqual(files.map((f) => f.file_path).sort(), ['src/a.ts', 'src/b.ts', 'src/c.ts'])
-  })
-
-  test('recordFiles rolls back the whole batch when one entry is invalid', async () => {
-    const task = await db.addTask({ slug: 'file-rollback-task', title: 'File Rollback Task' })
-    const action = await db.startAction(task.id, 'builder')
-    await assert.rejects(
-      db.recordFiles(action.id, [
-        { filePath: 'src/good.ts', operation: 'modified' },
-        { filePath: 'src/bad.ts', operation: 'not-a-real-operation' as ActionFileRow['operation'] },
-      ])
-    )
-    const files = await db.getFilesForTask(task.id)
-    assert.equal(files.length, 0)
-  })
-
-  test('recordTools stores a tool call from a single-element array', async () => {
-    const task = await db.addTask({ slug: 'tool-task', title: 'Tool Task' })
-    const action = await db.startAction(task.id, 'explorer')
-    const recorded = await db.recordTools(action.id, [
-      { toolName: 'Bash', argsJson: '{"cmd":"ls"}', resultSummary: 'file list' },
-    ])
-    assert.equal(recorded, 1)
-    const top = await db.getTopTools(10)
-    assert.equal(top.length, 1)
-    assert.equal(top[0].tool_name, 'Bash')
-    assert.equal(top[0].uses, 1)
-  })
-
-  test('recordTools rolls back the whole batch when one entry is invalid', async () => {
-    const task = await db.addTask({ slug: 'tool-rollback-task', title: 'Tool Rollback Task' })
-    const action = await db.startAction(task.id, 'explorer')
-    await assert.rejects(
-      db.recordTools(action.id, [{ toolName: 'Read' }, { toolName: null as unknown as string }])
-    )
-    const top = await db.getTopTools(10)
-    assert.equal(
-      top.find((t) => t.tool_name === 'Read'),
-      undefined
-    )
-  })
-
-  test('getTopTools returns tools sorted by usage', async () => {
-    const task = await db.addTask({ slug: 'multi-tools', title: 'Multi Tools' })
-    const action = await db.startAction(task.id, 'lead')
-    const recorded = await db.recordTools(action.id, [
-      { toolName: 'Read' },
-      { toolName: 'Read' },
-      { toolName: 'Bash' },
-    ])
-    assert.equal(recorded, 3)
-    const top = await db.getTopTools(10)
-    assert.equal(top[0].tool_name, 'Read')
-    assert.equal(top[0].uses, 2)
-    assert.equal(top[1].tool_name, 'Bash')
-    assert.equal(top[1].uses, 1)
-  })
-
   test('getStatusSummary counts tasks by status', async () => {
     await db.addTask({ slug: 'p1', title: 'P1' })
     await db.addTask({ slug: 'p2', title: 'P2' })
@@ -402,21 +319,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
       content      TEXT    NOT NULL,
       created_at   TEXT    NOT NULL
     );
-    CREATE TABLE action_files (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      action_id   TEXT    NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-      file_path   TEXT    NOT NULL,
-      operation   TEXT    NOT NULL,
-      notes       TEXT
-    );
-    CREATE TABLE action_tools (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      action_id      TEXT    NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-      tool_name      TEXT    NOT NULL,
-      args_json      TEXT,
-      result_summary TEXT,
-      called_at      TEXT    NOT NULL
-    );
   `
 
   test('migrates an existing UUID-id DB to sequential integers, preserving every row and FK relationship, and continuing the sqlite sequence correctly', async () => {
@@ -451,14 +353,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
       `INSERT INTO action_sections (action_id, section_type, content, created_at) VALUES (?, 'result', 'plan B', ?)`,
       [uuidB, later]
     )
-    await driver.exec(
-      `INSERT INTO action_files (action_id, file_path, operation) VALUES (?, 'src/a.ts', 'modified')`,
-      [uuidA]
-    )
-    await driver.exec(
-      `INSERT INTO action_tools (action_id, tool_name, called_at) VALUES (?, 'Read', ?)`,
-      [uuidB, now]
-    )
 
     // Triggers the migration.
     await driver.ensureSchema()
@@ -486,18 +380,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
     )
     assert.equal(sections.find((s) => s.content === 'plan A')?.action_id, idA)
     assert.equal(sections.find((s) => s.content === 'plan B')?.action_id, idB)
-
-    const files = await driver.query<{ action_id: number; file_path: string }>(
-      `SELECT action_id, file_path FROM action_files`
-    )
-    assert.equal(files.length, 1)
-    assert.equal(files[0].action_id, idA)
-
-    const tools = await driver.query<{ action_id: number; tool_name: string }>(
-      `SELECT action_id, tool_name FROM action_tools`
-    )
-    assert.equal(tools.length, 1)
-    assert.equal(tools[0].action_id, idB)
 
     // Old renamed tables must be gone.
     const leftover = await driver.query<{ name: string }>(
@@ -537,6 +419,38 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
     await driver.close()
   })
 
+  test('removes legacy traceability tables idempotently while preserving actions and sections', async () => {
+    mkdirSync(TMP_MIGRATE, { recursive: true })
+    const driver = new SQLiteDriver(join(TMP_MIGRATE, 'remove-traceability.db'))
+    await driver.ensureSchema()
+    const now = new Date().toISOString()
+    await driver.exec(
+      `INSERT INTO tasks (slug, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      ['preserved-task', 'Preserved task', 'pending', now, now]
+    )
+    await driver.exec(
+      `INSERT INTO actions (task_id, agent, status, created_at) VALUES (1, 'lead', 'completed', ?)`,
+      [now]
+    )
+    await driver.exec(
+      `INSERT INTO action_sections (action_id, section_type, content, created_at) VALUES (1, 'result', 'preserved', ?)`,
+      [now]
+    )
+    await driver.execRaw(`CREATE TABLE action_files (id INTEGER PRIMARY KEY)`)
+    await driver.execRaw(`CREATE TABLE action_tools (id INTEGER PRIMARY KEY)`)
+
+    await driver.ensureSchema()
+    await driver.ensureSchema()
+
+    const tables = await driver.query<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('action_files', 'action_tools')`
+    )
+    assert.equal(tables.length, 0)
+    assert.equal((await driver.query(`SELECT * FROM actions`)).length, 1)
+    assert.equal((await driver.query(`SELECT * FROM action_sections`)).length, 1)
+    await driver.close()
+  })
+
   // ─── resumeIfInterrupted() — task #73 review fix ─────────────────────────
   // The original resumeIfInterrupted() assumed "if actions_old_v2migration
   // exists, all 4 old-suffixed tables exist" and unconditionally dropped
@@ -565,14 +479,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
       `INSERT INTO action_sections (action_id, section_type, content, created_at) VALUES (?, 'result', 'plan A', ?)`,
       [uuid, now]
     )
-    await driver.exec(
-      `INSERT INTO action_files (action_id, file_path, operation) VALUES (?, 'src/a.ts', 'modified')`,
-      [uuid]
-    )
-    await driver.exec(
-      `INSERT INTO action_tools (action_id, tool_name, called_at) VALUES (?, 'Read', ?)`,
-      [uuid, now]
-    )
     return uuid
   }
 
@@ -596,14 +502,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
     assert.equal(sections.length, 1)
     assert.equal(sections[0].content, 'plan A')
     assert.equal(sections[0].action_id, newId)
-
-    const files = await driver.query<{ action_id: number }>(`SELECT action_id FROM action_files`)
-    assert.equal(files.length, 1)
-    assert.equal(files[0].action_id, newId)
-
-    const tools = await driver.query<{ action_id: number }>(`SELECT action_id FROM action_tools`)
-    assert.equal(tools.length, 1)
-    assert.equal(tools[0].action_id, newId)
 
     const leftover = await driver.query<{ name: string }>(
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_old_v2migration'`
@@ -639,8 +537,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
     // before step 3 (recreate) ever runs — no live tables exist at all.
     await driver.execRaw(`ALTER TABLE actions RENAME TO actions_old_v2migration`)
     await driver.execRaw(`ALTER TABLE action_sections RENAME TO action_sections_old_v2migration`)
-    await driver.execRaw(`ALTER TABLE action_files RENAME TO action_files_old_v2migration`)
-    await driver.execRaw(`ALTER TABLE action_tools RENAME TO action_tools_old_v2migration`)
 
     await driver.ensureSchema()
 
@@ -670,13 +566,6 @@ describe('actions.id UUID -> INTEGER migration (task #73)', () => {
     )
     await driver.exec(
       `INSERT INTO actions_old_v2migration (id, task_id, agent, status, created_at) VALUES ('stale-uuid', 1, 'lead', 'completed', ?)`,
-      [now]
-    )
-    await driver.execRaw(
-      `CREATE TABLE action_tools_old_v2migration (id INTEGER PRIMARY KEY, action_id TEXT, tool_name TEXT, args_json TEXT, result_summary TEXT, called_at TEXT)`
-    )
-    await driver.exec(
-      `INSERT INTO action_tools_old_v2migration (action_id, tool_name, called_at) VALUES ('stale-uuid', 'Read', ?)`,
       [now]
     )
     // action_sections_old_v2migration / action_files_old_v2migration were

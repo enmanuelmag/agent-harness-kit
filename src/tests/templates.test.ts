@@ -533,7 +533,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
     assert.ok(parsed.permissions.allow.includes('mcp__agent-harness-kit__actions_start'))
     assert.ok(Array.isArray(parsed.enabledMcpjsonServers))
     assert.ok(parsed.enabledMcpjsonServers.includes('agent-harness-kit'))
-    assert.equal(parsed.permissions.allow.length, 25)
+    assert.equal(parsed.permissions.allow.length, 23)
     teardown()
   })
 
@@ -571,7 +571,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.someOtherKey)
     assert.ok(Array.isArray(parsed.permissions.allow))
-    assert.ok(parsed.permissions.allow.length === 25)
+    assert.ok(parsed.permissions.allow.length === 23)
     teardown()
   })
 })
@@ -1501,7 +1501,7 @@ describe('agent prompt text — no path placeholders (task #59)', () => {
   })
 })
 
-describe('record_tool/record_file tracking guidance — batch-only, no per-call phrasing (task #75)', () => {
+describe('traceability removal from generated instructions', () => {
   const config = applyConfigDefaults({
     name: 'demo-app',
     description: 'demo',
@@ -1510,61 +1510,28 @@ describe('record_tool/record_file tracking guidance — batch-only, no per-call 
     tasksAdapter: 'mcp',
   })
 
-  // Text that described the old, retired single-entry call shape. None of it
-  // should survive anywhere agents are told how to call record_tool/record_file.
-  const staleNeedles = [
-    /After EVERY tool call/,
-    /After EVERY file change/,
-    /toolName>', '<args-summary>', '<why>'\)/,
-    /actions\.record_file\(actionId, '<file-path>'/,
-  ]
-
-  // Text that must be present wherever the tools are documented — proof the
-  // batch array shape (and the "even one entry is a one-element array" rule)
-  // is actually described, not just that the old text is gone.
-  function assertDescribesBatching(text: string, label: string): void {
-    for (const needle of staleNeedles) {
-      assert.doesNotMatch(
-        text,
-        needle,
-        `${label} still contains stale per-call phrasing: ${needle}`
-      )
-    }
-    assert.match(text, /calls:\s*\[/, `${label} should show the calls[] array shape`)
-    assert.match(text, /batch/i, `${label} should describe batching`)
+  function assertOmitsTraceability(text: string, label: string): void {
+    assert.doesNotMatch(text, /actions\.record_(file|tool)/, `${label} must omit logger tools`)
   }
 
-  test('agentsMd() documents batch-only record_tool/record_file', () => {
-    assertDescribesBatching(agentsMd(config), 'agentsMd()')
+  test('agentsMd() omits logger tools', () => {
+    assertOmitsTraceability(agentsMd(config), 'agentsMd()')
   })
 
-  test('claudeMd() documents batch-only record_tool/record_file', () => {
-    assertDescribesBatching(claudeMd(config), 'claudeMd()')
+  test('claudeMd() omits logger tools', () => {
+    assertOmitsTraceability(claudeMd(config), 'claudeMd()')
   })
 
-  test('lead agent template documents batch-only record_tool', () => {
-    assertDescribesBatching(agentLead({ projectName: 'demo' }), 'agentLead()')
+  test('all role templates omit logger tools', () => {
+    assertOmitsTraceability(agentLead({ projectName: 'demo' }), 'agentLead()')
+    assertOmitsTraceability(agentExplorer({ projectName: 'demo' }), 'agentExplorer()')
+    assertOmitsTraceability(agentBuilder({ projectName: 'demo' }), 'agentBuilder()')
+    assertOmitsTraceability(agentReviewer({ projectName: 'demo' }), 'agentReviewer()')
   })
 
-  test('explorer agent template documents batch-only record_tool', () => {
-    assertDescribesBatching(agentExplorer({ projectName: 'demo' }), 'agentExplorer()')
-  })
-
-  test('builder agent template documents batch-only record_tool and record_file, and drops the 1:1 call-count framing', () => {
-    const builder = agentBuilder({ projectName: 'demo' })
-    assertDescribesBatching(builder, 'agentBuilder()')
-    assert.match(builder, /files:\s*\[/, 'agentBuilder() should show the files[] array shape')
-    assert.doesNotMatch(
-      builder,
-      /there must be 5 `actions\.record_file` calls and 12 `actions\.record_tool` calls/,
-      'agentBuilder() should not hard-code a 1:1 call-per-event mapping'
-    )
-  })
-
-  test('reviewer agent template documents batch-only record_tool (acceptance-criteria guidance untouched)', () => {
+  test('reviewer retains acceptance guidance without logger mandates', () => {
     const reviewer = agentReviewer({ projectName: 'demo' })
-    assertDescribesBatching(reviewer, 'agentReviewer()')
-    // The unrelated tasks.acceptance.update guidance is per-criterion by design — must survive as-is.
+    assertOmitsTraceability(reviewer, 'agentReviewer()')
     assert.match(reviewer, /tasks\.acceptance\.update\(criterionId\)/)
     assert.match(reviewer, /one per criterion/)
   })

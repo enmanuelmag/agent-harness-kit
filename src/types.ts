@@ -171,23 +171,6 @@ export interface ActionSectionRow {
   created_at: string
 }
 
-export interface ActionFileRow {
-  id: number
-  action_id: number
-  file_path: string
-  operation: 'read' | 'created' | 'modified' | 'deleted'
-  notes: string | null
-}
-
-export interface ActionToolRow {
-  id: number
-  action_id: number
-  tool_name: string
-  args_json: string | null
-  result_summary: string | null
-  called_at: string
-}
-
 // ─── MCP tool result helpers ──────────────────────────────────────────────────
 
 export interface McpContent {

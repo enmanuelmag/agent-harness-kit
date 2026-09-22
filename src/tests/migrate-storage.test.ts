@@ -100,22 +100,16 @@ async function seedData(db: HarnessDB): Promise<{ taskId: number }> {
   const slug = `seed-task-${++seedCounter}`
   const task = await db.addTask({ slug, title: 'Seed Task', acceptance: ['must pass'] })
   const action = await db.startAction(task.id, 'lead')
-  await db.recordFiles(action.id, [
-    { filePath: 'src/index.ts', operation: 'modified', notes: 'note' },
-  ])
-  await db.recordTools(action.id, [
-    { toolName: 'Bash', argsJson: '{"cmd":"ls"}', resultSummary: 'summary' },
-  ])
   await db.writeSection(action.id, 'result', 'done')
   await db.completeAction(action.id, 'done')
   return { taskId: task.id }
 }
 
-describe('exportJson — full 6-table export (task #47)', () => {
+describe('exportJson — task workflow export', () => {
   const dir = join(TMP, 'export-full')
   afterEach(() => rmSync(TMP, { recursive: true, force: true }))
 
-  test('includes tasks, task_acceptance, actions, action_sections, action_files, action_tools', async () => {
+  test('includes tasks, task_acceptance, actions, and action_sections', async () => {
     mkdirSync(dir, { recursive: true })
     const config = baseConfig({
       storage: localStorage('migrate-storage-test-project', {
@@ -130,8 +124,6 @@ describe('exportJson — full 6-table export (task #47)', () => {
       assert.equal(data.taskAcceptance.length, 1)
       assert.equal(data.actions.length, 1)
       assert.equal(data.sections.length, 1)
-      assert.equal(data.actionFiles.length, 1)
-      assert.equal(data.actionTools.length, 1)
     } finally {
       await db.close()
     }
@@ -142,7 +134,7 @@ describe('importFullExport — id preservation, transactional rollback, sequence
   const dir = join(TMP, 'import-full')
   afterEach(() => rmSync(TMP, { recursive: true, force: true }))
 
-  test('imports all 6 tables into an empty sqlite destination with matching row counts', async () => {
+  test('imports task workflow tables into an empty sqlite destination with matching row counts', async () => {
     mkdirSync(dir, { recursive: true })
     const srcConfig = baseConfig({
       storage: localStorage('migrate-storage-test-project', { sqlitePath: join(dir, 'src.db') }),
@@ -167,8 +159,6 @@ describe('importFullExport — id preservation, transactional rollback, sequence
       assert.equal(counts.task_acceptance, 2)
       assert.equal(counts.actions, 2)
       assert.equal(counts.action_sections, 2)
-      assert.equal(counts.action_files, 2)
-      assert.equal(counts.action_tools, 2)
     } finally {
       await destDriver.close()
     }
