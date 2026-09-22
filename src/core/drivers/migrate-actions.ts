@@ -3,7 +3,7 @@ import { resetAutoincrementSequences } from '../db'
 import type { DBDriver } from './types'
 
 /** Suffix used to rename the pre-migration (UUID/TEXT id) `actions` table
- *  and its 3 FK children out of the way while the new autoincrement-INTEGER
+ *  and its remaining FK child out of the way while the new autoincrement-INTEGER
  *  shape is created and populated. Also the marker `resumeIfInterrupted()`
  *  looks for on every startup, so a migration interrupted mid-way (crash,
  *  kill -9 — a real risk on MySQL, whose DDL isn't transactional) is
@@ -209,6 +209,10 @@ interface OldActionRow {
 }
 
 async function runMigration(driver: DBDriver, dbType: DbType, schemaSql: string): Promise<void> {
+  const actionTables = [] as string[]
+  for (const table of ACTION_TABLES) {
+    if (await tableExists(driver, dbType, table)) actionTables.push(table)
+  }
   // 1. Build the UUID -> sequential-integer map, in creation order.
   const oldOrder = await driver.query<{ id: string }>(
     `SELECT id FROM actions ORDER BY created_at, id`
@@ -228,10 +232,10 @@ async function runMigration(driver: DBDriver, dbType: DbType, schemaSql: string)
   //    resumeIfInterrupted() above is still the last line of defense on all
   //    engines regardless.
   if (dbType === 'mysql') {
-    const renames = ACTION_TABLES.map((table) => `${table} TO ${oldName(table)}`).join(', ')
+    const renames = actionTables.map((table) => `${table} TO ${oldName(table)}`).join(', ')
     await driver.execRaw(`RENAME TABLE ${renames}`)
   } else {
-    for (const table of ACTION_TABLES) {
+    for (const table of actionTables) {
       await driver.execRaw(`ALTER TABLE ${table} RENAME TO ${oldName(table)}`)
     }
   }
@@ -252,29 +256,16 @@ async function runMigration(driver: DBDriver, dbType: DbType, schemaSql: string)
     )
   }
 
-  // 5. Copy the 3 child tables, keeping their own id but remapping action_id.
-  await copyChildTable(driver, 'action_sections', idMap, [
-    'id',
-    'action_id',
-    'section_type',
-    'content',
-    'created_at',
-  ])
-  await copyChildTable(driver, 'action_files', idMap, [
-    'id',
-    'action_id',
-    'file_path',
-    'operation',
-    'notes',
-  ])
-  await copyChildTable(driver, 'action_tools', idMap, [
-    'id',
-    'action_id',
-    'tool_name',
-    'args_json',
-    'result_summary',
-    'called_at',
-  ])
+  // 5. Copy the remaining child table, keeping its own id but remapping action_id.
+  if (actionTables.includes('action_sections')) {
+    await copyChildTable(driver, 'action_sections', idMap, [
+      'id',
+      'action_id',
+      'section_type',
+      'content',
+      'created_at',
+    ])
+  }
 
   // 6. Drop the old renamed tables — children first so FK constraints never block it.
   for (const table of [...CHILD_TABLES, 'actions']) {

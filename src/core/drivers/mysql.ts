@@ -1,6 +1,7 @@
 import mysql, { type ExecuteValues } from 'mysql2/promise'
 
 import { migrateActionsToIntegerIds } from './migrate-actions'
+import { removeTraceabilityTables } from './remove-traceability'
 
 import type { DBDriver } from './types'
 import type { RemoteDBConfig } from '@/types'
@@ -50,32 +51,10 @@ CREATE TABLE IF NOT EXISTS action_sections (
   FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS action_files (
-  id          INT AUTO_INCREMENT PRIMARY KEY,
-  action_id   INT  NOT NULL,
-  file_path   VARCHAR(1000) NOT NULL,
-  operation   VARCHAR(20)  NOT NULL
-              CHECK(operation IN ('read','created','modified','deleted')),
-  notes       TEXT,
-  FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS action_tools (
-  id             INT AUTO_INCREMENT PRIMARY KEY,
-  action_id      INT NOT NULL,
-  tool_name      VARCHAR(255) NOT NULL,
-  args_json      TEXT,
-  result_summary TEXT,
-  called_at      VARCHAR(30)  NOT NULL,
-  FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE
-);
-
 CREATE INDEX IF NOT EXISTS idx_tasks_status      ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_actions_task_id   ON actions(task_id);
 CREATE INDEX IF NOT EXISTS idx_actions_agent     ON actions(agent);
 CREATE INDEX IF NOT EXISTS idx_actions_status    ON actions(status);
-CREATE INDEX IF NOT EXISTS idx_action_files_path ON action_files(file_path(255));
-CREATE INDEX IF NOT EXISTS idx_action_tools_name ON action_tools(tool_name);
 `
 
 type MySQLPool = mysql.Pool
@@ -123,6 +102,7 @@ export class MySQLDriver implements DBDriver {
     // Run outside the connection above (own execRaw/query calls via the pool)
     // since MySQL's DDL isn't transactional either way.
     await migrateActionsToIntegerIds(this, 'mysql', SCHEMA)
+    await removeTraceabilityTables(this, 'mysql')
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {

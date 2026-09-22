@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 
 import { lastInsertId, openSQLite, type SQLiteDB } from '../sqlite-adapter'
 import { migrateActionsToIntegerIds } from './migrate-actions'
+import { removeTraceabilityTables } from './remove-traceability'
 
 import type { DBDriver } from './types'
 
@@ -49,30 +50,10 @@ CREATE TABLE IF NOT EXISTS action_sections (
   created_at   TEXT    NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS action_files (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  action_id   INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-  file_path   TEXT    NOT NULL,
-  operation   TEXT    NOT NULL
-              CHECK(operation IN ('read','created','modified','deleted')),
-  notes       TEXT
-);
-
-CREATE TABLE IF NOT EXISTS action_tools (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  action_id      INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-  tool_name      TEXT    NOT NULL,
-  args_json      TEXT,
-  result_summary TEXT,
-  called_at      TEXT    NOT NULL
-);
-
 CREATE INDEX IF NOT EXISTS idx_tasks_status      ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_actions_task_id   ON actions(task_id);
 CREATE INDEX IF NOT EXISTS idx_actions_agent     ON actions(agent);
 CREATE INDEX IF NOT EXISTS idx_actions_status    ON actions(status);
-CREATE INDEX IF NOT EXISTS idx_action_files_path ON action_files(file_path);
-CREATE INDEX IF NOT EXISTS idx_action_tools_name ON action_tools(tool_name);
 `
 
 export class SQLiteDriver implements DBDriver {
@@ -117,6 +98,7 @@ export class SQLiteDriver implements DBDriver {
     // Migration (task #73): actions.id TEXT/UUID -> INTEGER autoincrement,
     // preserving all existing rows. Idempotent — no-op once already migrated.
     await migrateActionsToIntegerIds(this, 'sqlite', SCHEMA)
+    await removeTraceabilityTables(this, 'sqlite')
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
