@@ -390,20 +390,25 @@ function injectCapabilityHints(md: string, capabilityHints: string): string {
   // Find the main H1 heading line and insert after it (and any blank line following).
   const headingMatch = md.match(/^(#\s+.*?\n\n)/m)
   if (!headingMatch) return md
-  return `${headingMatch[1]}## Available Research Tools\n\n${capabilityHints}\n\n${md.slice(headingMatch[1].length)}`
+  // The heading is after YAML frontmatter in agent templates. Preserve the
+  // whole prefix rather than treating the heading as if it started at offset 0.
+  const headingStart = headingMatch.index ?? 0
+  const heading = headingMatch[1]
+  const afterHeading = headingStart + heading.length
+  return `${md.slice(0, afterHeading)}## Available Research Tools\n\n${capabilityHints}\n\n${md.slice(afterHeading)}`
 }
 
 export function injectDelegationGuidance(md: string, delegationGuidance: string): string {
   if (!delegationGuidance) return md
   // Try to find the existing "Available Research Tools" section and insert
-  // after its closing blank line; otherwise fall back to right after H1.
-  const researchSection = md.match(/(## Available Research Tools\n\n[\s\S]*?)\n\n/m)
+  // after its content; otherwise fall back to right after H1. A capability
+  // section can contain several lines, so do not stop at its first blank line.
+  const researchSection = md.match(/## Available Research Tools\n\n[\s\S]*?(?=\n(?:## |---\n)|$)/)
   if (researchSection) {
-    const insertionPoint = researchSection[1].length + '## Available Research Tools\n\n'.length
-    const afterResearch = md.slice(insertionPoint)
+    const insertionPoint = (researchSection.index ?? 0) + researchSection[0].length
     return (
       md.slice(0, insertionPoint) +
-      `\n## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${afterResearch}`
+      `\n\n## Provider Delegation Guidance\n\n${delegationGuidance}\n\n${md.slice(insertionPoint)}`
     )
   }
   // Fallback: insert after H1 heading block.

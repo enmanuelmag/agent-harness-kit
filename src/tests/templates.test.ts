@@ -57,6 +57,19 @@ function teardown() {
   rmSync(TMP, { recursive: true, force: true })
 }
 
+describe('agent capability hints', () => {
+  test('preserve YAML frontmatter before inserting hints into the Markdown body', () => {
+    const hinted = agentExplorer({ projectName: 'demo' }, '- Context7 is available')
+    const result = translateFrontmatterForClaudeCode(hinted, 'explorer', { model: 'sonnet' })
+
+    assert.match(result, /^---\nname: explorer\ndescription: >\n/)
+    assert.match(result, /^model: sonnet$/m)
+    assert.match(result, /^disallowedTools:\n  - Write\n  - Edit$/m)
+    assert.doesNotMatch(result, /^tools:/m)
+    assert.ok(result.indexOf('## Available Research Tools') > result.indexOf('# Explorer Agent'))
+  })
+})
+
 // The merger suites below assert the package-manager-mediated command shape,
 // which only applies when the package is installed locally in the project
 // being configured. TMP is the cwd passed to those mergers, so it must
