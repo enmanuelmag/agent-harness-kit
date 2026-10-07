@@ -112,10 +112,10 @@ function agentsMdBody(
 ## Health check (run before making codebase changes)
 
 \`\`\`
-ahk health
+health.run(taskId)
 \`\`\`
 
-If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green. On a first scaffold, the marked placeholder/dummy check is an exception only for exploration and narrowly-scoped creation or adaptation of the native health script; it never proves health and cannot close a task. If only the opposite-platform script exists, have the builder adapt its checks to the native file instead of blindly translating it. Keep the compact log wrapper: 10 lines on success, 100 on failure.
+If it is not passed, stop and report the issue. Do not proceed with codebase changes until health is green. Use \`health.run(taskId)\` through MCP before work and immediately before \`tasks.update(taskId, 'done')\`; it stores the only evidence accepted for completion. \`ahk health\` remains available for manual, stateless checks. On a first scaffold, the marked placeholder/dummy check is an exception only for exploration and narrowly-scoped creation or adaptation of the native health script; it never proves health and cannot close a task. If only the opposite-platform script exists, have the builder adapt its checks to the native file instead of blindly translating it. Keep the compact log wrapper: 10 lines on success, 100 on failure.
 
 ## Harness data (source of truth)
 
@@ -140,7 +140,8 @@ actions.handoff.write  actionId recipient ...                 → recipient-dire
 tasks.add            title [slug] [description] [acceptance] → create a new task from natural language
 tasks.get            [status]                               → list tasks (pending | in_progress | done | blocked)
 tasks.claim          id                                     → atomically claim a pending task
-tasks.update         id status                              → change task status
+health.run           taskId                                 → run and persist task health evidence
+tasks.update         id status                              → change task status; done requires fresh health.run
 tasks.acceptance.update criterionId                        → mark an acceptance criterion as met
 docs.search          query                                  → search ${docsPath} for relevant content
 \`\`\`
@@ -149,7 +150,7 @@ docs.search          query                                  → search ${docsPat
 
 \`\`\`
 1. INIT
-   - Assess user intent: only run ahk health if changes are needed
+   - Assess user intent: for changes, select a task and call health.run(taskId) before work
    - tasks.get('in_progress') → resume if something is in progress
    - tasks.get('pending') → pick lowest id
 ${extraInitLines ? '\n' : ''}${extraInitLines}
@@ -158,8 +159,8 @@ ${extraInitLines ? '\n' : ''}${extraInitLines}
      - Closes with actions.complete(actionId, summary)
 
 3. CLOSE
+     - health.run(taskId) → must pass immediately before closing
      - tasks.update(taskId, 'done')
-     - Run ahk health (if changes were made) → must be green before closing
 \`\`\`
 
 ## Agent roles

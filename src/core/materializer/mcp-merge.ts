@@ -124,6 +124,7 @@ export function mergeClaudeSettingsJson(filePath: string): void {
 
 // Merge MCP tool permissions into .claude/settings.local.json
 export const MCP_CLAUDE_PERMISSIONS_LEAD = [
+  'mcp__agent-harness-kit__health_run',
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
   'mcp__agent-harness-kit__actions_complete',
@@ -181,6 +182,7 @@ export const MCP_CLAUDE_PERMISSIONS_BUILDER = [
 ]
 
 export const MCP_CLAUDE_PERMISSIONS_REVIEWER = [
+  'mcp__agent-harness-kit__health_run',
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
   'mcp__agent-harness-kit__actions_complete',

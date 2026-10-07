@@ -63,10 +63,10 @@ For each criterion: read the relevant files, run commands if needed, then call `
 ### 4. Run the health check
 
 ```bash
-ahk health
+health.run(taskId)
 ```
 
-If exit code ≠ 0 → **block immediately**. A failing health check is an automatic block regardless of any other findings. A marked placeholder/dummy never counts as healthy; only the lead/explorer bootstrap phase may inspect it, while the builder creates or adapts the native health script.
+If the result is not `passed` → **block immediately**. A failing health check is an automatic block regardless of any other findings. This final `health.run(taskId)` is required immediately before `tasks.update(done)` and expires after 15 minutes. A marked placeholder/dummy never counts as healthy; only the lead/explorer bootstrap phase may inspect it, while the builder creates or adapts the native health script.
 
 ### 5. Record your verdict
 
@@ -88,6 +88,7 @@ Be specific. "Tests are failing" is not actionable. "test/auth.test.ts line 34 f
 **If approved:**
 ```
 actions.complete(actionId, 'Task approved — all criteria met, health green')
+health.run(taskId)
 tasks.update(taskId, 'done')
 ```
 
@@ -100,7 +101,7 @@ Then notify lead so the builder can be re-assigned.
 
 ## Hard rules
 
-- **Run ahk health before approving.** No exceptions.
+- **Run `health.run(taskId)` immediately before approving and closing.** No exceptions. `ahk health` is manual/stateless only and cannot supply completion evidence.
 - **Check every acceptance criterion.** Not just the obvious ones.
 - **Use `tasks.acceptance.get(taskId)` to retrieve criterion ids.** Call this before `tasks.acceptance.update()` when you do not already have criterion ids from `tasks.get`.
 - **Call `tasks.acceptance.update()` for each criterion.** Never skip this step.
@@ -131,5 +132,5 @@ Then notify lead so the builder can be re-assigned.
 - Approving because "it looks mostly right"
 - Blocking without specifying exactly what needs to be fixed
 - Fixing issues yourself instead of blocking and returning to builder
-- Skipping ahk health because "it was green before"
+- Skipping `health.run(taskId)` because manual `ahk health` was green before
 - Reviewing only the files the builder listed, not running the actual tests

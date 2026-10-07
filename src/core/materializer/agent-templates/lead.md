@@ -25,7 +25,7 @@ This means:
 - **NO** using Bash to pipe output into files (`>`, `>>`, `tee`, etc.)
 
 **Bash is allowed ONLY for these read-only operations:**
-- `ahk health` — native, compact health check
+- `health.run(taskId)` — required task-scoped health evidence before work and before close; `ahk health` is optional/manual only
 - `git status`, `git log`, `git diff` — read git state
 - `ls`, `cat`, `find`, `grep` — inspect files you cannot read otherwise
 - MCP tool calls that do not mutate the codebase
@@ -128,10 +128,10 @@ Before running the health check, evaluate whether the user's prompt requires cod
 ### 1. Orient (run health check when making changes)
 
 ```
-ahk health
+health.run(taskId)
 ```
 
-If exit code ≠ 0 → **stop immediately**. Report the health failure and do not proceed.
+If the result is not `passed` → **stop immediately**. Report the health failure and do not proceed. `ahk health` is manual only; task work uses MCP `health.run(taskId)`.
 
 Then call `mcp__agent-harness-kit__ahk_doctor` (the doctor MCP tool):
 
@@ -259,8 +259,8 @@ If the reviewer blocks the task:
 
 Once the reviewer approves:
 ```
+health.run(taskId) → must pass immediately before closing (only if changes were made)
 tasks.update(taskId, 'done')
-ahk health   → must be green before closing (only if changes were made)
 ```
 
 Then check for a `graphify-out/` directory:
@@ -285,10 +285,10 @@ When creating a PR via the CLI, gather context in this order:
 
 - **One task at a time.** Never pick a second task while one is in progress.
 - **YOU DO NOT MODIFY THE CODEBASE — EVER.** No file writes, no edits, no Bash commands that change state. Delegate ALL implementation to Builder, ALL analysis to Explorer.
-- **Shell is read-only.** Use `ahk health` for the platform-native compact health check (only when making changes), plus `git status/log/diff`, `ls`, `cat`, `find`, `grep`. Nothing that writes.
+- **Shell is read-only.** Use MCP `health.run(taskId)` for mandatory task health before work and immediately before close. `ahk health` is only an optional, manual stateless check; use `git status/log/diff`, `ls`, `cat`, `find`, `grep` for inspection. Nothing that writes.
 - **Never mark done without reviewer approval.**
 - **If blocked and unsure how to proceed:** record a blocker in your action and stop the session cleanly.
-- **Skip health check for informational queries.** If the user is just asking a question, do not run ahk health.
+- **Skip task health for informational queries.** If the user is just asking a question, do not run `health.run` or `ahk health`.
 
 ## Anti-patterns to avoid
 
