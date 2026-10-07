@@ -143,6 +143,27 @@ export class HarnessDB {
     return (await this.tasks.getById(task.id))!
   }
 
+  /** Atomically closes a task only when this server's recent, post-claim health
+   * evidence is still the latest result. Do not replace this with a read then
+   * update: a later failed health run must invalidate an earlier pass. */
+  async completeTaskWithHealthEvidence(id: number, ttlMs: number, clock = new Date()): Promise<TaskRow | null> {
+    const now = clock.toISOString()
+    const cutoff = new Date(clock.getTime() - ttlMs).toISOString()
+    return this.driver.transaction(async (tx) => {
+      const changed = await tx.exec(
+        `UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ?
+         WHERE id = ? AND archived_at IS NULL AND status != 'done'
+           AND health_status = 'passed' AND health_started_at > started_at
+           AND health_completed_at >= ? AND health_completed_at <= ?`,
+        [now, now, id, cutoff, now]
+      )
+      if (!changed) return null
+      const actions = new ActionRepository(tx)
+      await actions.closeOrphaned(id, now)
+      return new TaskRepository(tx).getById(id)
+    })
+  }
+
   async claimTask(id: number, agent: string): Promise<TaskRow | null> {
     const now = new Date().toISOString()
     return this.driver.transaction(async (tx) => {

@@ -21,6 +21,7 @@ import {
   type SpecMetadata,
   SpecStore,
 } from './specs'
+import { HEALTH_EVIDENCE_TTL_MS, runTaskHealthCheck } from './task-health'
 
 import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types'
 
@@ -168,6 +169,15 @@ const SPEC_TOOLS = [
 
 const TOOLS = [
   ...SPEC_TOOLS,
+  {
+    name: 'health.run',
+    description: 'Run the native health check for a task and persist server-owned completion evidence. Run before work and immediately before tasks.update(done).',
+    inputSchema: {
+      type: 'object',
+      properties: { taskId: { type: 'number', description: 'Positive task ID' } },
+      required: ['taskId'],
+    },
+  },
   {
     name: 'actions.start',
     description: 'Start a new action for a task. Returns an actionId.',
@@ -864,6 +874,13 @@ export async function dispatch(
       return ok(JSON.stringify(tasks))
     }
 
+    case 'health.run': {
+      const taskId = num(args, 'taskId')
+      if (taskId < 1) throw new Error('taskId must be a positive integer')
+      const result = await runTaskHealthCheck(db, cwd, config, taskId)
+      return ok(JSON.stringify(result), result.state !== 'passed')
+    }
+
     case 'tasks.claim': {
       const id = num(args, 'id')
       const agent = str(args, 'agent')
@@ -887,7 +904,11 @@ export async function dispatch(
       const id = num(args, 'id')
       const status = str(args, 'status') as TaskStatus
       if (status === 'done') {
-        await db.closeOrphanedActions(id)
+        const task = await db.completeTaskWithHealthEvidence(id, HEALTH_EVIDENCE_TTL_MS)
+        if (!task) {
+          return ok(JSON.stringify({ error: 'recent_task_health_required', taskId: id, ttlMs: HEALTH_EVIDENCE_TTL_MS }), true)
+        }
+        return ok(JSON.stringify(task))
       }
       const task = await db.updateTaskStatus(id, status)
       return ok(JSON.stringify(task))

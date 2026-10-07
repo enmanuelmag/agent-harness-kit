@@ -103,7 +103,7 @@ export class TaskRepository {
         [status, extra.completed_at, now, id]
       )
     } else {
-      await this.driver.exec(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`, [
+      await this.driver.exec(`UPDATE tasks SET status = ?, health_run_id = NULL, health_status = NULL, health_started_at = NULL, health_completed_at = NULL, health_log_path = NULL, health_script_path = NULL, updated_at = ? WHERE id = ?`, [
         status,
         now,
         id,
@@ -172,8 +172,22 @@ export class TaskRepository {
 
   async claim(id: number, agent: string, now: string): Promise<number> {
     return this.driver.exec(
-      `UPDATE tasks SET status = 'in_progress', assigned_to = ?, started_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'`,
+      `UPDATE tasks SET status = 'in_progress', assigned_to = ?, started_at = ?, health_run_id = NULL, health_status = NULL, health_started_at = NULL, health_completed_at = NULL, health_log_path = NULL, health_script_path = NULL, updated_at = ? WHERE id = ? AND status = 'pending'`,
       [agent, now, now, id]
+    )
+  }
+
+  async reserveHealthRun(id: number, runId: string, startedAt: string, scriptPath: string): Promise<number> {
+    return this.driver.exec(
+      `UPDATE tasks SET health_run_id = ?, health_status = 'running', health_started_at = ?, health_completed_at = NULL, health_log_path = NULL, health_script_path = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL`,
+      [runId, startedAt, scriptPath, startedAt, id]
+    )
+  }
+
+  async finishHealthRun(id: number, runId: string, status: 'passed' | 'failed', completedAt: string, logPath: string | null, scriptPath: string | null): Promise<number> {
+    return this.driver.exec(
+      `UPDATE tasks SET health_status = ?, health_completed_at = ?, health_log_path = ?, health_script_path = COALESCE(?, health_script_path), updated_at = ? WHERE id = ? AND health_run_id = ? AND health_status = 'running'`,
+      [status, completedAt, logPath, scriptPath, completedAt, id, runId]
     )
   }
 
