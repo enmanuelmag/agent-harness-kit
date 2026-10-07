@@ -117,7 +117,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Structured 5-agent workflow** — Lead, Explorer, Consultant, Builder, and Reviewer each have defined responsibilities and can only act within their role.
 - **Atomic task claiming** — agents use `tasks.claim()` which uses a SQLite transaction to prevent two agents from picking up the same task at the same time.
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
-- **Health gate** — agents must run `ahk health` and get a green exit before starting or closing any task. You define what "healthy" means.
+- **Health gate** — agents must call MCP `health.run(taskId)` and get a green result before starting and immediately before closing a task. `ahk health` remains a manual, stateless check. You define what "healthy" means.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
 - **Specification discovery** — `ahk-use-cases`, `ahk-feature`, and `ahk-fix` turn product requests, Jira ideas, and defects into reviewable drafts in `docs/specs/`. `ahk-use-case-tech` creates a linked technical draft only after an approved use case, feature, or fix; MCP can search, read, edit, relate, validate, and approve the documents.
 - **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
@@ -340,6 +340,8 @@ ahk status --json    # machine-readable output
 
 Runs the native health script (`health.sh` on Linux/macOS, `health.bat` on Windows) and reports a compact result. Exit 0 = healthy, exit 1 = something is wrong.
 
+This is a manual, stateless command. Agents must instead call MCP `health.run(taskId)` before beginning a task and again immediately before `tasks.update(id, 'done')`. The server stores only the final run metadata; a passing run expires after 15 minutes and must have begun after the task was claimed. Failed or placeholder runs invalidate prior evidence.
+
 ```bash
 ahk health
 ```
@@ -436,7 +438,7 @@ ahk task list --json             # machine-readable output
 
 ### `ahk task done <id|slug>`
 
-Marks a task as done. Runs the health check first if health is required — if it fails, the task is not closed.
+Marks a task as done. It runs and persists the same task-scoped health evidence as MCP `health.run`; if it fails, is a placeholder, or cannot pass the 15-minute proof gate, the task is not closed.
 
 ```bash
 ahk task done 3
@@ -927,6 +929,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `tasks.get`               | `status?`                                       | List tasks, optionally filtered by `pending \| in_progress \| done \| blocked`                                                                                                      |
 | `tasks.claim`             | `id, agent`                                     | Atomically claim a pending task. Returns `task_already_claimed` if another agent got it first                                                                                       |
 | `tasks.update`            | `id, status`                                    | Change task status                                                                                                                                                                  |
+| `health.run`              | `taskId`                                        | Run native health and persist the 15-minute, server-owned evidence required by `tasks.update(done)`                                                                              |
 | `tasks.add`               | `title, slug?, description?, acceptance?`       | Create a new task directly from MCP (agents can queue work on the fly)                                                                                                              |
 | `tasks.acceptance.update` | `criterionId`                                   | Mark an acceptance criterion as met. Criterion IDs come from `tasks.acceptance_get`                                                                                                 |
 | `actions.start`           | `taskId, agent`                                 | Start a new action, returns `actionId`                                                                                                                                              |
@@ -967,6 +970,7 @@ The harness exposes these tools via MCP. Agents use them instead of reading file
 | `tasks.claim`                 |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
 | `tasks.add`                   |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
 | `tasks.update`                |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
+| `health.run`                  |  ✅  |    ❌    |     ❌     |   ❌    |    ✅    |
 | `tasks.edit`                  |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
 | `tasks.archive` / `unarchive` |  ✅  |    ❌    |     ❌     |   ✅    |    ✅    |
 | `tasks.acceptance_get`        |  ✅  |    ✅    |     ✅     |   ✅    |    ✅    |
