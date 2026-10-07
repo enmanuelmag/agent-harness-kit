@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { renderDelegationGuidance } from './delegation-guidance'
@@ -11,6 +11,7 @@ import {
   writeAgentFiles,
   writeSkills,
 } from './scaffold-utils'
+import { ensureNativeHealthScaffold } from './scaffold-utils'
 import {
   agentBuilderToml,
   agentConsultantToml,
@@ -19,7 +20,6 @@ import {
   agentLeadToml,
   agentReviewerToml,
   agentsMd,
-  HEALTH_SH,
 } from './templates'
 
 import type { BuildMaterializerOptions, BuildReport, Materializer } from './index'
@@ -100,10 +100,7 @@ export class CodexCliMaterializer implements Materializer {
     // markerless file would look human-edited and freeze config propagation).
     write('AGENTS.md', stampGenerated(agentsMd(config)))
 
-    // health.sh — only create if it doesn't exist
-    if (!existsSync(join(cwd, 'health.sh'))) {
-      write('health.sh', HEALTH_SH, 0o755)
-    }
+    ensureNativeHealthScaffold(cwd)
 
     // .codex/agents/ — user-owned: create when missing, never overwrite
     writeAgentFiles(cwd, codexAgentFiles(config, codexAgentModels))

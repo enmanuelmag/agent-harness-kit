@@ -3,9 +3,26 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { getDefaultHealthScriptPath } from '@/core/health-check'
+
 import { GITIGNORE_ENTRIES, injectDelegationGuidance } from './templates'
+import { HEALTH_BAT, HEALTH_SH } from './templates'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+/** Create only the native starter health check. Existing scripts are user-owned;
+ * an opposite-platform script is intentionally left intact for a builder to
+ * inspect and adapt instead of attempting unsafe shell translation. */
+export function ensureNativeHealthScaffold(cwd: string, platform = process.platform): string | null {
+  const relPath = getDefaultHealthScriptPath(platform)
+  const path = join(cwd, relPath)
+  if (existsSync(path)) return null
+  writeFileSync(path, platform === 'win32' ? HEALTH_BAT : HEALTH_SH, {
+    encoding: 'utf8',
+    mode: platform === 'win32' ? undefined : 0o755,
+  })
+  return relPath
+}
 
 /* NOTE: the single-file `writeAgentFile()` was folded into `writeAgentFiles()`
  * below. Keeping both would have left two competing write policies in the same

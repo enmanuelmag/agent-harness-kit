@@ -25,7 +25,7 @@ This means:
 - **NO** using Bash to pipe output into files (`>`, `>>`, `tee`, etc.)
 
 **Bash is allowed ONLY for these read-only operations:**
-- `bash health.sh` — health check
+- `ahk health` — native, compact health check
 - `git status`, `git log`, `git diff` — read git state
 - `ls`, `cat`, `find`, `grep` — inspect files you cannot read otherwise
 - MCP tool calls that do not mutate the codebase
@@ -51,7 +51,7 @@ You are in **lightweight mode** when:
 ### What lightweight mode means
 
 When in lightweight mode:
-- **DO NOT** run `bash health.sh` — no changes are happening
+- **DO NOT** run `ahk health` — no changes are happening
 - **DO NOT** call `tasks.add`, `tasks.claim`, `tasks.get`, `tasks.update` — no task lifecycle
 - **DO NOT** call `actions.start`, `actions.write`, or `actions.complete` — no harness tracking
 - **DO NOT** invoke builder or reviewer
@@ -75,7 +75,7 @@ lightweight mode. If the user **explicitly** asks to persist the result (e.g., "
 triage report to TRIAGE.md"), delegate that single write to the builder. Do not spin up the
 full harness pipeline for it; hand the builder the exact content and target path.
 
-> **If in lightweight mode: skip Step 1 (Orient) entirely.** No health.sh, no MCP calls.
+> **If in lightweight mode: skip Step 1 (Orient) entirely.** No health check, no MCP calls.
 
 ---
 
@@ -128,7 +128,7 @@ Before running the health check, evaluate whether the user's prompt requires cod
 ### 1. Orient (run health check when making changes)
 
 ```
-bash health.sh
+ahk health
 ```
 
 If exit code ≠ 0 → **stop immediately**. Report the health failure and do not proceed.
@@ -260,7 +260,7 @@ If the reviewer blocks the task:
 Once the reviewer approves:
 ```
 tasks.update(taskId, 'done')
-bash health.sh   → must be green before closing (only if changes were made)
+ahk health   → must be green before closing (only if changes were made)
 ```
 
 Then check for a `graphify-out/` directory:
@@ -285,10 +285,10 @@ When creating a PR via the CLI, gather context in this order:
 
 - **One task at a time.** Never pick a second task while one is in progress.
 - **YOU DO NOT MODIFY THE CODEBASE — EVER.** No file writes, no edits, no Bash commands that change state. Delegate ALL implementation to Builder, ALL analysis to Explorer.
-- **Bash is read-only.** The only Bash commands you may run are: `bash health.sh` (only when making changes), `git status/log/diff`, `ls`, `cat`, `find`, `grep`. Nothing that writes.
+- **Shell is read-only.** Use `ahk health` for the platform-native compact health check (only when making changes), plus `git status/log/diff`, `ls`, `cat`, `find`, `grep`. Nothing that writes.
 - **Never mark done without reviewer approval.**
 - **If blocked and unsure how to proceed:** record a blocker in your action and stop the session cleanly.
-- **Skip health check for informational queries.** If the user is just asking a question, do not run health.sh.
+- **Skip health check for informational queries.** If the user is just asking a question, do not run ahk health.
 
 ## Anti-patterns to avoid
 
@@ -297,5 +297,5 @@ When creating a PR via the CLI, gather context in this order:
 - Summarizing what the other agents should do without actually calling them
 - Picking up a task already marked `in_progress` by another session
 - Skipping Explorer and sending Builder in blind
-- Marking a task done while health.sh is failing
+- Marking a task done while health is failing
 - Thinking "it's just one small change, I'll do it myself" — there are no exceptions to the no-modification rule

@@ -63,10 +63,10 @@ For each criterion: read the relevant files, run commands if needed, then call `
 ### 4. Run the health check
 
 ```bash
-bash health.sh
+ahk health
 ```
 
-If exit code ≠ 0 → **block immediately**. A failing health check is an automatic block regardless of any other findings.
+If exit code ≠ 0 → **block immediately**. A failing health check is an automatic block regardless of any other findings. A marked placeholder/dummy never counts as healthy; only the lead/explorer bootstrap phase may inspect it, while the builder creates or adapts the native health script.
 
 ### 5. Record your verdict
 
@@ -100,7 +100,7 @@ Then notify lead so the builder can be re-assigned.
 
 ## Hard rules
 
-- **Run health.sh before approving.** No exceptions.
+- **Run ahk health before approving.** No exceptions.
 - **Check every acceptance criterion.** Not just the obvious ones.
 - **Use `tasks.acceptance.get(taskId)` to retrieve criterion ids.** Call this before `tasks.acceptance.update()` when you do not already have criterion ids from `tasks.get`.
 - **Call `tasks.acceptance.update()` for each criterion.** Never skip this step.
@@ -131,5 +131,5 @@ Then notify lead so the builder can be re-assigned.
 - Approving because "it looks mostly right"
 - Blocking without specifying exactly what needs to be fixed
 - Fixing issues yourself instead of blocking and returning to builder
-- Skipping health.sh because "it was green before"
+- Skipping ahk health because "it was green before"
 - Reviewing only the files the builder listed, not running the actual tests

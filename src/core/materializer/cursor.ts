@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { renderDelegationGuidance } from './delegation-guidance'
@@ -12,6 +12,7 @@ import {
   writeAgentFiles,
   writeSkills,
 } from './scaffold-utils'
+import { ensureNativeHealthScaffold } from './scaffold-utils'
 import {
   agentBuilder,
   agentConsultant,
@@ -19,7 +20,6 @@ import {
   agentLead,
   agentReviewer,
   agentsMd,
-  HEALTH_SH,
   translateFrontmatterForCursor,
 } from './templates'
 
@@ -87,7 +87,7 @@ export class CursorMaterializer implements Materializer {
       writeFileSync(abs, content, { encoding: 'utf8', mode })
     }
     write('AGENTS.md', stampGenerated(agentsMd(config, hints)))
-    if (!existsSync(join(cwd, 'health.sh'))) write('health.sh', HEALTH_SH, 0o755)
+    ensureNativeHealthScaffold(cwd)
     writeAgentFiles(cwd, cursorAgentFiles(config, cursorAgentModels, hints))
     mergeCursorMcpJson(
       join(cwd, '.cursor/mcp.json'),

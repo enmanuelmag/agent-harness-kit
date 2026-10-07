@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { renderDelegationGuidance } from './delegation-guidance'
@@ -11,6 +11,7 @@ import {
   writeAgentFiles,
   writeSkills,
 } from './scaffold-utils'
+import { ensureNativeHealthScaffold } from './scaffold-utils'
 import {
   agentBuilder,
   agentConsultant,
@@ -18,7 +19,6 @@ import {
   agentLead,
   agentReviewer,
   agentsMd,
-  HEALTH_SH,
   translateFrontmatterForGrok,
 } from './templates'
 
@@ -78,10 +78,7 @@ export class GrokMaterializer implements Materializer {
     // equivalent file — AGENTS.md is the sole provider-agnostic navigation doc.
     write('AGENTS.md', stampGenerated(agentsMd(config)))
 
-    // health.sh — only create if it doesn't exist
-    if (!existsSync(join(cwd, 'health.sh'))) {
-      write('health.sh', HEALTH_SH, 0o755)
-    }
+    ensureNativeHealthScaffold(cwd)
 
     // .grok/agents/ — user-owned: create when missing, never overwrite
     writeAgentFiles(cwd, grokAgentFiles(config))

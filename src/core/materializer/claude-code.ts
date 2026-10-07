@@ -1,4 +1,3 @@
-import { existsSync } from 'fs'
 import { join } from 'path'
 
 import { write } from '@/utils/file'
@@ -18,6 +17,7 @@ import {
   writeAgentFiles,
   writeSkills,
 } from './scaffold-utils'
+import { ensureNativeHealthScaffold } from './scaffold-utils'
 import {
   agentBuilder,
   agentConsultant,
@@ -26,7 +26,6 @@ import {
   agentReviewer,
   agentsMd,
   claudeMd,
-  HEALTH_SH,
   translateFrontmatterForClaudeCode,
 } from './templates'
 
@@ -116,10 +115,7 @@ export class ClaudeCodeMaterializer implements Materializer {
     write(cwd, 'AGENTS.md', stampGenerated(agentsMd(config, capabilityHints)))
     write(cwd, 'CLAUDE.md', stampGenerated(claudeMd(config, capabilityHints)))
 
-    // health.sh — only create if it doesn't exist
-    if (!existsSync(join(cwd, 'health.sh'))) {
-      write(cwd, 'health.sh', HEALTH_SH, 0o755)
-    }
+    ensureNativeHealthScaffold(cwd)
 
     // .claude/agents/ — user-owned: create when missing, never overwrite
     writeAgentFiles(cwd, claudeAgentFiles(config, claudeAgentModels, capabilityHints))

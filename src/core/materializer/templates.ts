@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { getDefaultHealthScriptPath } from '@/core/health-check'
+
 import {
   claudeDisallowedTools,
   codexRestrictionNotice,
@@ -35,6 +37,7 @@ function loadAgentTemplate(
 
 export const HEALTH_SH = `#!/usr/bin/env bash
 # health.sh — project health check for agent-harness-kit
+# AHK_HEALTH_CHECK_PLACEHOLDER — replace this marker when implementing real checks.
 #
 # This script must exit 0 when the project is healthy.
 # Agents will run this before making codebase changes.
@@ -48,10 +51,34 @@ export const HEALTH_SH = `#!/usr/bin/env bash
 # Until you implement it, this script intentionally exits 1
 # so agents know the environment is not verified.
 
-echo "health.sh not implemented yet."
-echo "Edit this file with your project's health checks."
-echo "It must exit 0 for agents to start working."
-exit 1
+LOG_FILE="$(mktemp "\${TMPDIR:-/tmp}/ahk-health.XXXXXX")"
+(
+  echo "health.sh not implemented yet."
+  echo "Edit this file with your project's health checks."
+  echo "It must exit 0 for agents to start working."
+  exit 1
+) >"$LOG_FILE" 2>&1
+status=$?
+if [ "$status" -eq 0 ]; then tail -n 10 "$LOG_FILE"; else tail -n 100 "$LOG_FILE"; fi
+echo "Full health log: $LOG_FILE" >&2
+exit "$status"
+`
+
+export const HEALTH_BAT = `@echo off
+REM health.bat — project health check for agent-harness-kit
+REM AHK_HEALTH_CHECK_PLACEHOLDER — replace this marker when implementing real checks.
+setlocal DisableDelayedExpansion
+set "LOG_FILE=%TEMP%\\ahk-health-%RANDOM%-%RANDOM%.log"
+call :checks > "%LOG_FILE%" 2>&1
+set "STATUS=%ERRORLEVEL%"
+if "%STATUS%"=="0" (powershell -NoProfile -Command "Get-Content -LiteralPath $env:LOG_FILE -Tail 10") else (powershell -NoProfile -Command "Get-Content -LiteralPath $env:LOG_FILE -Tail 100")
+echo Full health log: %LOG_FILE% 1>&2
+exit /b %STATUS%
+:checks
+echo health.bat not implemented yet.
+echo Edit this file with your project's health checks.
+echo It must exit 0 for agents to start working.
+exit /b 1
 `
 
 // ─── Shared AGENTS.md / CLAUDE.md body ────────────────────────────────────────
@@ -84,11 +111,11 @@ function agentsMdBody(
 
 ## Health check (run before making codebase changes)
 
-\`\`\`bash
-bash health.sh
+\`\`\`
+ahk health
 \`\`\`
 
-If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green.
+If it exits non-zero, stop and report the issue. Do not proceed with codebase changes until health is green. On a first scaffold, the marked placeholder/dummy check is an exception only for exploration and narrowly-scoped creation or adaptation of the native health script; it never proves health and cannot close a task. If only the opposite-platform script exists, have the builder adapt its checks to the native file instead of blindly translating it. Keep the compact log wrapper: 10 lines on success, 100 on failure.
 
 ## Harness data (source of truth)
 
@@ -122,7 +149,7 @@ docs.search          query                                  → search ${docsPat
 
 \`\`\`
 1. INIT
-   - Assess user intent: only run health.sh if changes are needed
+   - Assess user intent: only run ahk health if changes are needed
    - tasks.get('in_progress') → resume if something is in progress
    - tasks.get('pending') → pick lowest id
 ${extraInitLines ? '\n' : ''}${extraInitLines}
@@ -132,7 +159,7 @@ ${extraInitLines ? '\n' : ''}${extraInitLines}
 
 3. CLOSE
      - tasks.update(taskId, 'done')
-     - Run health.sh (if changes were made) → must be green before closing
+     - Run ahk health (if changes were made) → must be green before closing
 \`\`\`
 
 ## Agent roles
@@ -252,7 +279,7 @@ function configObjectBody(params: ConfigTemplateParams): string {
   },
 
   health: {
-    scriptPath: './health.sh',
+    scriptPath: '${getDefaultHealthScriptPath()}',
     required:   true,
   },
 
@@ -302,7 +329,7 @@ function configObject(params: ConfigTemplateParams): Record<string, unknown> {
       projectId: params.projectId,
     },
     health: {
-      scriptPath: './health.sh',
+      scriptPath: getDefaultHealthScriptPath(),
       required: true,
     },
     tools: {
