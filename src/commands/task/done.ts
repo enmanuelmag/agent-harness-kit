@@ -2,28 +2,10 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { openDB } from '@/core/db'
-import { executeHealthCheck, inspectHealthCheck } from '@/core/health-check'
+import { HEALTH_EVIDENCE_TTL_MS, runTaskHealthCheck } from '@/core/task-health'
 
 export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> {
   const config = await loadConfig(cwd)
-
-  // Run health check first if required
-  if (config.health.required) {
-    const health = inspectHealthCheck(cwd, config.health.scriptPath)
-    if (health.state !== 'ready') {
-      console.error(pc.red(`✗ Health check is ${health.state} — cannot mark task as done.`))
-      if (health.adaptFrom) console.error(`  Adapt: ${health.adaptFrom}`)
-      process.exit(1)
-    }
-    const result = executeHealthCheck(cwd, health.path)
-    if (result.error || result.status !== 0) {
-      console.error(pc.red('✗ Health check failed — cannot mark task as done.'))
-      if (result.tail) console.error(result.tail)
-      console.error(`Full health log: ${result.logPath}`)
-      process.exit(1)
-    }
-    printSuccessfulHealthTail(result.tail)
-  }
 
   const db = await openDB(config, cwd)
 
@@ -42,7 +24,22 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
       return
     }
 
-    await db.updateTaskStatus(task.id, 'done')
+    // Keep the CLI convenience command safe too: it mints the same
+    // task-scoped evidence as MCP health.run, rather than accepting a prior
+    // manual `ahk health` invocation as completion proof.
+    const health = await runTaskHealthCheck(db, cwd, config, task.id)
+    if (health.state !== 'passed') {
+      console.error(pc.red('✗ Health check failed — cannot mark task as done.'))
+      if (health.tail) console.error(health.tail)
+      if (health.logPath) console.error(`Full health log: ${health.logPath}`)
+      process.exit(1)
+    }
+    printSuccessfulHealthTail(health.tail)
+    const completed = await db.completeTaskWithHealthEvidence(task.id, HEALTH_EVIDENCE_TTL_MS)
+    if (!completed) {
+      console.error(pc.red('✗ Fresh task health evidence is required — cannot mark task as done.'))
+      process.exit(1)
+    }
 
     console.log(pc.green(`✓ Task #${task.id} — ${task.slug} marked as done`))
   } finally {

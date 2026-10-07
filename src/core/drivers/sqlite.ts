@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   completed_at TEXT,
   archived_at  TEXT,
   updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  ,health_run_id TEXT
+  ,health_status TEXT
+  ,health_started_at TEXT
+  ,health_completed_at TEXT
+  ,health_log_path TEXT
+  ,health_script_path TEXT
 );
 
 CREATE TABLE IF NOT EXISTS task_acceptance (
@@ -85,6 +91,11 @@ export class SQLiteDriver implements DBDriver {
       this.db.exec('ALTER TABLE tasks ADD COLUMN archived_at TEXT')
     } catch {
       // Column already exists — ignore
+    }
+    for (const column of ['health_run_id TEXT', 'health_status TEXT', 'health_started_at TEXT', 'health_completed_at TEXT', 'health_log_path TEXT', 'health_script_path TEXT']) {
+      try { this.db.exec(`ALTER TABLE tasks ADD COLUMN ${column}`) } catch (error) {
+        if (!/duplicate column|already exists/i.test(String(error))) throw error
+      }
     }
     // Migration: add updated_at column (safe to run multiple times)
     try {
