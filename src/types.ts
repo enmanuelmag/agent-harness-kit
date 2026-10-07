@@ -139,6 +139,13 @@ export interface TaskRow {
   completed_at: string | null
   archived_at: string | null
   updated_at: string
+  /** Server-minted health evidence. Never accepted from MCP callers. */
+  health_run_id: string | null
+  health_status: 'running' | 'passed' | 'failed' | null
+  health_started_at: string | null
+  health_completed_at: string | null
+  health_log_path: string | null
+  health_script_path: string | null
 }
 
 export interface TaskAcceptanceRow {
