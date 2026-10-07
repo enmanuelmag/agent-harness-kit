@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createJiti } from 'jiti'
 
+import { getDefaultHealthScriptPath } from '@/core/health-check'
+
 import type { HarnessConfig } from '@/types'
 
 /** Order is precedence: the first file that exists wins. `.json` is appended
@@ -209,7 +211,7 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
     database: c.database ?? { type: 'sqlite' as const },
     storage,
     health: {
-      scriptPath: './health.sh',
+      scriptPath: getDefaultHealthScriptPath(),
       required: true,
       ...c.health,
     },
