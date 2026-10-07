@@ -1,26 +1,28 @@
-import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
 import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { openDB } from '@/core/db'
+import { executeHealthCheck, inspectHealthCheck } from '@/core/health-check'
 
 export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> {
   const config = await loadConfig(cwd)
 
   // Run health check first if required
   if (config.health.required) {
-    const scriptPath = resolve(cwd, config.health.scriptPath)
-    if (existsSync(scriptPath)) {
-      const result = spawnSync('bash', [scriptPath], { cwd, stdio: 'pipe', encoding: 'utf8' })
-      if (result.status !== 0) {
-        console.error(pc.red('✗ Health check failed — cannot mark task as done.'))
-        if (result.stdout) console.error(result.stdout)
-        if (result.stderr) console.error(result.stderr)
-        process.exit(1)
-      }
+    const health = inspectHealthCheck(cwd, config.health.scriptPath)
+    if (health.state !== 'ready') {
+      console.error(pc.red(`✗ Health check is ${health.state} — cannot mark task as done.`))
+      if (health.adaptFrom) console.error(`  Adapt: ${health.adaptFrom}`)
+      process.exit(1)
     }
+    const result = executeHealthCheck(cwd, health.path)
+    if (result.error || result.status !== 0) {
+      console.error(pc.red('✗ Health check failed — cannot mark task as done.'))
+      if (result.tail) console.error(result.tail)
+      console.error(`Full health log: ${result.logPath}`)
+      process.exit(1)
+    }
+    printSuccessfulHealthTail(result.tail)
   }
 
   const db = await openDB(config, cwd)
@@ -46,4 +48,10 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
   } finally {
     await db.close()
   }
+}
+
+/** Kept separate so the completion path cannot silently drop the same compact
+ * successful evidence shown by `ahk health`. */
+export function printSuccessfulHealthTail(tail: string): void {
+  if (tail) console.log(tail)
 }

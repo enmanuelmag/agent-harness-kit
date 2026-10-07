@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import pc from 'picocolors'
 
+import { getDefaultHealthScriptPath } from '@/core/health-check'
 import { isLocalInstallSatisfied } from '@/core/local-install-guard'
 
 import type { HarnessConfig, Provider } from '@/types'
@@ -93,7 +94,7 @@ export function applyConfigDefaults(params: {
     database: { type: 'sqlite' as const },
     storage,
     health: {
-      scriptPath: './health.sh',
+      scriptPath: getDefaultHealthScriptPath(),
       required: true,
     },
     tools: {

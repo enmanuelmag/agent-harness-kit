@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -6,6 +5,7 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { resolveSqlitePath } from '@/core/db'
+import { executeHealthCheck, inspectHealthCheck } from '@/core/health-check'
 
 import type { HarnessConfig } from '@/types'
 
@@ -77,31 +77,38 @@ export async function runHealth(cwd: string): Promise<void> {
     process.exit(1)
   }
 
-  // ─── Run health.sh ──────────────────────────────────────────────────────────
-  const scriptPath = resolve(cwd, config.health.scriptPath)
-
-  if (!existsSync(scriptPath)) {
-    console.error(pc.red(`✗ health.sh not found: ${scriptPath}`))
-    console.error('  Run ahk init first.')
+  // ─── Run the native health check ───────────────────────────────────────────
+  const health = inspectHealthCheck(cwd, config.health.scriptPath)
+  if (health.state === 'missing') {
+    console.error(pc.red(`✗ Native health check not found: ${health.path}`))
+    if (health.adaptFrom) console.error(`  Adapt the existing opposite-platform script: ${health.adaptFrom}`)
+    else console.error('  Create the native health script or run ahk init.')
     process.exit(1)
   }
-
-  const result = spawnSync('bash', [scriptPath], {
-    cwd,
-    stdio: 'inherit',
-    encoding: 'utf8',
-  })
+  if (health.state === 'incompatible') {
+    console.error(pc.red(`✗ Incompatible health check: ${health.message}`))
+    process.exit(1)
+  }
+  if (health.state === 'placeholder') {
+    console.error(pc.yellow('! Health check is the scaffold placeholder/dummy. Explore the project and have the builder replace it with real native checks; it cannot verify or close a task.'))
+    process.exit(1)
+  }
+  const result = executeHealthCheck(cwd, health.path)
 
   if (result.error) {
-    console.error(pc.red(`✗ Failed to run health.sh: ${result.error.message}`))
+    console.error(pc.red(`✗ Failed to run health check: ${result.error.message}`))
+    console.error(`  Full health log: ${result.logPath}`)
     process.exit(1)
   }
+
+  if (result.tail) console.log(result.tail)
 
   if (result.status === 0) {
     console.log(pc.green('✓ Health check passed'))
     process.exit(0)
   } else {
-    console.error(pc.red(`✗ Health check failed (exit ${result.status ?? 'unknown'})`))
+    console.error(pc.red(`✗ Health check failed (exit ${result.status ?? result.signal ?? 'unknown'})`))
+    console.error(`  Full health log: ${result.logPath}`)
     process.exit(result.status ?? 1)
   }
 }

@@ -5,6 +5,7 @@ import pc from 'picocolors'
 
 import { findConfigFile } from '@/core/config'
 import { openDB } from '@/core/db'
+import { getDefaultHealthScriptPath } from '@/core/health-check'
 import { getMaterializer } from '@/core/materializer/index'
 import { configCjs, configJson, configMjs, configTs } from '@/core/materializer/templates'
 import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/init'
@@ -339,7 +340,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log('')
   console.log(pc.green(`✓ agent-harness-kit.config.${configExt}`))
   console.log(pc.green('✓ AGENTS.md'))
-  console.log(pc.green('✓ health.sh'))
+  console.log(pc.green(`✓ ${getDefaultHealthScriptPath()}`))
   console.log(
     pc.green(
       storageScope === 'global'
@@ -356,7 +357,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.green('✓ .gitignore entries added'))
 
   console.log('')
-  console.log(pc.cyan('→') + ` Edit ${pc.cyan('health.sh')} with your project checks`)
+  console.log(pc.cyan('→') + ` Replace the dummy checks in ${pc.cyan(getDefaultHealthScriptPath())} with your project checks`)
   console.log(pc.cyan('→') + ` ${pc.cyan('ahk task add')} to queue work for agents`)
   console.log(
     pc.cyan('→') +
