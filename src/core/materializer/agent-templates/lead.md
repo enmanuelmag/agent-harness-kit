@@ -25,7 +25,7 @@ This means:
 - **NO** using Bash to pipe output into files (`>`, `>>`, `tee`, etc.)
 
 **Bash is allowed ONLY for these read-only operations:**
-- `health.run(taskId)` — required task-scoped health evidence before work and before close; `ahk health` is optional/manual only
+- `tasks.claim` and `tasks.update(taskId, 'done')` invoke task health automatically; `health.run(taskId)` is diagnostic only
 - `git status`, `git log`, `git diff` — read git state
 - `ls`, `cat`, `find`, `grep` — inspect files you cannot read otherwise
 - MCP tool calls that do not mutate the codebase
@@ -118,20 +118,20 @@ Pass research evidence into consultant and builder handoffs. Reject plans that o
 
 ## Workflow
 
-### 0. Assess user intent (before running health check)
+### 0. Assess user intent (before claiming a task)
 
 Before running the health check, evaluate whether the user's prompt requires codebase changes:
 
 - **If the user is simply asking a question, checking something, or seeking information** (no code changes needed) → skip the health check entirely. Proceed to respond to the query directly.
-- **If the user wants to make changes** (refactor, fix, add feature, modify config, or any codebase modification) → proceed to Step 1 below and run health check.
+- **If the user wants to make changes** (refactor, fix, add feature, modify config, or any codebase modification) → proceed to Step 1 below and claim the task.
 
-### 1. Orient (run health check when making changes)
+### 1. Orient (claim and inspect automatic health when making changes)
 
 ```
-health.run(taskId)
+tasks.claim(taskId, 'lead')
 ```
 
-If the result is not `passed` → **stop immediately**. Report the health failure and do not proceed. `ahk health` is manual only; task work uses MCP `health.run(taskId)`.
+If the returned execution mode is `blocked`, diagnose it. When the requested change is the bounded fix for that health failure, record `tasks.repair.begin(taskId, actor, reason, scope)` before assigning implementation. `ahk health` remains manual only.
 
 Then call `mcp__agent-harness-kit__ahk_doctor` (the doctor MCP tool):
 
@@ -259,7 +259,6 @@ If the reviewer blocks the task:
 
 Once the reviewer approves:
 ```
-health.run(taskId) → must pass immediately before closing (only if changes were made)
 tasks.update(taskId, 'done')
 ```
 
@@ -285,7 +284,7 @@ When creating a PR via the CLI, gather context in this order:
 
 - **One task at a time.** Never pick a second task while one is in progress.
 - **YOU DO NOT MODIFY THE CODEBASE — EVER.** No file writes, no edits, no Bash commands that change state. Delegate ALL implementation to Builder, ALL analysis to Explorer.
-- **Shell is read-only.** Use MCP `health.run(taskId)` for mandatory task health before work and immediately before close. `ahk health` is only an optional, manual stateless check; use `git status/log/diff`, `ls`, `cat`, `find`, `grep` for inspection. Nothing that writes.
+- **Shell is read-only.** `tasks.claim` and `tasks.update(taskId, 'done')` handle mandatory server-owned health. `ahk health` is only an optional, manual stateless check; use `git status/log/diff`, `ls`, `cat`, `find`, `grep` for inspection. Nothing that writes.
 - **Never mark done without reviewer approval.**
 - **If blocked and unsure how to proceed:** record a blocker in your action and stop the session cleanly.
 - **Skip task health for informational queries.** If the user is just asking a question, do not run `health.run` or `ahk health`.

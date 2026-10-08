@@ -2,7 +2,7 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { openDB } from '@/core/db'
-import { HEALTH_EVIDENCE_TTL_MS, runTaskHealthCheck } from '@/core/task-health'
+import { runTaskHealthCheck } from '@/core/task-health'
 
 export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> {
   const config = await loadConfig(cwd)
@@ -24,10 +24,13 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
       return
     }
 
-    // Keep the CLI convenience command safe too: it mints the same
-    // task-scoped evidence as MCP health.run, rather than accepting a prior
-    // manual `ahk health` invocation as completion proof.
+    const reserved = await db.beginVerification(task.id)
+    if (!reserved) {
+      console.error(pc.red('✗ Task is not open for final health verification.'))
+      process.exit(1)
+    }
     const health = await runTaskHealthCheck(db, cwd, config, task.id)
+    await db.resolveHealthMode(task.id, health, 'verify')
     if (health.state !== 'passed') {
       console.error(pc.red('✗ Health check failed — cannot mark task as done.'))
       if (health.tail) console.error(health.tail)
@@ -35,7 +38,7 @@ export async function runTaskDone(cwd: string, idOrSlug: string): Promise<void> 
       process.exit(1)
     }
     printSuccessfulHealthTail(health.tail)
-    const completed = await db.completeTaskWithHealthEvidence(task.id, HEALTH_EVIDENCE_TTL_MS)
+    const completed = await db.finalizeVerifiedTask(task.id, health)
     if (!completed) {
       console.error(pc.red('✗ Fresh task health evidence is required — cannot mark task as done.'))
       process.exit(1)

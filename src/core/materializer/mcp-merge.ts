@@ -136,6 +136,7 @@ export const MCP_CLAUDE_PERMISSIONS_LEAD = [
   'mcp__agent-harness-kit__actions_sections_get',
   'mcp__agent-harness-kit__actions_sections_list',
   'mcp__agent-harness-kit__tasks_acceptance_get',
+  'mcp__agent-harness-kit__tasks_repair_begin',
   'mcp__agent-harness-kit__docs_search',
   'mcp__agent-harness-kit__ahk_doctor',
 ]
@@ -173,6 +174,7 @@ export const MCP_CLAUDE_PERMISSIONS_BUILDER = [
   'mcp__agent-harness-kit__tasks_claim',
   'mcp__agent-harness-kit__tasks_add',
   'mcp__agent-harness-kit__tasks_update',
+  'mcp__agent-harness-kit__tasks_repair_begin',
   'mcp__agent-harness-kit__tasks_edit',
   'mcp__agent-harness-kit__tasks_archive',
   'mcp__agent-harness-kit__tasks_unarchive',
@@ -197,6 +199,7 @@ export const MCP_CLAUDE_PERMISSIONS_REVIEWER = [
   'mcp__agent-harness-kit__tasks_claim',
   'mcp__agent-harness-kit__tasks_add',
   'mcp__agent-harness-kit__tasks_update',
+  'mcp__agent-harness-kit__tasks_repair_begin',
   'mcp__agent-harness-kit__tasks_edit',
   'mcp__agent-harness-kit__tasks_archive',
   'mcp__agent-harness-kit__tasks_unarchive',

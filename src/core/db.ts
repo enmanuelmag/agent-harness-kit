@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { ActionRepository } from './repositories/ActionRepository'
 import { StatsRepository } from './repositories/StatsRepository'
 import { TaskRepository } from './repositories/TaskRepository'
+import { actionDeniedMessage,canStartAction } from './task-execution-policy'
 
 import type { DBDriver } from './drivers/types'
 import type {
@@ -14,6 +15,9 @@ import type {
   HarnessConfig,
   StorageState,
   TaskAcceptanceRow,
+  TaskExecutionMode,
+  TaskHealthRunRow,
+  TaskRepairRow,
   TaskRow,
   TaskStatus,
 } from '@/types'
@@ -24,6 +28,8 @@ export interface FullExport {
   taskAcceptance: TaskAcceptanceRow[]
   actions: ActionRow[]
   sections: ActionSectionRow[]
+  healthRuns: TaskHealthRunRow[]
+  repairs: TaskRepairRow[]
 }
 
 /** Tables with an integer autoincrement/serial primary key, in FK-safe
@@ -37,6 +43,7 @@ const AUTOINCREMENT_TABLES = [
   'task_acceptance',
   'actions',
   'action_sections',
+  'task_repairs',
 ] as const
 
 /** Full insertion order across the four workflow tables, respecting FK constraints
@@ -47,6 +54,8 @@ const TABLE_INSERT_ORDER = [
   'task_acceptance',
   'actions',
   'action_sections',
+  'task_health_runs',
+  'task_repairs',
 ] as const
 
 /** Reverse of TABLE_INSERT_ORDER — used to TRUNCATE a non-empty destination
@@ -125,6 +134,9 @@ export class HarnessDB {
   }
 
   async updateTaskStatus(idOrSlug: number | string, status: TaskStatus): Promise<TaskRow> {
+    if (status === 'done') {
+      throw new Error('Direct completion is forbidden; use the final health verification flow')
+    }
     const now = new Date().toISOString()
     const task =
       typeof idOrSlug === 'number'
@@ -132,10 +144,10 @@ export class HarnessDB {
         : await this.tasks.getBySlug(idOrSlug)
     if (!task) throw new Error(`Task not found: ${idOrSlug}`)
 
-    if (status === 'in_progress' && !task.started_at) {
+    if (status === 'pending') {
+      await this.tasks.release(task.id, now)
+    } else if (status === 'in_progress' && !task.started_at) {
       await this.tasks.setStatus(task.id, status, { started_at: now })
-    } else if (status === 'done') {
-      await this.tasks.setStatus(task.id, status, { completed_at: now })
     } else {
       await this.tasks.setStatus(task.id, status)
     }
@@ -151,7 +163,7 @@ export class HarnessDB {
     const cutoff = new Date(clock.getTime() - ttlMs).toISOString()
     return this.driver.transaction(async (tx) => {
       const changed = await tx.exec(
-        `UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ?
+        `UPDATE tasks SET status = 'done', execution_mode = 'normal', completed_at = ?, updated_at = ?
          WHERE id = ? AND archived_at IS NULL AND status != 'done'
            AND health_status = 'passed' AND health_started_at > started_at
            AND health_completed_at >= ? AND health_completed_at <= ?`,
@@ -174,6 +186,66 @@ export class HarnessDB {
       const task = await txTasks.getById(id)
       if (!task || task.status !== 'in_progress' || task.assigned_to !== agent) return null
       return task
+    })
+  }
+
+  /** Resolve an automatically or manually run health result without holding a
+   * DB transaction while the external script runs. */
+  async resolveHealthMode(taskId: number, result: { state: string; runId: string; claimGeneration: number; executionMode: TaskExecutionMode }, phase: 'claim' | 'manual' | 'verify'): Promise<TaskRow | null> {
+    const task = await this.getTaskById(taskId)
+    if (!task || task.claim_generation !== result.claimGeneration || task.health_run_id !== result.runId || task.execution_mode !== result.executionMode) return null
+    const passed = result.state === 'passed'
+    let next = task.execution_mode
+    if (phase === 'claim') next = passed ? 'normal' : 'blocked'
+    else if (phase === 'verify') next = passed ? 'verifying' : ((await this.tasks.getActiveRepair(taskId, task.claim_generation)) ? 'repair' : 'blocked')
+    else if (!passed) next = (await this.tasks.getActiveRepair(taskId, task.claim_generation)) ? 'repair' : 'blocked'
+    else if (task.execution_mode === 'blocked' || task.execution_mode === 'checking') next = 'normal'
+    const changed = await this.tasks.setExecutionMode(taskId, next, result.claimGeneration, new Date().toISOString(), result.executionMode, result.runId)
+    return changed ? this.getTaskById(taskId) : null
+  }
+
+  async beginRepair(taskId: number, actor: string, reason: string, scope: string): Promise<{ task: TaskRow; repair: TaskRepairRow } | 'duplicate' | null> {
+    return this.driver.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx)
+      const task = await tasks.getById(taskId)
+      if (!task || task.archived_at || task.status !== 'in_progress' || task.health_status !== 'failed' || !task.health_run_id)
+        return null
+      const existing = await tasks.getActiveRepair(taskId, task.claim_generation)
+      if (existing) return 'duplicate'
+      if (task.execution_mode !== 'blocked') return null
+      const failedRun = await tasks.getHealthRun(task.health_run_id)
+      if (!failedRun || failedRun.task_id !== taskId || failedRun.claim_generation !== task.claim_generation || failedRun.status !== 'failed') return null
+      const now = new Date().toISOString()
+      const repairId = await tasks.createRepair({ task_id: taskId, claim_generation: task.claim_generation, failed_health_run_id: task.health_run_id, reason, scope, actor, created_at: now })
+      const changed = await tasks.setExecutionMode(taskId, 'repair', task.claim_generation, now, 'blocked', task.health_run_id)
+      if (!changed) return null
+      const repair = (await tx.queryOne<TaskRepairRow>('SELECT * FROM task_repairs WHERE id = ?', [repairId]))!
+      return { task: (await tasks.getById(taskId))!, repair }
+    })
+  }
+
+  async beginVerification(taskId: number): Promise<TaskRow | null> {
+    return this.driver.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx)
+      const task = await tasks.getById(taskId)
+      if (!task || task.archived_at || task.status === 'done') return null
+      const changed = await tasks.setExecutionMode(taskId, 'verifying', task.claim_generation, new Date().toISOString(), task.execution_mode)
+      return changed ? tasks.getById(taskId) : null
+    })
+  }
+
+  async finalizeVerifiedTask(taskId: number, result: { state: string; runId: string; claimGeneration: number; executionMode: TaskExecutionMode }): Promise<TaskRow | null> {
+    if (result.state !== 'passed') return null
+    const now = new Date().toISOString()
+    return this.driver.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx)
+      const task = await tasks.getById(taskId)
+      if (!task || task.execution_mode !== 'verifying' || result.executionMode !== 'verifying' || task.claim_generation !== result.claimGeneration || task.health_run_id !== result.runId || task.health_status !== 'passed') return null
+      const changed = await tx.exec(`UPDATE tasks SET status = 'done', execution_mode = 'normal', completed_at = ?, updated_at = ? WHERE id = ? AND claim_generation = ? AND execution_mode = 'verifying'`, [now, now, taskId, result.claimGeneration])
+      if (!changed) return null
+      await tasks.closeActiveRepair(taskId, result.claimGeneration, result.runId, now)
+      await new ActionRepository(tx).closeOrphaned(taskId, now)
+      return tasks.getById(taskId)
     })
   }
 
@@ -215,8 +287,25 @@ export class HarnessDB {
 
   async startAction(taskId: number, agent: AgentName): Promise<ActionRow> {
     const now = new Date().toISOString()
-    const id = await this.actions.create(taskId, agent, now)
-    return (await this.actions.getById(id))!
+    return this.driver.transaction(async (tx) => {
+      const tasks = new TaskRepository(tx)
+      const task = await tasks.getById(taskId)
+      if (!task || task.archived_at) throw new Error(`Task not found: ${taskId}`)
+      // Repository callers include import/legacy maintenance flows. External
+      // callers are gated in `assertActionCanStart`, shared by MCP/UI adapters.
+      if (task.status === 'in_progress' && !canStartAction(task.execution_mode, agent))
+        throw new Error(actionDeniedMessage(task.execution_mode, agent))
+      const actions = new ActionRepository(tx)
+      const id = await actions.create(taskId, agent, now)
+      return (await actions.getById(id))!
+    })
+  }
+
+  async assertActionCanStart(taskId: number, agent: AgentName): Promise<void> {
+    const task = await this.getTaskById(taskId)
+    if (!task || task.archived_at) throw new Error(`Task not found: ${taskId}`)
+    if (task.status !== 'in_progress') throw new Error(`Cannot start an action for task #${taskId} with status '${task.status}'`)
+    if (!canStartAction(task.execution_mode, agent)) throw new Error(actionDeniedMessage(task.execution_mode, agent))
   }
 
   async writeSection(actionId: number, sectionType: string, content: string): Promise<void> {
@@ -289,6 +378,8 @@ export class HarnessDB {
       taskAcceptance: await this.tasks.getAllAcceptance(),
       actions: await this.actions.getAll(),
       sections: await this.actions.getAllSections(),
+      healthRuns: await this.driver.query<TaskHealthRunRow>('SELECT * FROM task_health_runs ORDER BY started_at, id'),
+      repairs: await this.driver.query<TaskRepairRow>('SELECT * FROM task_repairs ORDER BY id'),
     }
   }
 
@@ -437,7 +528,7 @@ export async function importFullExport(
 
     for (const task of data.tasks) {
       await tx.exec(
-        `INSERT INTO tasks (id, slug, title, description, status, assigned_to, created_at, started_at, completed_at, archived_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO tasks (id, slug, title, description, status, assigned_to, created_at, started_at, completed_at, archived_at, updated_at, health_run_id, health_status, health_started_at, health_completed_at, health_log_path, health_script_path, execution_mode, claim_generation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           task.id,
           task.slug,
@@ -450,6 +541,14 @@ export async function importFullExport(
           task.completed_at,
           task.archived_at,
           task.updated_at,
+          task.health_run_id ?? null,
+          task.health_status ?? null,
+          task.health_started_at ?? null,
+          task.health_completed_at ?? null,
+          task.health_log_path ?? null,
+          task.health_script_path ?? null,
+          task.execution_mode ?? 'normal',
+          task.claim_generation ?? 0,
         ]
       )
     }
@@ -480,6 +579,20 @@ export async function importFullExport(
       await tx.exec(
         `INSERT INTO action_sections (id, action_id, section_type, content, created_at) VALUES (?, ?, ?, ?, ?)`,
         [section.id, section.action_id, section.section_type, section.content, section.created_at]
+      )
+    }
+
+    for (const run of data.healthRuns ?? []) {
+      await tx.exec(
+        `INSERT INTO task_health_runs (id, task_id, claim_generation, execution_mode, status, started_at, completed_at, log_path, script_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [run.id, run.task_id, run.claim_generation, run.execution_mode, run.status, run.started_at, run.completed_at, run.log_path, run.script_path]
+      )
+    }
+
+    for (const repair of data.repairs ?? []) {
+      await tx.exec(
+        `INSERT INTO task_repairs (id, task_id, claim_generation, failed_health_run_id, reason, scope, actor, created_at, closed_at, final_health_run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [repair.id, repair.task_id, repair.claim_generation, repair.failed_health_run_id, repair.reason, repair.scope, repair.actor, repair.created_at, repair.closed_at, repair.final_health_run_id]
       )
     }
 

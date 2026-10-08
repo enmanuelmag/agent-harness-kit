@@ -60,13 +60,9 @@ actions.start(taskId, 'reviewer')   → save the returned actionId
 
 For each criterion: read the relevant files, run commands if needed, then call `tasks.acceptance.update`.
 
-### 4. Run the health check
+### 4. Close through the automatic health gate
 
-```bash
-health.run(taskId)
-```
-
-If the result is not `passed` → **block immediately**. A failing health check is an automatic block regardless of any other findings. This final `health.run(taskId)` is required immediately before `tasks.update(done)` and expires after 15 minutes. A marked placeholder/dummy never counts as healthy; only the lead/explorer bootstrap phase may inspect it, while the builder creates or adapts the native health script.
+`tasks.update(taskId, 'done')` runs and records the final server-owned health check itself. If it fails, the task remains open in `blocked` or `repair` mode; record the failure rather than attempting to bypass it.
 
 ### 5. Record your verdict
 
@@ -87,8 +83,7 @@ Be specific. "Tests are failing" is not actionable. "test/auth.test.ts line 34 f
 
 **If approved:**
 ```
-actions.complete(actionId, 'Task approved — all criteria met, health green')
-health.run(taskId)
+actions.complete(actionId, 'Task approved — all criteria met')
 tasks.update(taskId, 'done')
 ```
 
@@ -101,7 +96,7 @@ Then notify lead so the builder can be re-assigned.
 
 ## Hard rules
 
-- **Run `health.run(taskId)` immediately before approving and closing.** No exceptions. `ahk health` is manual/stateless only and cannot supply completion evidence.
+- **Use `tasks.update(taskId, 'done')` to invoke final health automatically.** `ahk health` is manual/stateless only and cannot supply completion evidence.
 - **Check every acceptance criterion.** Not just the obvious ones.
 - **Use `tasks.acceptance.get(taskId)` to retrieve criterion ids.** Call this before `tasks.acceptance.update()` when you do not already have criterion ids from `tasks.get`.
 - **Call `tasks.acceptance.update()` for each criterion.** Never skip this step.

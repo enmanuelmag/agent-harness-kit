@@ -21,7 +21,7 @@ import {
   type SpecMetadata,
   SpecStore,
 } from './specs'
-import { HEALTH_EVIDENCE_TTL_MS, runTaskHealthCheck } from './task-health'
+import { runTaskHealthCheck } from './task-health'
 
 import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types'
 
@@ -372,7 +372,7 @@ const TOOLS = [
   {
     name: 'tasks.claim',
     description:
-      'Atomically claim a pending task. Returns task_already_claimed if another agent got it first.',
+      'Atomically claim a pending task and run server-owned health automatically. Returns the task, health result, and execution mode.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -380,6 +380,17 @@ const TOOLS = [
         agent: { type: 'string', description: 'Your agent name' },
       },
       required: ['id', 'agent'],
+    },
+  },
+  {
+    name: 'tasks.repair.begin',
+    description: 'Enter an audited repair mode after a failed server-owned health run. Requires a bounded reason and scope.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'number' }, actor: { type: 'string' }, reason: { type: 'string' }, scope: { type: 'string' },
+      },
+      required: ['taskId', 'actor', 'reason', 'scope'],
     },
   },
   {
@@ -705,6 +716,7 @@ export async function dispatch(
     case 'actions.start': {
       const taskId = num(args, 'taskId')
       const agent = str(args, 'agent') as AgentName
+      await db.assertActionCanStart(taskId, agent)
       const action = await db.startAction(taskId, agent)
       return ok(JSON.stringify({ actionId: action.id }))
     }
@@ -878,7 +890,8 @@ export async function dispatch(
       const taskId = num(args, 'taskId')
       if (taskId < 1) throw new Error('taskId must be a positive integer')
       const result = await runTaskHealthCheck(db, cwd, config, taskId)
-      return ok(JSON.stringify(result), result.state !== 'passed')
+      const task = await db.resolveHealthMode(taskId, result, 'manual')
+      return ok(JSON.stringify({ ...result, executionMode: task?.execution_mode ?? null }), result.state !== 'passed')
     }
 
     case 'tasks.claim': {
@@ -888,7 +901,9 @@ export async function dispatch(
       if (!task) {
         return ok(JSON.stringify({ error: 'task_already_claimed', taskId: id }))
       }
-      return ok(JSON.stringify(task))
+      const health = await runTaskHealthCheck(db, cwd, config, task.id)
+      const resolved = await db.resolveHealthMode(task.id, health, 'claim')
+      return ok(JSON.stringify({ task: resolved, health, executionMode: resolved?.execution_mode ?? null }), health.state !== 'passed')
     }
 
     case 'tasks.add': {
@@ -904,14 +919,34 @@ export async function dispatch(
       const id = num(args, 'id')
       const status = str(args, 'status') as TaskStatus
       if (status === 'done') {
-        const task = await db.completeTaskWithHealthEvidence(id, HEALTH_EVIDENCE_TTL_MS)
+        const reserved = await db.beginVerification(id)
+        if (!reserved) return ok(JSON.stringify({ error: 'task_not_open_for_verification', taskId: id }), true)
+        const health = await runTaskHealthCheck(db, cwd, config, id)
+        const afterHealth = await db.resolveHealthMode(id, health, 'verify')
+        const task = await db.finalizeVerifiedTask(id, health)
         if (!task) {
-          return ok(JSON.stringify({ error: 'recent_task_health_required', taskId: id, ttlMs: HEALTH_EVIDENCE_TTL_MS }), true)
+          return ok(JSON.stringify({ error: 'final_health_failed', taskId: id, health, executionMode: afterHealth?.execution_mode ?? null }), true)
         }
-        return ok(JSON.stringify(task))
+        return ok(JSON.stringify({ task, health }))
+      }
+      if (status === 'in_progress') {
+        return ok(JSON.stringify({ error: 'claim_required', taskId: id }), true)
       }
       const task = await db.updateTaskStatus(id, status)
       return ok(JSON.stringify(task))
+    }
+
+    case 'tasks.repair.begin': {
+      const taskId = num(args, 'taskId')
+      const actor = str(args, 'actor').trim()
+      const reason = str(args, 'reason').trim()
+      const scope = str(args, 'scope').trim()
+      if (!actor || actor.length > 255 || !reason || reason.length > 2000 || !scope || scope.length > 2000)
+        return ok(JSON.stringify({ error: 'invalid_repair_audit', taskId }), true)
+      const repair = await db.beginRepair(taskId, actor, reason, scope)
+      if (repair === 'duplicate') return ok(JSON.stringify({ error: 'repair_already_active', taskId }), true)
+      if (!repair) return ok(JSON.stringify({ error: 'failed_health_required', taskId }), true)
+      return ok(JSON.stringify(repair))
     }
 
     case 'docs.search': {

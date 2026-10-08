@@ -26,6 +26,33 @@ CREATE TABLE IF NOT EXISTS tasks (
   ,health_completed_at TEXT
   ,health_log_path TEXT
   ,health_script_path TEXT
+  ,execution_mode TEXT NOT NULL DEFAULT 'normal'
+  ,claim_generation INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS task_health_runs (
+  id TEXT PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  claim_generation INTEGER NOT NULL,
+  execution_mode TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('running','passed','failed','superseded')),
+  started_at TEXT NOT NULL,
+  completed_at TEXT,
+  log_path TEXT,
+  script_path TEXT
+);
+
+CREATE TABLE IF NOT EXISTS task_repairs (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  claim_generation INTEGER NOT NULL,
+  failed_health_run_id TEXT NOT NULL REFERENCES task_health_runs(id),
+  reason TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  closed_at TEXT,
+  final_health_run_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS task_acceptance (
@@ -87,6 +114,13 @@ export class PostgresDriver implements DBDriver {
         if (!/duplicate column|already exists/i.test(String(error))) throw error
       }
     }
+    for (const column of ["execution_mode TEXT NOT NULL DEFAULT 'normal'", 'claim_generation INTEGER NOT NULL DEFAULT 0']) {
+      try { await this.sql.unsafe(`ALTER TABLE tasks ADD COLUMN ${column}`) } catch (error) {
+        if (!/duplicate column|already exists/i.test(String(error))) throw error
+      }
+    }
+    await this.sql.unsafe(`CREATE TABLE IF NOT EXISTS task_health_runs (id TEXT PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, claim_generation INTEGER NOT NULL, execution_mode TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT, log_path TEXT, script_path TEXT)`)
+    await this.sql.unsafe(`CREATE TABLE IF NOT EXISTS task_repairs (id SERIAL PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, claim_generation INTEGER NOT NULL, failed_health_run_id TEXT NOT NULL, reason TEXT NOT NULL, scope TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL, closed_at TEXT, final_health_run_id TEXT)`)
     // Migration: add updated_at column (safe to run multiple times)
     try {
       await this.sql.unsafe(`ALTER TABLE tasks ADD COLUMN updated_at TEXT NOT NULL DEFAULT NOW()`)
