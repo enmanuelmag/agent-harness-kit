@@ -13,6 +13,7 @@ import { runModels } from '@/commands/models'
 import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
+import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskEdit, runTaskList } from '@/commands/task/index'
 import { isLocalInstallSatisfied } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
@@ -85,6 +86,16 @@ program
   )
   .action(async (opts) => {
     await runBuild(cwd, opts)
+  })
+
+program
+  .command('sync')
+  .description('Safely synchronize generated files; existing agent files remain yours')
+  .option('--force', 'Regenerate existing agent files (backs them up first)')
+  .option('--keep-models', 'With --force, reuse saved per-role model choices without prompting')
+  .option('--capture-models', 'Import model metadata from existing current-provider agent files')
+  .action(async (opts) => {
+    await runSync(cwd, opts)
   })
 
 // ─── health ───────────────────────────────────────────────────────────────────

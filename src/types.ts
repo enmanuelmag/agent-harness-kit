@@ -114,6 +114,17 @@ export interface ToolsConfig {
   scripts: { enabled: boolean; outputDir: string }
 }
 
+/** A deliberately explicit per-role override. `inherit` means that this role
+ * has no native override; it is not the same as an absent preference. */
+export interface AgentModelPreference {
+  model: string
+  reasoningEffort?: string
+}
+
+export type AgentModelPreferences = Partial<
+  Record<Provider, Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', AgentModelPreference>>>
+>
+
 export interface HarnessConfig {
   project: ProjectConfig
   provider: Provider
@@ -121,6 +132,8 @@ export interface HarnessConfig {
   database: DatabaseConfig
   health: HealthConfig
   tools: ToolsConfig
+  /** Remembered selector choices, used by `ahk sync --force --keep-models`. */
+  agentPreferences?: AgentModelPreferences
 }
 
 // ─── SQLite row types ─────────────────────────────────────────────────────────
