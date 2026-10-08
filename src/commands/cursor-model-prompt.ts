@@ -16,7 +16,8 @@ const MANUAL_MODEL = '__ahk_manual_model__'
 const MODEL_GROUP_PREFIX = '__ahk_cursor_model_group__:'
 
 export async function promptCursorAgentModels(
-  provider: Provider
+  provider: Provider,
+  roles: AgentName[] = AGENTS.map(({ key }) => key)
 ): Promise<Partial<Record<AgentName, CursorAgentModelChoice>>> {
   const choices: Partial<Record<AgentName, CursorAgentModelChoice>> = {}
   if (provider !== 'cursor') return choices
@@ -30,7 +31,7 @@ export async function promptCursorAgentModels(
   const autoModel = catalog.ok ? catalog.data.find(({ id }) => id === 'auto') : undefined
   const modelGroups = catalog.ok ? groupCursorModels(catalog.data) : []
 
-  for (const agent of AGENTS) {
+  for (const agent of AGENTS.filter(({ key }) => roles.includes(key))) {
     const model = await promptCursorModel(agent.label, autoModel, modelGroups, catalog.ok)
     if (p.isCancel(model)) cancel()
 

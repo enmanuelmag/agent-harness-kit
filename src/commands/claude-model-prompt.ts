@@ -27,12 +27,13 @@ const AGENT_LABELS: { key: AgentName; label: string }[] = [
  * their own provider guard before calling this.
  */
 export async function promptClaudeAgentModels(
-  provider: Provider
+  provider: Provider,
+  roles: AgentName[] = AGENT_LABELS.map(({ key }) => key)
 ): Promise<Partial<Record<AgentName, string>>> {
   const claudeAgentModels: Partial<Record<AgentName, string>> = {}
   if (provider !== 'claude-code') return claudeAgentModels
 
-  for (const agent of AGENT_LABELS) {
+  for (const agent of AGENT_LABELS.filter(({ key }) => roles.includes(key))) {
     const val = await p.select({
       message: `Model for ${agent.label}`,
       options: [

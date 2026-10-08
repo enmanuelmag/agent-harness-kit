@@ -12,6 +12,7 @@ import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
 
+import { mergePreferences, toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
@@ -80,7 +81,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         pc.cyan('ahk build') +
         pc.dim('         — re-sync agent files after updating the library')
     )
-    console.log('  ' + pc.cyan('ahk build --sync') + pc.dim('  — also sync agent permissions'))
+    console.log('  ' + pc.cyan('ahk sync') + pc.dim('         — safely refresh generated files and skills'))
     console.log(
       '  ' + pc.cyan('ahk reset') + pc.dim('         — wipe and re-initialize from scratch')
     )
@@ -174,6 +175,13 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // cancel-handling.
   const codexAgentModels = await promptCodexAgentModels(provider)
   const cursorAgentModels = await promptCursorAgentModels(provider)
+  const agentPreferences = mergePreferences(
+    {},
+    mergePreferences(
+      toPreferences(provider, claudeAgentModels),
+      mergePreferences(toPreferences(provider, codexAgentModels), toPreferences(provider, cursorAgentModels))
+    )
+  )
 
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string
@@ -257,6 +265,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       tasksAdapter: 'mcp',
       scope: storageScope,
     })
+    config.agentPreferences = agentPreferences
     const materializer = getMaterializer(provider)
 
     const installDir = cwd
@@ -280,6 +289,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       port: config.tools.mcp.port,
       scope: config.storage.scope,
       projectId: config.storage.projectId,
+      agentPreferences,
     })
     writeFileSync(join(installDir, configFileName), configContent, 'utf8')
 

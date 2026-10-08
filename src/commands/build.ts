@@ -5,6 +5,8 @@ import pc from 'picocolors'
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
 
+import { persistPreferences, toPreferences } from './agent-preferences'
+import { choicesFromPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
@@ -12,7 +14,7 @@ import { promptCursorAgentModels } from './cursor-model-prompt'
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
 
-interface BuildOptions {
+export interface BuildOptions {
   watch?: boolean
   sync?: boolean
   force?: boolean
@@ -44,7 +46,7 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
   }
 }
 
-async function buildOnce(cwd: string, force?: boolean): Promise<void> {
+export async function buildOnce(cwd: string, force?: boolean, keepModels = false): Promise<void> {
   // Load config OUTSIDE any spinner: when --force is set on a claude-code
   // project, the per-role model prompt below needs the provider (from config)
   // before it can decide whether to run, and an interactive p.select cannot
@@ -63,20 +65,49 @@ async function buildOnce(cwd: string, force?: boolean): Promise<void> {
   // model prompt `ahk init` and `ahk models` use, before regenerating agent
   // files. Must happen BEFORE the spinner below starts.
   let claudeAgentModels: Partial<Record<AgentName, string>> | undefined
-  if (force && config.provider === 'claude-code') {
+  let codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>> | undefined
+  let cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>> | undefined
+  // A safe rebuild never prompts, but a deleted role agent should be recreated
+  // with the recorded choice rather than silently losing its model override.
+  if (!force) {
+    const stored = choicesFromPreferences(config)
+    claudeAgentModels = stored.claudeAgentModels
+    codexAgentModels = stored.codexAgentModels
+    cursorAgentModels = stored.cursorAgentModels
+  }
+  if (force && config.provider === 'claude-code' && !keepModels) {
     claudeAgentModels = await promptClaudeAgentModels(config.provider)
   }
 
   // Codex CLI only, and only when --force is set: mirror the claude-code
   // branch above with the same per-role model + reasoning-effort prompt
   // `ahk init` uses. Must also happen BEFORE the spinner below starts.
-  let codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>> | undefined
-  if (force && config.provider === 'codex-cli') {
+  if (force && config.provider === 'codex-cli' && !keepModels) {
     codexAgentModels = await promptCodexAgentModels(config.provider)
   }
-  let cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>> | undefined
-  if (force && config.provider === 'cursor') {
+  if (force && config.provider === 'cursor' && !keepModels) {
     cursorAgentModels = await promptCursorAgentModels(config.provider)
+  }
+  if (force && keepModels) {
+    const { choicesFromPreferences, missingPreferenceRoles } = await import('./agent-preferences')
+    const missing = missingPreferenceRoles(config)
+    if (missing.length) {
+      if (config.provider === 'claude-code') claudeAgentModels = await promptClaudeAgentModels(config.provider, missing)
+      if (config.provider === 'codex-cli') codexAgentModels = await promptCodexAgentModels(config.provider, missing)
+      if (config.provider === 'cursor') cursorAgentModels = await promptCursorAgentModels(config.provider, missing)
+      const result = await persistPreferences(cwd, toPreferences(config.provider, (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never))
+      if (result === 'manual-update-required') throw new Error('Preferences need to be saved before regenerating agent files.')
+      config = await loadConfig(cwd)
+    }
+    const stored = choicesFromPreferences(config)
+    claudeAgentModels = stored.claudeAgentModels
+    codexAgentModels = stored.codexAgentModels
+    cursorAgentModels = stored.cursorAgentModels
+  } else if (force) {
+    const choices = (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never
+    const result = await persistPreferences(cwd, toPreferences(config.provider, choices))
+    if (result === 'manual-update-required') throw new Error('Preferences need to be saved before regenerating agent files.')
+    config = await loadConfig(cwd)
   }
 
   const spinner = p.spinner()

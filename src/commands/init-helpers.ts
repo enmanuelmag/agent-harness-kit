@@ -81,6 +81,7 @@ export function applyConfigDefaults(params: {
 
   return {
     provider: params.provider,
+    agentPreferences: {},
     project: {
       name: params.name,
       description: params.description,

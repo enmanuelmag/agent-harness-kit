@@ -19,7 +19,8 @@ const AGENTS: { key: AgentName; label: string }[] = [
 const MANUAL_MODEL = '__ahk_manual_model__'
 
 export async function promptCodexAgentModels(
-  provider: Provider
+  provider: Provider,
+  roles: AgentName[] = AGENTS.map(({ key }) => key)
 ): Promise<Partial<Record<AgentName, CodexAgentModelChoice>>> {
   const choices: Partial<Record<AgentName, CodexAgentModelChoice>> = {}
   if (provider !== 'codex-cli') return choices
@@ -30,7 +31,7 @@ export async function promptCodexAgentModels(
     p.log.info('Choose inherit or enter a model ID and supported effort manually.')
   }
 
-  for (const agent of AGENTS) {
+  for (const agent of AGENTS.filter(({ key }) => roles.includes(key))) {
     const model = await p.select({
       message: `Model for ${agent.label}`,
       options: [
