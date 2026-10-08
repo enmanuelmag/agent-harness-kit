@@ -12,6 +12,8 @@ export type {
   ProjectConfig,
   Provider,
   StorageConfig,
+  TaskExecutionMode,
+  TaskRepairRow,
   TaskRow,
   TasksAdapter,
   TaskStatus,

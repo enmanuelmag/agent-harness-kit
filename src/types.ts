@@ -126,6 +126,7 @@ export interface HarnessConfig {
 // ─── SQLite row types ─────────────────────────────────────────────────────────
 
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked'
+export type TaskExecutionMode = 'checking' | 'normal' | 'blocked' | 'repair' | 'verifying'
 
 export interface TaskRow {
   id: number
@@ -146,6 +147,35 @@ export interface TaskRow {
   health_completed_at: string | null
   health_log_path: string | null
   health_script_path: string | null
+  /** Server-controlled authorization state, independent of backlog status. */
+  execution_mode: TaskExecutionMode
+  /** Incremented for every successful claim; prevents old runs authorizing a new claim. */
+  claim_generation: number
+}
+
+export interface TaskRepairRow {
+  id: number
+  task_id: number
+  claim_generation: number
+  failed_health_run_id: string
+  reason: string
+  scope: string
+  actor: string
+  created_at: string
+  closed_at: string | null
+  final_health_run_id: string | null
+}
+
+export interface TaskHealthRunRow {
+  id: string
+  task_id: number
+  claim_generation: number
+  execution_mode: TaskExecutionMode
+  status: 'running' | 'passed' | 'failed' | 'superseded'
+  started_at: string
+  completed_at: string | null
+  log_path: string | null
+  script_path: string | null
 }
 
 export interface TaskAcceptanceRow {
