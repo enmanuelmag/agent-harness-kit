@@ -225,6 +225,7 @@ interface ConfigTemplateParams {
   port: number
   scope: 'local' | 'global'
   projectId: string
+  agentPreferences?: unknown
 }
 
 /**
@@ -245,6 +246,10 @@ function configObjectBody(params: ConfigTemplateParams): string {
   },
 
   provider: '${params.provider}',
+
+  // Choices made by ahk init / ahk sync --force are remembered here. Keep
+  // model: 'inherit' explicitly uses the provider default for a role.
+  agentPreferences: ${JSON.stringify(params.agentPreferences ?? {}, null, 2)},
 
   // There is no 'agents' key. Agent files are yours: edit the role prompt and
   // the 'model:' frontmatter line directly in the generated file. 'ahk build'
@@ -309,6 +314,7 @@ function configObject(params: ConfigTemplateParams): Record<string, unknown> {
       docsPath: params.docsPath,
     },
     provider: params.provider,
+    agentPreferences: (params.agentPreferences as Record<string, unknown> | undefined) ?? {},
     // There is no 'agents' key here either — it was removed from the config
     // entirely, so the JSON variant must not reintroduce it.
     database: { type: 'sqlite' },
