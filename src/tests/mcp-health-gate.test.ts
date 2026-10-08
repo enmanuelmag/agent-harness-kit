@@ -4,10 +4,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 
 import { type HarnessDB, openDB } from '@/core/db'
-import { executeHealthCheck } from '@/core/health-check'
-import { agentLead, agentReviewer } from '@/core/materializer/templates'
 import { dispatch } from '@/core/mcp-server'
-import { HEALTH_EVIDENCE_TTL_MS } from '@/core/task-health'
+import { runTaskHealthCheck } from '@/core/task-health'
 
 import type { HarnessConfig } from '@/types'
 
@@ -20,13 +18,21 @@ const config: HarnessConfig = {
   tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
 }
 
-function body(result: Awaited<ReturnType<typeof dispatch>>) {
-  const item = result.content[0]
-  assert.equal(item.type, 'text')
-  return JSON.parse(item.text) as Record<string, unknown>
+interface ResultBody {
+  health?: { state?: string }
+  executionMode?: string
+  task?: { execution_mode?: string; status?: string }
+  error?: string
+  actionId?: number
 }
 
-describe('MCP task health completion gate', () => {
+function body(result: Awaited<ReturnType<typeof dispatch>>): ResultBody {
+  const item = result.content[0]
+  assert.equal(item.type, 'text')
+  return JSON.parse(item.text) as ResultBody
+}
+
+describe('automatic MCP task health gate', () => {
   let db: HarnessDB
   let taskId: number
   beforeEach(async () => {
@@ -37,77 +43,88 @@ describe('MCP task health completion gate', () => {
   })
   afterEach(async () => { await db.close(); rmSync(TMP, { recursive: true, force: true }) })
 
-  test('only a post-claim server health pass can atomically close task and orphan actions', async () => {
-    await db.claimTask(taskId, 'lead')
-    const orphan = await db.startAction(taskId, 'builder')
-    const health = body(await dispatch('health.run', { taskId }, db, TMP, TMP, config))
-    assert.equal(health.state, 'passed')
-    assert.ok(typeof health.logPath === 'string')
+  test('claim runs health and enables normal work on a pass', async () => {
+    const claim = await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    assert.equal(claim.isError, false)
+    assert.equal(body(claim).health?.state, 'passed')
+    assert.equal(body(claim).executionMode, 'normal')
+    assert.equal((await dispatch('actions.start', { taskId, agent: 'builder' }, db, TMP, TMP, config)).isError, false)
+  })
+
+  test('failed claim remains owned and blocks builder until an audited repair', async () => {
+    writeFileSync(join(TMP, 'health.sh'), '#!/usr/bin/env bash\nexit 1\n')
+    const claim = await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    assert.equal(claim.isError, true)
+    assert.equal(body(claim).executionMode, 'blocked')
+    assert.equal((await db.getTaskById(taskId))?.assigned_to, 'lead')
+    assert.equal((await dispatch('actions.start', { taskId, agent: 'explorer' }, db, TMP, TMP, config)).isError, false)
+    await assert.rejects(() => dispatch('actions.start', { taskId, agent: 'builder' }, db, TMP, TMP, config), /execution mode is 'blocked'/)
+    const repair = await dispatch('tasks.repair.begin', { taskId, actor: 'lead', reason: 'health script must be repaired', scope: 'health.sh only' }, db, TMP, TMP, config)
+    assert.equal(repair.isError, false)
+    assert.equal(body(repair).task?.execution_mode, 'repair')
+    assert.equal((await dispatch('actions.start', { taskId, agent: 'builder' }, db, TMP, TMP, config)).isError, false)
+  })
+
+  test('repair entry requires failed server-owned health evidence', async () => {
+    await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    const denied = await dispatch('tasks.repair.begin', { taskId, actor: 'lead', reason: 'no failure', scope: 'none' }, db, TMP, TMP, config)
+    assert.equal(denied.isError, true)
+    assert.equal(body(denied).error, 'failed_health_required')
+  })
+
+  test('repair audit references persisted failed evidence and rejects duplicates or blank audit fields', async () => {
+    writeFileSync(join(TMP, 'health.sh'), '#!/usr/bin/env bash\nexit 1\n')
+    await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    const blank = await dispatch('tasks.repair.begin', { taskId, actor: ' ', reason: ' ', scope: ' ' }, db, TMP, TMP, config)
+    assert.equal(blank.isError, true)
+    assert.equal(body(blank).error, 'invalid_repair_audit')
+    const repair = await dispatch('tasks.repair.begin', { taskId, actor: 'lead', reason: 'broken check', scope: 'health.sh' }, db, TMP, TMP, config)
+    assert.equal(repair.isError, false)
+    const rows = await db.queryRaw<{ failed_health_run_id: string }>('SELECT failed_health_run_id FROM task_repairs WHERE task_id = ?', taskId)
+    assert.equal(rows.length, 1)
+    const runs = await db.queryRaw<{ status: string }>('SELECT status FROM task_health_runs WHERE id = ?', rows[0].failed_health_run_id)
+    assert.equal(runs[0].status, 'failed')
+    const duplicate = await dispatch('tasks.repair.begin', { taskId, actor: 'lead', reason: 'again', scope: 'health.sh' }, db, TMP, TMP, config)
+    assert.equal(duplicate.isError, true)
+    assert.equal(body(duplicate).error, 'repair_already_active')
+  })
+
+  test('superseded runs and released claims cannot authorize completion or repair', async () => {
+    await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    const first = await runTaskHealthCheck(db, TMP, config, taskId)
+    const second = await runTaskHealthCheck(db, TMP, config, taskId)
+    assert.equal(await db.resolveHealthMode(taskId, first, 'manual'), null)
+    assert.ok(await db.resolveHealthMode(taskId, second, 'manual'))
+    const verifying = await db.beginVerification(taskId)
+    assert.ok(verifying)
+    const final = await runTaskHealthCheck(db, TMP, config, taskId)
+    assert.ok(await db.resolveHealthMode(taskId, final, 'verify'))
+    await db.updateTaskStatus(taskId, 'pending')
+    assert.equal(await db.finalizeVerifiedTask(taskId, final), null)
+    const reclaimed = await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    assert.equal(reclaimed.isError, false)
+    const repair = await dispatch('tasks.repair.begin', { taskId, actor: 'lead', reason: 'old failure', scope: 'none' }, db, TMP, TMP, config)
+    assert.equal(repair.isError, true)
+    await assert.rejects(() => db.updateTaskStatus(taskId, 'done'), /Direct completion is forbidden/)
+  })
+
+  test('done runs fresh health itself and keeps a failed task open', async () => {
+    await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    writeFileSync(join(TMP, 'health.sh'), '#!/usr/bin/env bash\necho failed\nexit 1\n')
+    const done = await dispatch('tasks.update', { id: taskId, status: 'done' }, db, TMP, TMP, config)
+    assert.equal(done.isError, true)
+    assert.equal(body(done).error, 'final_health_failed')
+    assert.equal((await db.getTaskById(taskId))?.status, 'in_progress')
+    assert.equal((await db.getTaskById(taskId))?.execution_mode, 'blocked')
+  })
+
+  test('done closes after its own fresh health pass', async () => {
+    await dispatch('tasks.claim', { id: taskId, agent: 'lead' }, db, TMP, TMP, config)
+    const orphan = body(await dispatch('actions.start', { taskId, agent: 'builder' }, db, TMP, TMP, config)).actionId
+    assert.equal(typeof orphan, 'number')
     const done = await dispatch('tasks.update', { id: taskId, status: 'done' }, db, TMP, TMP, config)
     assert.equal(done.isError, false)
-    assert.equal(body(done).status, 'done')
-    assert.equal((await db.getAction(orphan.id))?.status, 'completed')
+    assert.equal(body(done).task?.status, 'done')
+    assert.equal((await db.getAction(orphan!))?.status, 'completed')
   })
-
-  test('preclaim health and spoofed action sections cannot close a task', async () => {
-    assert.equal(body(await dispatch('health.run', { taskId }, db, TMP, TMP, config)).state, 'passed')
-    await db.claimTask(taskId, 'lead')
-    const orphan = await db.startAction(taskId, 'builder')
-    await db.writeSection(orphan.id, 'result', 'health passed')
-    const denied = await dispatch('tasks.update', { id: taskId, status: 'done' }, db, TMP, TMP, config)
-    assert.equal(denied.isError, true)
-    assert.equal(body(denied).error, 'recent_task_health_required')
-    assert.equal((await db.getAction(orphan.id))?.status, 'in_progress')
-  })
-
-  test('absent or expired evidence cannot close a task', async () => {
-    await db.claimTask(taskId, 'lead')
-    assert.equal((await dispatch('tasks.update', { id: taskId, status: 'done' }, db, TMP, TMP, config)).isError, true)
-    await dispatch('health.run', { taskId }, db, TMP, TMP, config)
-    assert.equal(
-      await db.completeTaskWithHealthEvidence(taskId, HEALTH_EVIDENCE_TTL_MS, new Date(Date.now() + HEALTH_EVIDENCE_TTL_MS + 1)),
-      null
-    )
-  })
-
-  test('a later failed run invalidates the earlier pass', async () => {
-    await db.claimTask(taskId, 'lead')
-    assert.equal(body(await dispatch('health.run', { taskId }, db, TMP, TMP, config)).state, 'passed')
-    writeFileSync(join(TMP, 'health.sh'), '#!/usr/bin/env bash\necho failed\nexit 1\n')
-    const failed = await dispatch('health.run', { taskId }, db, TMP, TMP, config)
-    assert.equal(failed.isError, true)
-    assert.equal(body(failed).state, 'failed')
-    assert.equal((await dispatch('tasks.update', { id: taskId, status: 'done' }, db, TMP, TMP, config)).isError, true)
-  })
-
-  test('missing and placeholder health scripts fail as bootstrap evidence', async () => {
-    await db.claimTask(taskId, 'lead')
-    rmSync(join(TMP, 'health.sh'))
-    const missing = await dispatch('health.run', { taskId }, db, TMP, TMP, config)
-    assert.equal(missing.isError, true)
-    assert.equal(body(missing).state, 'missing')
-    writeFileSync(join(TMP, 'health.sh'), '# AHK_HEALTH_CHECK_PLACEHOLDER\necho "health.sh not implemented yet"\nexit 1\n')
-    const placeholder = await dispatch('health.run', { taskId }, db, TMP, TMP, config)
-    assert.equal(placeholder.isError, true)
-    assert.equal(body(placeholder).state, 'placeholder')
-  })
-
-  test('manual health execution remains stateless and cannot close a task', async () => {
-    await db.claimTask(taskId, 'lead')
-    const manual = executeHealthCheck(TMP, join(TMP, 'health.sh'))
-    assert.equal(manual.status, 0)
-    const task = await db.getTaskById(taskId)
-    assert.equal(task?.health_status, null)
-    assert.equal((await dispatch('tasks.update', { id: taskId, status: 'done' }, db, TMP, TMP, config)).isError, true)
-  })
-
-  test('generated lead and reviewer instructions order health.run before work and done', () => {
-    const lead = agentLead({ projectName: 'test' })
-    const reviewer = agentReviewer({ projectName: 'test' })
-    assert.ok(lead.indexOf('health.run(taskId)') < lead.indexOf('tasks.update(taskId, \'done\')'))
-    assert.ok(reviewer.indexOf('health.run(taskId)') < reviewer.indexOf('tasks.update(taskId, \'done\')'))
-    assert.doesNotMatch(lead, /Use `ahk health` for the platform-native compact health check/)
-    assert.doesNotMatch(reviewer, /Run ahk health before approving/)
-  })
-
 })

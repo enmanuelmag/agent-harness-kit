@@ -25,6 +25,8 @@ export class MockRemoteDriver implements DBDriver {
     task_acceptance: [],
     actions: [],
     action_sections: [],
+    task_health_runs: [],
+    task_repairs: [],
   }
 
   /** Per-table counter, mimicking a Postgres SERIAL sequence / MySQL
@@ -34,6 +36,7 @@ export class MockRemoteDriver implements DBDriver {
     tasks: 0,
     task_acceptance: 0,
     action_sections: 0,
+    task_repairs: 0,
   }
 
   private txDepth = 0

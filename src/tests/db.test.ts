@@ -151,10 +151,10 @@ describe('HarnessDB', () => {
     assert.equal(found, null)
   })
 
-  test('updateTaskStatus changes task status', async () => {
+  test('updateTaskStatus changes a non-terminal task status', async () => {
     await db.addTask({ slug: 'status-test', title: 'Status Test' })
-    const updated = await db.updateTaskStatus('status-test', 'done')
-    assert.equal(updated.status, 'done')
+    const updated = await db.updateTaskStatus('status-test', 'blocked')
+    assert.equal(updated.status, 'blocked')
     assert.ok(updated.updated_at)
   })
 
