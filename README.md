@@ -182,7 +182,7 @@ Detection order: the `packageManager` field in your `package.json` (e.g. `"packa
 
 Working inside the `agent-harness-kit` repository itself does **not** count as a local install for this decision: there is no real `node_modules/@cardor/agent-harness-kit` entry for a package manager to resolve, so self-dev generates the bare global `ahk serve --port <port>` form, same as any other project with no local install. This is a narrower check than the one deciding your config file format, above (`ahk init`'s `.ts`/`.mjs`/`.cjs` vs. `.json` choice) — that check still treats self-dev as satisfied, since it only cares whether the package is resolvable for type-checking purposes, not whether a package manager can mediate a spawned command.
 
-**Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml`/`.grok/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` (or `ahk build --sync`), including if you've since switched package managers.
+**Existing projects:** if you initialized your project before this change, your `.mcp.json`/`opencode.json`/`.codex/config.toml`/`.grok/config.toml` may still have a hardcoded `npx` command. No migration step is needed — `ahk build` always regenerates (merges) these files from scratch on every run, so the command self-corrects the next time you run `ahk build` or `ahk sync`, including if you've since switched package managers.
 
 ---
 
@@ -192,9 +192,9 @@ Working inside the `agent-harness-kit` repository itself does **not** count as a
 
 Interactive scaffold. Asks for your project name, description, AI provider, docs path, storage scope, task adapter, and an optional first task. Creates all harness files in the current directory.
 
-Claude Code only, init asks you to pick a model for each of the 5 core roles (lead, explorer, consultant, builder, reviewer) one at a time: `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable`. Each choice is written straight into that role's generated `.claude/agents/<role>.md` frontmatter as a `model:` line at scaffold time — it is never persisted to the config file. Picking `inherit` (the default) emits no `model:` line at all, leaving Claude Code to apply its own default. Agent files are user-owned once generated (see [Agent files are yours](#agent-files-are-yours) below), so after init the model can be changed three ways: hand-editing the `model:` frontmatter line directly, running [`ahk models`](#ahk-models) to re-prompt and regenerate just the 5 agent files, or running `ahk build --force` (which re-prompts too, then regenerates everything `--force` regenerates).
+Claude Code only, init asks you to pick a model for each of the 5 core roles. The choices are written to the generated agents and saved in `agentPreferences` in the harness config. `inherit` is stored explicitly, so a later forced sync can reliably reproduce the provider default.
 
-Codex CLI only, init asks for a **model and a reasoning effort** for each of the 5 core roles. The picker queries the installed, signed-in Codex CLI through its App Server, so it shows the models currently available to that account and only the selected model's supported effort levels. Both choices are written straight into that role's generated `.codex/agents/<role>.toml` as `model = "..."` / `model_reasoning_effort = "..."` lines at scaffold time — never persisted to config.toml. Choose `inherit` to omit both role overrides and use the project default. If live discovery is unavailable, the CLI reports it and offers `inherit` or manual model/effort entry; manual entries reject whitespace, quotes, control characters, and other syntax that could alter TOML. It never silently substitutes a model. Agent files are user-owned once generated, so after init the model/effort can only be changed by hand-editing the TOML directly or running `ahk build --force` (which re-prompts, then regenerates everything `--force` regenerates).
+Codex CLI only, init asks for a **model and a reasoning effort** for each role and saves both in `agentPreferences`; optional effort remains optional. Choose `inherit` to omit native overrides while retaining an explicit saved choice for future syncs.
 
 Separately, `.codex/config.toml` always gets a project-wide top-level default — `model = "gpt-5.6-terra"` and `model_reasoning_effort = "medium"` — written once and preserved across every subsequent `ahk build`/`ahk init --force`: if you hand-edit either value in config.toml, your edit is never overwritten. Per-role `model`/`model_reasoning_effort` lines in `.codex/agents/<role>.toml` (above) act as overrides of this baseline for that one role.
 
@@ -219,7 +219,7 @@ ahk init --name "my-app" --provider codex-cli   --docs ./docs --tasks local --st
 ahk init --name "my-app" --provider grok-cli    --docs ./docs --tasks local --storage-scope local
 ```
 
-Run this once per project. If the project is already initialized, the command prints an 'already initialized' message with suggested next-step commands (`ahk build`, `ahk build --sync`, `ahk reset`, `ahk serve`) and exits without overwriting anything.
+Run this once per project. If the project is already initialized, the command prints an 'already initialized' message with suggested next-step commands (`ahk build`, `ahk sync`, `ahk reset`, `ahk serve`) and exits without overwriting anything.
 
 The config file extension is chosen automatically: `.ts` if a `tsconfig.json` is present, `.mjs` for ESM-only projects (`"type": "module"` in `package.json`), or `.mjs` otherwise.
 
@@ -233,7 +233,7 @@ Regenerates `AGENTS.md` and provider-specific files from your `agent-harness-kit
 ahk build
 ahk build --watch    # watch mode: rebuilds automatically on config changes
 ahk build --force    # DESTRUCTIVE: regenerate agent files, discarding your edits
-ahk build --sync     # kept for backwards compatibility — now a no-op on every provider
+ahk build --sync     # legacy permission refresh; use `ahk sync` for file synchronization
 ```
 
 ### Agent files are yours
@@ -388,14 +388,16 @@ All skills follow the same contract: they invoke Explorer, Builder, or Reviewer 
 
 ### `ahk sync`
 
+Synchronizes generated skills and derived files, creates missing role agents, and preserves existing agent edits without prompting.
 
 ```bash
-ahk sync                         # both directions (default)
-ahk sync --direction in          # JSON → SQLite only
-ahk sync --direction out         # SQLite → JSON only
-ahk sync --dry-run               # preview changes without applying them
-ahk sync --dry-run --direction in
+ahk sync                         # safe, non-interactive synchronization
+ahk sync --force                 # re-prompt and regenerate agents (backs up prior files)
+ahk sync --force --keep-models   # regenerate with saved model/effort choices, no prompts
+ahk sync --capture-models        # import existing canonical agent metadata into config
 ```
+
+For existing projects, run `ahk sync --capture-models` once. JSON configs are updated atomically. TypeScript, MJS, CJS, and extensionless configs are never rewritten: AHK prints a complete copy-ready `agentPreferences` block; save it, then rerun the command. `--keep-models` requires `--force`.
 
 ---
 
@@ -896,9 +898,9 @@ For the builder, `tools:` is omitted entirely, same as every other provider — 
 The equivalent constraint under Claude Code is expressed as `disallowedTools: [Write, Edit]`, under OpenCode as `permission: { edit: deny }`, and under Grok Build as the `tools:` allowlist shown above.
 
 
-The human-editable task backlog. Add tasks here, then run `ahk sync` to load them into SQLite.
+The human-editable task backlog. It is imported during `ahk init`; `ahk sync` does not read or write task backlog data.
 
-`ahk init` **never clobbers** this file: an existing backlog is merged into SQLite (deduplicated by slug) alongside any first task you add during init, then re-emitted — so a hand-written backlog is preserved. On a fresh project the file is created (empty `[]` if you skip the first-task prompt). If the file contains invalid JSON, init leaves it untouched and warns you to fix it and run `ahk sync`.
+`ahk init` **never clobbers** this file: an existing backlog is merged into SQLite (deduplicated by slug) alongside any first task you add during init, then re-emitted — so a hand-written backlog is preserved. On a fresh project the file is created (empty `[]` if you skip the first-task prompt). If the file contains invalid JSON, init leaves it untouched and warns you to fix it before running init again.
 
 ```json
 [
