@@ -3,13 +3,17 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
+import { claudeEffortsForModel } from '@/commands/claude-model-prompt'
 import { applyConfigDefaults } from '@/commands/init-helpers'
+import { choicesForMigrationTarget } from '@/commands/migrate'
 import {
   codexInitializedNotification,
   collectCodexModels,
   discoverCursorModels,
   groupCursorModels,
+  orderCodexModels,
   parseCursorModels,
+  selectCodexRoleDefaults,
   validateManualModelId,
   validateManualReasoningEffort,
 } from '@/commands/model-catalog'
@@ -107,6 +111,39 @@ describe('runtime model catalogs', () => {
         { id: 'muse-spark-1.3-minimal', label: 'Muse Spark' },
       ]
     )
+  })
+
+  test('orders Cursor GPT families, numeric versions, and native effort variants', () => {
+    assert.deepEqual(
+      parseCursorModels(
+        'gpt-5.9-terra-low - old\n' +
+        'gpt-5.10-luna-low - luna\n' +
+        'gpt-5.10-terra[effort=high] - high\n' +
+        'gpt-5.10-terra-ultra - ultra\n' +
+        'gpt-6-sol-medium - sol\n' +
+        'gpt-6-astra-low - astra\n' +
+        'cursor-grok-4.10-high - grok new\n' +
+        'cursor-grok-4.9-ultra - grok old\n'
+      ).map(({ id }) => id),
+      ['gpt-6-astra-low', 'gpt-6-sol-medium', 'gpt-5.10-terra-ultra', 'gpt-5.10-terra[effort=high]', 'gpt-5.9-terra-low', 'gpt-5.10-luna-low', 'cursor-grok-4.10-high', 'cursor-grok-4.9-ultra']
+    )
+  })
+
+  test('orders Codex catalog families and numeric versions without hardcoded IDs', () => {
+    assert.deepEqual(
+      orderCodexModels([
+        { id: 'gpt-5.9-terra', label: '', supportedReasoningEfforts: [] },
+        { id: 'gpt-6-sol', label: '', supportedReasoningEfforts: [] },
+        { id: 'gpt-5.10-terra', label: '', supportedReasoningEfforts: [] },
+        { id: 'gpt-6-astra', label: '', supportedReasoningEfforts: [] },
+      ]).map(({ id }) => id),
+      ['gpt-6-astra', 'gpt-6-sol', 'gpt-5.10-terra', 'gpt-5.9-terra']
+    )
+  })
+
+  test('Claude aliases expose only their documented native efforts', () => {
+    assert.deepEqual(claudeEffortsForModel('opus'), ['low', 'medium', 'high', 'xhigh', 'max'])
+    assert.deepEqual(claudeEffortsForModel('unrecognized-future-model'), [])
   })
 
   test('groups live Cursor IDs by provider, keeps auto special, and retains unknown prefixes in Others', () => {
@@ -217,6 +254,25 @@ describe('runtime model catalogs', () => {
     )
   })
 
+  test('selects newest live Sol and Luna families with only supported efforts', () => {
+    const choices = selectCodexRoleDefaults([
+      { id: 'gpt-5.10-sol', label: 'old', supportedReasoningEfforts: ['medium', 'high'] },
+      { id: 'gpt-6-sol', label: 'new', supportedReasoningEfforts: ['medium'] },
+      { id: 'gpt-6.1-sol', label: 'newest', supportedReasoningEfforts: ['medium'], defaultReasoningEffort: 'medium' },
+      { id: 'gpt-5.9-luna', label: 'old luna', supportedReasoningEfforts: ['low'] },
+      { id: 'gpt-5.10-luna', label: 'new luna', supportedReasoningEfforts: ['medium'], defaultReasoningEffort: 'medium' },
+    ])
+    assert.deepEqual(choices.lead, { model: 'gpt-6.1-sol', effort: 'medium' })
+    assert.deepEqual(choices.consultant, { model: 'gpt-6.1-sol', effort: 'medium' })
+    assert.deepEqual(choices.explorer, { model: 'gpt-5.10-luna', effort: 'medium' })
+  })
+
+  test('keeps unavailable live families inherited', () => {
+    assert.deepEqual(selectCodexRoleDefaults([{ id: 'gpt-6.1-sol', label: 'Sol', supportedReasoningEfforts: ['high'] }]), {
+      lead: { model: 'gpt-6.1-sol' }, builder: { model: 'gpt-6.1-sol' }, reviewer: { model: 'gpt-6.1-sol' }, consultant: { model: 'gpt-6.1-sol', effort: 'high' },
+    })
+  })
+
   test('uses the lead choice unchanged for Codex default.toml', () => {
     const models = {
       lead: { model: 'gpt-5.6-terra', effort: 'medium' },
@@ -273,6 +329,13 @@ describe('claudeAgentFiles — direct export used by ahk models', () => {
       /^model:/m,
       'consultant was left unset — no model line'
     )
+  })
+
+  test('writes Claude native effort independently and clears stale scalar on regeneration', () => {
+    const config = configFor('claude-code')
+    const entry = claudeAgentFiles(config, { lead: { effort: 'high' } }).find((file) => file.relPath.endsWith('/lead.md'))!
+    assert.match(entry.content, /^effort: high$/m)
+    assert.doesNotMatch(entry.content, /^model:/m)
   })
 
   test('no models arg → no model line for any role (same as before extraction)', () => {
@@ -355,13 +418,13 @@ describe('ahk models — resolveModelsContext (no-op / error paths, no prompt in
     assert.deepEqual(ctx, { ok: false, reason: 'no-config' })
   })
 
-  test('non-claude-code provider → ok:false, reason "not-claude-code", provider reported', async () => {
+  test('unsupported provider → an explicit no-op reason and provider', async () => {
     const cwd = makeTmp('models-not-claude-code')
     writeRealConfig(cwd, 'opencode')
 
     const ctx = await resolveModelsContext(cwd)
     assert.equal(ctx.ok, false)
-    assert.deepEqual(ctx, { ok: false, reason: 'not-claude-code', provider: 'opencode' })
+    assert.deepEqual(ctx, { ok: false, reason: 'unsupported-provider', provider: 'opencode' })
   })
 
   test('claude-code provider → ok:true, config returned', async () => {
@@ -374,4 +437,21 @@ describe('ahk models — resolveModelsContext (no-op / error paths, no prompt in
       assert.equal(ctx.config.provider, 'claude-code')
     }
   })
+
+  test('Codex and Cursor providers are eligible for native model selection', async () => {
+    for (const provider of ['codex-cli', 'cursor'] as const) {
+      const cwd = makeTmp(`models-${provider}`)
+      writeRealConfig(cwd, provider)
+      assert.equal((await resolveModelsContext(cwd)).ok, true)
+    }
+  })
+})
+
+test('migration persists the target provider choice instead of a guarded empty map', () => {
+  const selected = choicesForMigrationTarget('codex-cli', {
+    claudeAgentModels: {},
+    codexAgentModels: { builder: { model: 'gpt-6.1-sol', effort: 'medium' } },
+    cursorAgentModels: {},
+  })
+  assert.deepEqual(selected, { builder: { model: 'gpt-6.1-sol', effort: 'medium' } })
 })

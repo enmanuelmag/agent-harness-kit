@@ -15,9 +15,9 @@ import { captureModels, runSync } from '@/commands/sync'
 const TMP = join(import.meta.dirname, '../../.tmp-agent-preferences-test')
 afterEach(() => rmSync(TMP, { recursive: true, force: true }))
 
-function writeConfig(ext: 'json' | 'cjs' = 'json'): string {
+function writeConfig(ext: 'json' | 'cjs' = 'json', provider = 'codex-cli'): string {
   mkdirSync(TMP, { recursive: true })
-  const config = { provider: 'codex-cli', project: { name: 'test', description: 'test', docsPath: './docs' }, untouched: { preserve: true } }
+  const config = { provider, project: { name: 'test', description: 'test', docsPath: './docs' }, untouched: { preserve: true } }
   const path = join(TMP, `agent-harness-kit.config.${ext}`)
   writeFileSync(path, ext === 'json' ? JSON.stringify(config, null, 2) : `module.exports = ${JSON.stringify(config)}\n`)
   return path
@@ -32,6 +32,14 @@ test('preferences preserve explicit inherit and clear stale effort when replaced
 test('stored preferences convert back to native choices without emitting inherit', () => {
   const values = choicesFromPreferences({ provider: 'codex-cli', agentPreferences: { 'codex-cli': { lead: { model: 'inherit' } } } } as never)
   assert.deepEqual(values.codexAgentModels?.lead, {})
+})
+
+test('effort-only Claude and Codex choices round-trip with inherited model', () => {
+  assert.deepEqual(toPreferences('claude-code', { lead: { effort: 'high' } })['claude-code']?.lead, { model: 'inherit', reasoningEffort: 'high' })
+  const claude = choicesFromPreferences({ provider: 'claude-code', agentPreferences: { 'claude-code': { lead: { model: 'inherit', reasoningEffort: 'high' } } } } as never)
+  assert.deepEqual(claude.claudeAgentModels?.lead, { effort: 'high' })
+  const codex = choicesFromPreferences({ provider: 'codex-cli', agentPreferences: { 'codex-cli': { lead: { model: 'inherit', reasoningEffort: 'high' } } } } as never)
+  assert.deepEqual(codex.codexAgentModels?.lead, { effort: 'high' })
 })
 
 test('explicit inherit is complete whereas an absent role is a gap', () => {
@@ -68,6 +76,35 @@ test('capture imports current-provider canonical TOML metadata and ignores defau
   assert.equal(saved.agentPreferences['codex-cli'].builder.reasoningEffort, 'medium')
   assert.ok(existsSync(join(TMP, '.codex/agents/default.toml')))
 })
+
+test('capture rejects duplicate authoritative Codex role names', async () => {
+  const path = writeConfig()
+  mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
+  for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
+    const names = role === 'lead' ? 'name = "lead"\nname = "lead"\n' : `name = "${role}"\n`
+    writeFileSync(join(TMP, `.codex/agents/${role}.toml`), `model = "gpt-${role}"\n[agent]\n${names}`)
+  }
+  await captureModels(TMP)
+  const saved = JSON.parse(readFileSync(path, 'utf8'))
+  assert.equal(saved.agentPreferences['codex-cli'].lead, undefined)
+  assert.equal(saved.agentPreferences['codex-cli'].builder.model, 'gpt-builder')
+})
+
+for (const provider of ['claude-code', 'cursor'] as const) {
+  test(`capture rejects duplicate authoritative YAML role names for ${provider}`, async () => {
+    const path = writeConfig('json', provider)
+    const agentDir = provider === 'claude-code' ? '.claude/agents' : '.cursor/agents'
+    mkdirSync(join(TMP, agentDir), { recursive: true })
+    for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
+      const names = role === 'lead' ? 'name: lead\nname: lead' : `name: ${role}`
+      writeFileSync(join(TMP, agentDir, `${role}.md`), `---\n${names}\nmodel: ${provider}-${role}\n---\n`)
+    }
+    await captureModels(TMP)
+    const saved = JSON.parse(readFileSync(path, 'utf8'))
+    assert.equal(saved.agentPreferences[provider].lead, undefined)
+    assert.equal(saved.agentPreferences[provider].builder.model, `${provider}-builder`)
+  })
+}
 
 test('sync rejects ambiguous flags before touching configuration', async () => {
   await assert.rejects(() => runSync(TMP, { keepModels: true }), /requires --force/)

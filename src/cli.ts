@@ -249,7 +249,7 @@ program
 program
   .command('models')
   .description(
-    'Re-prompt per-role Claude Code models and regenerate .claude/agents/*.md (claude-code projects only)'
+    'Re-prompt per-role native model settings for Claude Code, Codex CLI, or Cursor'
   )
   .action(async () => {
     await runModels(cwd)

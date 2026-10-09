@@ -240,6 +240,13 @@ export interface McpToolResult {
  * verbatim instead of being rejected by a stale compile-time catalog. */
 export type CodexReasoningEffort = string
 
+/** Claude Code exposes model and effort as independent frontmatter scalars.
+ * A model may be inherited while an explicit effort is still selected. */
+export interface ClaudeAgentModelChoice {
+  model?: string
+  effort?: string
+}
+
 /** A single role's Codex CLI model + reasoning-effort choice, collected by
  *  `ahk init`'s Codex-conditional prompt (`promptCodexAgentModels`) and
  *  written into that role's generated `.codex/agents/<role>.toml`.
@@ -275,7 +282,7 @@ export interface ScaffoldOptions {
    *  exposes one `scaffold(config, opts)` signature across all providers;
    *  OpenCode's and Codex CLI's materializers simply never read this field. */
   claudeAgentModels?: Partial<
-    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', string>
+    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', ClaudeAgentModelChoice | string>
   >
   /** Codex CLI only: per-role model + reasoning-effort choice collected by
    *  `ahk init`'s provider-conditional prompt (`promptCodexAgentModels`).

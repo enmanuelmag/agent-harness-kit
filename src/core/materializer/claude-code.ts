@@ -55,6 +55,11 @@ export function claudeAgentFiles(
   capabilityHints = ''
 ): AgentFileEntry[] {
   const projectName = config.project.name
+  // Accept legacy string maps while configs/tests transition to native choices.
+  const choice = (role: keyof NonNullable<typeof modelsByRole>) => {
+    const value = modelsByRole?.[role]
+    return typeof value === 'string' ? { model: value } : value
+  }
   return [
     {
       relPath: '.claude/agents/lead.md',
@@ -65,7 +70,7 @@ export function claudeAgentFiles(
           renderDelegationGuidance('claude-code', 'lead')
         ),
         'lead',
-        { model: modelsByRole?.lead }
+        choice('lead')
       ),
     },
     {
@@ -73,7 +78,7 @@ export function claudeAgentFiles(
       content: translateFrontmatterForClaudeCode(
         agentExplorer({ projectName }, capabilityHints),
         'explorer',
-        { model: modelsByRole?.explorer }
+        choice('explorer')
       ),
     },
     {
@@ -81,7 +86,7 @@ export function claudeAgentFiles(
       content: translateFrontmatterForClaudeCode(
         agentConsultant({ projectName }, capabilityHints),
         'consultant',
-        { model: modelsByRole?.consultant }
+        choice('consultant')
       ),
     },
     {
@@ -89,7 +94,7 @@ export function claudeAgentFiles(
       content: translateFrontmatterForClaudeCode(
         agentBuilder({ projectName }, capabilityHints),
         'builder',
-        { model: modelsByRole?.builder }
+        choice('builder')
       ),
     },
     {
@@ -97,7 +102,7 @@ export function claudeAgentFiles(
       content: translateFrontmatterForClaudeCode(
         agentReviewer({ projectName }, capabilityHints),
         'reviewer',
-        { model: modelsByRole?.reviewer }
+        choice('reviewer')
       ),
     },
   ]
