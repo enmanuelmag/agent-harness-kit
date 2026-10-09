@@ -225,6 +225,7 @@ describe('coordination skill injection', () => {
       writeSkills(tmpDir, '.skills', guidance)
 
       for (const skillName of [
+        'ahk-docs',
         'ahk-ask',
         'ahk-consultant',
         'ahk-triage',
@@ -245,6 +246,13 @@ describe('coordination skill injection', () => {
       }
 
       for (const resourcePath of [
+        'ahk-docs/resources/workflows.md',
+        'ahk-docs/resources/setup-and-providers.md',
+        'ahk-docs/resources/mcp-and-lifecycle.md',
+        'ahk-docs/resources/maintenance.md',
+        'ahk-docs/resources/cli-and-configuration.md',
+        'ahk-docs/resources/mcp-tools.md',
+        'ahk-docs/resources/development-and-safety.md',
         'ahk-feature/resources/feature-workflow.md',
         'ahk-feature/resources/feature-template.md',
         'ahk-fix/resources/fix-workflow.md',

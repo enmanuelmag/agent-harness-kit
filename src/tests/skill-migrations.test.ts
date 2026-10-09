@@ -136,6 +136,21 @@ test('removes an empty stale generated resource directory', () => {
   assert.equal(existsSync(join(root, 'retired')), false)
 })
 
+test('restores a missing ahk-docs resource from the canonical offline guide', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'ahk-skill-migration-'))
+  roots.push(cwd)
+  const source = join(process.cwd(), 'src/core/materializer/skills')
+  const root = join(cwd, '.agents/skills')
+
+  reconcileCanonicalSkills(cwd, '.agents/skills', source)
+  const resource = join(root, 'ahk-docs/resources/mcp-and-lifecycle.md')
+  const expected = readFileSync(join(source, 'ahk-docs/resources/mcp-and-lifecycle.md'), 'utf8')
+  rmSync(resource)
+
+  reconcileCanonicalSkills(cwd, '.agents/skills', source)
+  assert.equal(readFileSync(resource, 'utf8'), expected)
+})
+
 test('upgrades known old feature and fix handoffs but preserves edited manifests', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'ahk-skill-migration-'))
   roots.push(cwd)
@@ -179,7 +194,7 @@ test('retries an interrupted canonical refresh without treating its first write 
   }
   assert.throws(
     () => reconcileCanonicalSkills(cwd, '.agents/skills', source, undefined, state),
-    /canonical skill 'ahk-consultant' is missing/
+    new RegExp(`canonical skill '${CANONICAL_SKILLS[1]}' is missing`)
   )
   assert.equal(readFileSync(join(root, first, 'SKILL.md'), 'utf8'), readFileSync(join(installed, first, 'SKILL.md'), 'utf8'))
   const interrupted = JSON.parse(readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8'))

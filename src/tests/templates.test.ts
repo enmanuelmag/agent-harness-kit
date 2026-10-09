@@ -1857,7 +1857,7 @@ describe('ahk-test — content assertions on essential contract phrases', () => 
   })
 })
 
-describe('ahk-test — regression: four existing skills still present and matching', () => {
+describe('canonical skills — materialized by all five providers', () => {
   const TMP_REG = join(import.meta.dirname, '../../.tmp-skill-regression')
 
   function setup(): void {
@@ -1868,6 +1868,7 @@ describe('ahk-test — regression: four existing skills still present and matchi
   }
 
   const ALL_SKILLS = [
+    'ahk-docs',
     'ahk-ask',
     'ahk-consultant',
     'ahk-triage',
@@ -1881,7 +1882,7 @@ describe('ahk-test — regression: four existing skills still present and matchi
   ]
 
   for (const skillName of ALL_SKILLS) {
-    test(`${skillName}: materialized by all four providers`, () => {
+    test(`${skillName}: materialized by all five providers`, () => {
       setup()
       try {
         for (const [, skillsSubdir] of [
@@ -1918,6 +1919,41 @@ describe('ahk-test — regression: four existing skills still present and matchi
       }
     })
   }
+})
+
+describe('canonical skill frontmatter', () => {
+  const SKILL_ROOT = join(import.meta.dirname, '../core/materializer/skills')
+  const ALL_SKILLS = [
+    'ahk-docs',
+    'ahk-ask',
+    'ahk-consultant',
+    'ahk-triage',
+    'ahk-review',
+    'ahk-test',
+    'ahk-use-case',
+    'ahk-spec',
+    'ahk-spec-tech',
+    'ahk-feature',
+    'ahk-fix',
+  ]
+
+  test('all eleven descriptions are valid plain YAML scalars', () => {
+    for (const skillName of ALL_SKILLS) {
+      const content = readFileSync(join(SKILL_ROOT, skillName, 'SKILL.md'), 'utf8')
+      const frontmatter = content.match(/^---\n([\s\S]*?)\n---\n/)?.[1]
+      assert.ok(frontmatter, `${skillName} must have YAML frontmatter`)
+      const scalar = frontmatter!
+        .split('\n')
+        .find((line) => line.startsWith('description: '))
+      assert.ok(scalar, `${skillName} must declare description`)
+      const description = scalar!.slice('description: '.length)
+      assert.ok(description.length > 0, `${skillName} description must not be empty`)
+      assert.ok(
+        !description.includes(': '),
+        `${skillName} description must quote or avoid a YAML mapping separator`
+      )
+    }
+  })
 })
 
 // ─── research-policy — content assertions on essential phrases ──────────────
