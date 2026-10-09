@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { getDefaultHealthScriptPath } from '@/core/health-check'
 
-import { GITIGNORE_ENTRIES, injectDelegationGuidance } from './templates'
+import { CANONICAL_SKILLS, migrateSkills, reconcileCanonicalSkills } from './skill-migrations'
+import { GITIGNORE_ENTRIES } from './templates'
 import { HEALTH_BAT, HEALTH_SH } from './templates'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -13,7 +14,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 /** Create only the native starter health check. Existing scripts are user-owned;
  * an opposite-platform script is intentionally left intact for a builder to
  * inspect and adapt instead of attempting unsafe shell translation. */
-export function ensureNativeHealthScaffold(cwd: string, platform = process.platform): string | null {
+export function ensureNativeHealthScaffold(
+  cwd: string,
+  platform = process.platform
+): string | null {
   const relPath = getDefaultHealthScriptPath(platform)
   const path = join(cwd, relPath)
   if (existsSync(path)) return null
@@ -353,31 +357,29 @@ export function slugify(title: string): string {
 }
 
 export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?: string): void {
-  const skillNames = [
-    'ahk-ask',
-    'ahk-consultant',
-    'ahk-triage',
-    'ahk-review',
-    'ahk-test',
-    'ahk-use-cases',
-    'ahk-use-case-tech',
-    'ahk-feature',
-    'ahk-fix',
-  ]
-  for (const skillName of skillNames) {
-    const srcDir = join(__dirname, 'skills', skillName)
-    const destDir = join(cwd, skillsDir, skillName)
-    // Copy the complete canonical skill tree: resources are part of the skill
-    // contract, not optional companions to its manifest.
-    cpSync(srcDir, destDir, { recursive: true })
-
-    // Provider guidance is intentionally injected into the manifest only.
-    // Resource files must remain byte-for-byte copies of their canonical source.
-    const skillManifest = join(srcDir, 'SKILL.md')
-    let content = readFileSync(skillManifest, 'utf8')
-    if (delegationGuidance) {
-      content = injectDelegationGuidance(content, delegationGuidance)
-    }
-    writeFileSync(join(destDir, 'SKILL.md'), content, 'utf8')
-  }
+  // Migrations are project-local and ordered by the executable package version.
+  // A missing state is bootstrapped by inspecting legacy owned skill names only.
+  const provider = skillsDir.startsWith('.claude')
+    ? 'claude-code'
+    : skillsDir.startsWith('.agents')
+      ? 'codex-cli'
+      : skillsDir.startsWith('.cursor')
+        ? 'cursor'
+        : skillsDir.startsWith('.grok')
+          ? 'grok-cli'
+          : skillsDir.startsWith('.opencode')
+            ? 'opencode'
+            : undefined
+  // Each completed migration persists its own checkpoint before a later
+  // migration or canonical refresh can fail; retries resume safely.
+  const migration = migrateSkills(cwd, skillsDir, provider)
+  reconcileCanonicalSkills(
+    cwd,
+    skillsDir,
+    join(__dirname, 'skills'),
+    delegationGuidance,
+    migration.state
+  )
 }
+
+export { CANONICAL_SKILLS }

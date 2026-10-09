@@ -8,8 +8,11 @@ import {
 } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-export const SPEC_KINDS = ['use-case', 'feature', 'fix', 'technical'] as const
-export const PRODUCT_SPEC_KINDS = ['use-case', 'feature', 'fix'] as const
+/** Legacy names remain readable so existing project documents never disappear. */
+export const SPEC_KINDS = ['use-case', 'spec', 'feature', 'fix', 'spec-tech', 'technical'] as const
+export const PRODUCT_SPEC_KINDS = ['spec', 'feature', 'fix', 'use-case'] as const
+export const FUNCTIONAL_SPEC_KINDS = ['spec', 'feature', 'fix'] as const
+export const TECHNICAL_SPEC_KINDS = ['spec-tech', 'technical'] as const
 export const USE_CASE_STATUSES = ['draft', 'needs-decision', 'approved', 'superseded'] as const
 export const TECHNICAL_STATUSES = [
   'draft',
@@ -28,16 +31,13 @@ export const RELATIONSHIPS = [
   'informs',
   'informed-by',
 ] as const
-
 export type SpecKind = (typeof SPEC_KINDS)[number]
 export type SpecStatus = (typeof USE_CASE_STATUSES)[number] | (typeof TECHNICAL_STATUSES)[number]
 export type Relationship = (typeof RELATIONSHIPS)[number]
-
 export interface SpecRelation {
   slug: string
   relationship: Relationship
 }
-
 export interface SpecMetadata {
   slug: string
   title: string
@@ -47,19 +47,17 @@ export interface SpecMetadata {
   createdAt: string
   lastUpdated: string
   sourceSpec?: string
+  sourceUseCases: string[]
   relatedSpecs: SpecRelation[]
 }
-
 export interface SpecDocument {
   metadata: SpecMetadata
   content: string
 }
-
 export interface SpecSearchResult {
   document: SpecDocument
   excerpt: string
 }
-
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const inverse: Record<Relationship, Relationship> = {
   'depends-on': 'required-by',
@@ -72,74 +70,78 @@ const inverse: Record<Relationship, Relationship> = {
   informs: 'informed-by',
   'informed-by': 'informs',
 }
-
-function ensureSlug(value: string, field = 'slug'): string {
+const technical = (k: SpecKind) => TECHNICAL_SPEC_KINDS.includes(k as never)
+const trueUseCase = (k: SpecKind) => k === 'use-case'
+const functional = (k: SpecKind) => FUNCTIONAL_SPEC_KINDS.includes(k as never) || k === 'use-case'
+function ensureSlug(value: string, field = 'slug') {
   if (!SLUG.test(value))
     throw new Error(`${field} must be lowercase letters, numbers, and single hyphens`)
   return value
 }
-
-function asString(value: unknown, field: string): string {
+function asString(value: unknown, field: string) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${field} is required`)
-  if (value.includes('\n') || value.includes('\r')) throw new Error(`${field} must be one line`)
+  if (/\r|\n/.test(value)) throw new Error(`${field} must be one line`)
   return value.trim()
 }
-
-function parseScalar(value: string): string {
-  const trimmed = value.trim()
-  if (trimmed.startsWith('"')) {
+function scalar(v: string) {
+  const t = v.trim()
+  if (t.startsWith('"')) {
     try {
-      const parsed = JSON.parse(trimmed)
-      if (typeof parsed === 'string') return parsed
-    } catch {
-      // The error below names the field rather than leaking parser internals.
-    }
+      const p = JSON.parse(t)
+      if (typeof p === 'string') return p
+    } catch {}
     throw new Error('frontmatter contains an invalid quoted value')
   }
-  return trimmed
+  return t
 }
-
 function statusFor(kind: SpecKind, status: string): SpecStatus {
-  const permitted = PRODUCT_SPEC_KINDS.includes(kind as (typeof PRODUCT_SPEC_KINDS)[number])
-    ? USE_CASE_STATUSES
-    : TECHNICAL_STATUSES
-  if (!permitted.includes(status as never))
+  const allowed = technical(kind) ? TECHNICAL_STATUSES : USE_CASE_STATUSES
+  if (!allowed.includes(status as never))
     throw new Error(`status '${status}' is invalid for ${kind}`)
   return status as SpecStatus
 }
-
 function parseMetadata(header: string): SpecMetadata {
-  const values = new Map<string, string>()
-  const relations: SpecRelation[] = []
+  const values = new Map<string, string>(),
+    relations: SpecRelation[] = []
   let pending: Partial<SpecRelation> | null = null
-
+  const sourceUseCases: string[] = []
+  let listMode = false
   for (const raw of header.split('\n')) {
     if (!raw.trim()) continue
-    const relationStart = raw.match(/^\s{2}-\s+slug:\s*(.+)$/)
-    if (relationStart) {
-      if (pending?.slug || pending?.relationship)
-        throw new Error('related_specs entry is incomplete')
-      pending = { slug: parseScalar(relationStart[1]) }
+    if (/^source_use_cases:\s*$/.test(raw)) {
+      listMode = true
       continue
     }
-    const relationField = raw.match(/^\s{4}relationship:\s*(.+)$/)
-    if (relationField) {
+    const uc = raw.match(/^\s{2}-\s+(.+)$/)
+    if (listMode && uc) {
+      sourceUseCases.push(ensureSlug(scalar(uc[1]), 'source_use_cases'))
+      continue
+    }
+    listMode = false
+    const rs = raw.match(/^\s{2}-\s+slug:\s*(.+)$/)
+    if (rs) {
+      if (pending?.slug || pending?.relationship)
+        throw new Error('related_specs entry is incomplete')
+      pending = { slug: scalar(rs[1]) }
+      continue
+    }
+    const rf = raw.match(/^\s{4}relationship:\s*(.+)$/)
+    if (rf) {
       if (!pending?.slug) throw new Error('related_specs relationship must follow a slug')
-      const relationship = parseScalar(relationField[1]) as Relationship
+      const relationship = scalar(rf[1]) as Relationship
       if (!RELATIONSHIPS.includes(relationship))
         throw new Error(`invalid relationship '${relationship}'`)
       relations.push({ slug: ensureSlug(pending.slug, 'related_specs.slug'), relationship })
       pending = null
       continue
     }
-    const field = raw.match(/^([a-z_]+):\s*(.*)$/)
-    if (!field) throw new Error(`unsupported frontmatter line: ${raw}`)
-    if (field[1] === 'related_specs') continue
+    const f = raw.match(/^([a-z_]+):\s*(.*)$/)
+    if (!f) throw new Error(`unsupported frontmatter line: ${raw}`)
+    if (f[1] === 'related_specs') continue
     if (pending) throw new Error('related_specs entry is incomplete')
-    values.set(field[1], parseScalar(field[2]))
+    values.set(f[1], scalar(f[2]))
   }
   if (pending) throw new Error('related_specs entry is incomplete')
-
   const known = new Set([
     'slug',
     'title',
@@ -150,16 +152,17 @@ function parseMetadata(header: string): SpecMetadata {
     'last_updated',
     'source_spec',
   ])
-  for (const field of values.keys())
-    if (!known.has(field)) throw new Error(`unsupported frontmatter field '${field}'`)
-
+  for (const key of values.keys())
+    if (!known.has(key)) throw new Error(`unsupported frontmatter field '${key}'`)
   const specKind = asString(values.get('spec_kind'), 'spec_kind') as SpecKind
   if (!SPEC_KINDS.includes(specKind)) throw new Error(`invalid spec_kind '${specKind}'`)
   const sourceSpec = values.get('source_spec')
-  if (specKind === 'technical' && !sourceSpec)
+  if (technical(specKind) && !sourceSpec)
     throw new Error('source_spec is required for technical specs')
-  if (specKind !== 'technical' && sourceSpec)
+  if (!technical(specKind) && sourceSpec)
     throw new Error('source_spec is only valid for technical specs')
+  if (!functional(specKind) && sourceUseCases.length)
+    throw new Error('source_use_cases is only valid for functional specs')
   return {
     slug: ensureSlug(asString(values.get('slug'), 'slug')),
     title: asString(values.get('title'), 'title'),
@@ -169,232 +172,293 @@ function parseMetadata(header: string): SpecMetadata {
     createdAt: asString(values.get('created_at'), 'created_at'),
     lastUpdated: asString(values.get('last_updated'), 'last_updated'),
     sourceSpec: sourceSpec ? ensureSlug(sourceSpec, 'source_spec') : undefined,
+    sourceUseCases: [...new Set(sourceUseCases)],
     relatedSpecs: relations,
   }
 }
-
 function parseDocument(raw: string): SpecDocument {
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
-  if (!match) throw new Error('spec must begin with a YAML frontmatter block')
-  return { metadata: parseMetadata(match[1]), content: match[2] }
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  if (!m) throw new Error('spec must begin with a YAML frontmatter block')
+  return { metadata: parseMetadata(m[1]), content: m[2] }
 }
-
-function yaml(value: string): string {
-  return JSON.stringify(value)
-}
-
-function serialize(doc: SpecDocument): string {
-  const { metadata, content } = doc
-  const lines = [
-    '---',
-    `slug: ${yaml(metadata.slug)}`,
-    `title: ${yaml(metadata.title)}`,
-    `description: ${yaml(metadata.description)}`,
-    `spec_kind: ${metadata.specKind}`,
-    `status: ${metadata.status}`,
-    `created_at: ${yaml(metadata.createdAt)}`,
-    `last_updated: ${yaml(metadata.lastUpdated)}`,
-  ]
-  if (metadata.sourceSpec) lines.push(`source_spec: ${metadata.sourceSpec}`)
-  if (metadata.relatedSpecs.length) {
-    lines.push('related_specs:')
-    for (const relation of metadata.relatedSpecs) {
-      lines.push(`  - slug: ${relation.slug}`, `    relationship: ${relation.relationship}`)
-    }
+function serialize(doc: SpecDocument) {
+  const m = doc.metadata,
+    lines = [
+      '---',
+      `slug: ${JSON.stringify(m.slug)}`,
+      `title: ${JSON.stringify(m.title)}`,
+      `description: ${JSON.stringify(m.description)}`,
+      `spec_kind: ${m.specKind}`,
+      `status: ${m.status}`,
+      `created_at: ${JSON.stringify(m.createdAt)}`,
+      `last_updated: ${JSON.stringify(m.lastUpdated)}`,
+    ]
+  if (m.sourceSpec) lines.push(`source_spec: ${m.sourceSpec}`)
+  if (m.sourceUseCases.length) {
+    lines.push('source_use_cases:')
+    for (const s of m.sourceUseCases) lines.push(`  - ${s}`)
   }
-  lines.push('---', '')
-  return lines.join('\n') + content
+  if (m.relatedSpecs.length) {
+    lines.push('related_specs:')
+    for (const r of m.relatedSpecs)
+      lines.push(`  - slug: ${r.slug}`, `    relationship: ${r.relationship}`)
+  }
+  return lines.concat(['---', '']).join('\n') + doc.content
 }
-
-function now(): string {
-  return new Date().toISOString()
-}
-
+const now = () => new Date().toISOString()
 export class SpecStore {
   readonly root: string
-
+  readonly useCasesRoot: string
   constructor(docsPath: string) {
     this.root = resolve(docsPath, 'specs')
+    this.useCasesRoot = resolve(docsPath, 'use-cases')
   }
-
-  private path(slug: string): string {
-    return join(this.root, `${ensureSlug(slug)}.md`)
+  private roots() {
+    return [this.useCasesRoot, this.root]
   }
-
-  private write(doc: SpecDocument): void {
-    mkdirSync(this.root, { recursive: true })
-    const destination = this.path(doc.metadata.slug)
-    const temporary = `${destination}.${process.pid}.tmp`
-    writeFileSync(temporary, serialize(doc), 'utf8')
-    renameSync(temporary, destination)
+  private paths(slug: string) {
+    ensureSlug(slug)
+    return this.roots().map((root) => join(root, `${slug}.md`))
   }
-
-  get(slug: string): SpecDocument {
-    const path = this.path(slug)
-    if (!existsSync(path)) throw new Error(`spec '${slug}' was not found`)
-    const document = parseDocument(readFileSync(path, 'utf8'))
-    if (document.metadata.slug !== slug)
-      throw new Error(`spec filename and slug disagree for '${slug}'`)
-    return document
+  private location(doc: SpecDocument) {
+    return trueUseCase(doc.metadata.specKind) ? this.useCasesRoot : this.root
   }
-
-  list(): SpecDocument[] {
-    if (!existsSync(this.root)) return []
-    return readdirSync(this.root)
-      .filter((file) => file.endsWith('.md'))
-      .sort()
-      .map((file) => this.get(file.slice(0, -3)))
+  private write(doc: SpecDocument) {
+    mkdirSync(this.location(doc), { recursive: true })
+    const dest = join(this.location(doc), `${doc.metadata.slug}.md`),
+      tmp = `${dest}.${process.pid}.tmp`
+    writeFileSync(tmp, serialize(doc), 'utf8')
+    renameSync(tmp, dest)
   }
-
-  search(query: string): SpecSearchResult[] {
+  private located(slug: string) {
+    const paths = this.paths(slug).filter(existsSync)
+    if (!paths.length) throw new Error(`spec '${slug}' was not found`)
+    if (paths.length > 1)
+      throw new Error(`spec slug '${slug}' is ambiguous across docs/use-cases and docs/specs`)
+    return paths[0]
+  }
+  get(slug: string) {
+    const path = this.located(slug),
+      d = parseDocument(readFileSync(path, 'utf8'))
+    if (d.metadata.slug !== slug) throw new Error(`spec filename and slug disagree for '${slug}'`)
+    this.validateRoot(path, d)
+    return d
+  }
+  list() {
+    const docs: SpecDocument[] = []
+    const seen = new Set<string>()
+    for (const root of this.roots())
+      if (existsSync(root))
+        for (const file of readdirSync(root)
+          .filter((f) => f.endsWith('.md'))
+          .sort()) {
+          const path = join(root, file),
+            d = parseDocument(readFileSync(path, 'utf8'))
+          if (d.metadata.slug !== file.slice(0, -3))
+            throw new Error(`spec filename and slug disagree for '${file}'`)
+          this.validateRoot(path, d)
+          if (seen.has(d.metadata.slug))
+            throw new Error(
+              `spec slug '${d.metadata.slug}' is ambiguous across docs/use-cases and docs/specs`
+            )
+          seen.add(d.metadata.slug)
+          docs.push(d)
+        }
+    return docs.sort((a, b) => a.metadata.slug.localeCompare(b.metadata.slug))
+  }
+  search(query: string) {
     const needle = asString(query, 'query').toLowerCase()
     return this.list().flatMap((document) => {
-      const haystack = `${document.metadata.slug}\n${document.metadata.title}\n${document.metadata.description}\n${document.content}`
-      const index = haystack.toLowerCase().indexOf(needle)
-      if (index < 0) return []
-      const excerpt = haystack
-        .slice(Math.max(0, index - 80), Math.min(haystack.length, index + needle.length + 160))
-        .replace(/\s+/g, ' ')
-        .trim()
-      return [{ document, excerpt }]
+      const h = `${document.metadata.slug}\n${document.metadata.title}\n${document.metadata.description}\n${document.content}`,
+        i = h.toLowerCase().indexOf(needle)
+      return i < 0
+        ? []
+        : [
+            {
+              document,
+              excerpt: h
+                .slice(Math.max(0, i - 80), Math.min(h.length, i + needle.length + 160))
+                .replace(/\s+/g, ' ')
+                .trim(),
+            },
+          ]
     })
   }
-
   create(
-    input: Omit<SpecMetadata, 'createdAt' | 'lastUpdated'> & { content: string }
-  ): SpecDocument {
+    input: Omit<SpecMetadata, 'createdAt' | 'lastUpdated' | 'sourceUseCases'> & {
+      sourceUseCases?: string[]
+      content: string
+    }
+  ) {
     ensureSlug(input.slug)
-    if (existsSync(this.path(input.slug))) throw new Error(`spec '${input.slug}' already exists`)
-    if (input.specKind === 'technical') this.requireApprovedSource(input.sourceSpec)
-    const timestamp = now()
-    const document: SpecDocument = {
-      metadata: { ...input, createdAt: timestamp, lastUpdated: timestamp },
+    if (this.paths(input.slug).some(existsSync))
+      throw new Error(`spec '${input.slug}' already exists`)
+    const doc = {
+      metadata: {
+        ...input,
+        sourceUseCases: input.sourceUseCases ?? [],
+        createdAt: now(),
+        lastUpdated: now(),
+      },
       content: input.content,
     }
-    this.write(document)
-    return document
+    this.validateInput(doc)
+    this.write(doc)
+    return doc
   }
-
-  updateMetadata(
-    slug: string,
-    changes: Partial<Omit<SpecMetadata, 'slug' | 'createdAt'>>
-  ): SpecDocument {
-    const document = this.get(slug)
-    const metadata = { ...document.metadata, ...changes, lastUpdated: now() }
-    if (metadata.specKind === 'technical') this.requireApprovedSource(metadata.sourceSpec)
-    this.invalidateTechnicalSpecs(document.metadata)
-    if (document.metadata.status === 'needs-decision') metadata.status = 'needs-decision'
-    document.metadata = metadata
-    this.write(document)
-    return document
-  }
-
-  updateContent(slug: string, content: string): SpecDocument {
-    const document = this.get(slug)
-    this.invalidateTechnicalSpecs(document.metadata)
-    document.content = content
-    document.metadata.lastUpdated = now()
-    this.write(document)
-    return document
-  }
-
-  transition(slug: string, status: SpecStatus): SpecDocument {
-    const document = this.get(slug)
-    document.metadata.status = statusFor(document.metadata.specKind, status)
-    if (document.metadata.specKind === 'technical' && status === 'approved') {
-      this.requireApprovedSource(document.metadata.sourceSpec)
+  updateMetadata(slug: string, changes: Partial<Omit<SpecMetadata, 'slug' | 'createdAt'>>) {
+    const d = this.get(slug),
+      before = { ...d.metadata }
+    d.metadata = {
+      ...d.metadata,
+      ...changes,
+      sourceUseCases: changes.sourceUseCases ?? d.metadata.sourceUseCases,
+      lastUpdated: now(),
     }
-    document.metadata.lastUpdated = now()
-    this.write(document)
-    return document
+    this.validateInput(d)
+    this.invalidateFromChange(before, d)
+    this.write(d)
+    return d
   }
-
-  link(slug: string, targetSlug: string, relationship: Relationship): void {
-    const source = this.get(slug)
-    const target = this.get(targetSlug)
+  updateContent(slug: string, content: string) {
+    const d = this.get(slug),
+      before = { ...d.metadata }
+    d.content = content
+    d.metadata.lastUpdated = now()
+    this.invalidateFromChange(before, d)
+    this.write(d)
+    return d
+  }
+  transition(slug: string, status: SpecStatus) {
+    const d = this.get(slug)
+    d.metadata.status = statusFor(d.metadata.specKind, status)
+    if (technical(d.metadata.specKind) && status === 'approved')
+      this.requireApprovedSource(d.metadata.sourceSpec)
+    if (functional(d.metadata.specKind) && status === 'approved')
+      this.requireApprovedUseCases(d.metadata.sourceUseCases)
+    d.metadata.lastUpdated = now()
+    this.write(d)
+    return d
+  }
+  link(slug: string, targetSlug: string, relationship: Relationship) {
+    const a = this.get(slug),
+      b = this.get(targetSlug)
     if (slug === targetSlug) throw new Error('a spec cannot relate to itself')
     if (!RELATIONSHIPS.includes(relationship))
       throw new Error(`invalid relationship '${relationship}'`)
-    this.addRelation(source, { slug: targetSlug, relationship })
-    this.addRelation(target, { slug, relationship: inverse[relationship] })
-    source.metadata.lastUpdated = now()
-    target.metadata.lastUpdated = now()
-    this.write(source)
-    this.write(target)
+    this.add(a, { slug: targetSlug, relationship })
+    this.add(b, { slug, relationship: inverse[relationship] })
+    a.metadata.lastUpdated = b.metadata.lastUpdated = now()
+    this.write(a)
+    this.write(b)
   }
-
-  unlink(slug: string, targetSlug: string, relationship: Relationship): void {
-    const source = this.get(slug)
-    const target = this.get(targetSlug)
-    source.metadata.relatedSpecs = source.metadata.relatedSpecs.filter(
-      (entry) => entry.slug !== targetSlug || entry.relationship !== relationship
+  unlink(slug: string, targetSlug: string, relationship: Relationship) {
+    const a = this.get(slug),
+      b = this.get(targetSlug)
+    a.metadata.relatedSpecs = a.metadata.relatedSpecs.filter(
+      (x) => x.slug !== targetSlug || x.relationship !== relationship
     )
-    target.metadata.relatedSpecs = target.metadata.relatedSpecs.filter(
-      (entry) => entry.slug !== slug || entry.relationship !== inverse[relationship]
+    b.metadata.relatedSpecs = b.metadata.relatedSpecs.filter(
+      (x) => x.slug !== slug || x.relationship !== inverse[relationship]
     )
-    source.metadata.lastUpdated = now()
-    target.metadata.lastUpdated = now()
-    this.write(source)
-    this.write(target)
+    a.metadata.lastUpdated = b.metadata.lastUpdated = now()
+    this.write(a)
+    this.write(b)
   }
-
-  validate(): string[] {
-    const documents = this.list()
-    const known = new Set(documents.map((document) => document.metadata.slug))
+  validate() {
+    const docs = this.list(),
+      known = new Map(docs.map((d) => [d.metadata.slug, d]))
     const errors: string[] = []
-    for (const document of documents) {
-      const { metadata } = document
-      if (metadata.sourceSpec && !known.has(metadata.sourceSpec))
-        errors.push(`${metadata.slug}: source_spec is missing`)
-      for (const relation of metadata.relatedSpecs) {
-        if (!known.has(relation.slug))
-          errors.push(`${metadata.slug}: related spec '${relation.slug}' is missing`)
+    for (const d of docs) {
+      const m = d.metadata
+      if (m.sourceSpec && !known.has(m.sourceSpec)) errors.push(`${m.slug}: source_spec is missing`)
+      for (const uc of m.sourceUseCases) {
+        const source = known.get(uc)
+        if (!source) errors.push(`${m.slug}: source use-case '${uc}' is missing`)
+        else if (!trueUseCase(source.metadata.specKind))
+          errors.push(`${m.slug}: source use-case '${uc}' is not a use-case`)
       }
+      for (const r of m.relatedSpecs)
+        if (!known.has(r.slug)) errors.push(`${m.slug}: related spec '${r.slug}' is missing`)
     }
     return errors
   }
-
-  private addRelation(document: SpecDocument, relation: SpecRelation): void {
-    if (
-      !document.metadata.relatedSpecs.some(
-        (entry) => entry.slug === relation.slug && entry.relationship === relation.relationship
-      )
-    ) {
-      document.metadata.relatedSpecs.push(relation)
-    }
-  }
-
-  private requireApprovedSource(sourceSpec: string | undefined): void {
-    if (!sourceSpec) throw new Error('source_spec is required for technical specs')
-    const source = this.get(sourceSpec)
-    if (
-      !PRODUCT_SPEC_KINDS.includes(source.metadata.specKind as (typeof PRODUCT_SPEC_KINDS)[number]) ||
-      source.metadata.status !== 'approved'
-    ) {
-      throw new Error(`source_spec '${sourceSpec}' must be an approved use-case, feature, or fix spec`)
-    }
-  }
-
-  private invalidateTechnicalSpecs(changed: SpecMetadata): void {
-    if (
-      !PRODUCT_SPEC_KINDS.includes(changed.specKind as (typeof PRODUCT_SPEC_KINDS)[number]) ||
-      changed.status !== 'approved'
-    )
-      return
-    for (const candidate of this.list()) {
-      if (
-        candidate.metadata.specKind === 'technical' &&
-        candidate.metadata.sourceSpec === changed.slug
-      ) {
-        candidate.metadata.status = 'needs-reconciliation'
-        candidate.metadata.lastUpdated = now()
-        this.write(candidate)
+  private validateInput(doc: SpecDocument) {
+    const m = doc.metadata
+    if (technical(m.specKind)) this.requireApprovedSource(m.sourceSpec)
+    if (m.sourceUseCases.length)
+      for (const slug of m.sourceUseCases) {
+        const source = this.get(slug)
+        if (!trueUseCase(source.metadata.specKind))
+          throw new Error(`source_use_cases '${slug}' must be a use-case`)
       }
+  }
+  private validateRoot(path: string, doc: SpecDocument) {
+    const inUseCases = path.startsWith(`${this.useCasesRoot}/`)
+    if (inUseCases && !trueUseCase(doc.metadata.specKind))
+      throw new Error(`${doc.metadata.slug}: use-case documents belong in docs/use-cases`)
+    if (!inUseCases && trueUseCase(doc.metadata.specKind)) {
+      /* legacy docs/specs use-case is intentionally readable as a functional spec until explicit migration */
     }
-    changed.status = 'needs-decision'
+  }
+  private requireApprovedSource(source: string | undefined) {
+    if (!source) throw new Error('source_spec is required for technical specs')
+    const d = this.get(source)
+    if (!functional(d.metadata.specKind) || d.metadata.status !== 'approved')
+      throw new Error(`source_spec '${source}' must be an approved spec, feature, or fix spec`)
+  }
+  private requireApprovedUseCases(slugs: string[]) {
+    for (const slug of slugs) {
+      const d = this.get(slug)
+      if (!trueUseCase(d.metadata.specKind) || d.metadata.status !== 'approved')
+        throw new Error(`source_use_cases '${slug}' must be an approved use-case`)
+    }
+  }
+  private add(d: SpecDocument, r: SpecRelation) {
+    if (
+      !d.metadata.relatedSpecs.some((x) => x.slug === r.slug && x.relationship === r.relationship)
+    )
+      d.metadata.relatedSpecs.push(r)
+  }
+  private invalidateFromChange(changed: SpecMetadata, current: SpecDocument) {
+    if (changed.status !== 'approved') return
+    const docs = this.list()
+    const isRealUseCase =
+      trueUseCase(changed.specKind) && existsSync(join(this.useCasesRoot, `${changed.slug}.md`))
+    if (isRealUseCase) {
+      current.metadata.status = 'needs-decision'
+      for (const techDoc of docs)
+        if (technical(techDoc.metadata.specKind) && techDoc.metadata.sourceSpec === changed.slug) {
+          techDoc.metadata.status = 'needs-reconciliation'
+          techDoc.metadata.lastUpdated = now()
+          this.write(techDoc)
+        }
+      for (const d of docs)
+        if (functional(d.metadata.specKind) && d.metadata.sourceUseCases.includes(changed.slug)) {
+          d.metadata.status = 'needs-decision'
+          d.metadata.lastUpdated = now()
+          this.write(d)
+          for (const techDoc of docs)
+            if (
+              technical(techDoc.metadata.specKind) &&
+              techDoc.metadata.sourceSpec === d.metadata.slug
+            ) {
+              techDoc.metadata.status = 'needs-reconciliation'
+              techDoc.metadata.lastUpdated = now()
+              this.write(techDoc)
+            }
+        }
+    } else if (functional(changed.specKind)) {
+      current.metadata.status = 'needs-decision'
+      for (const d of docs)
+        if (technical(d.metadata.specKind) && d.metadata.sourceSpec === changed.slug) {
+          d.metadata.status = 'needs-reconciliation'
+          d.metadata.lastUpdated = now()
+          this.write(d)
+        }
+    }
   }
 }
-
-export function specHeader(document: SpecDocument): SpecMetadata {
+export function specHeader(document: SpecDocument) {
   return document.metadata
 }

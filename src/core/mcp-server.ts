@@ -32,7 +32,8 @@ const VERSION = '0.1.0'
 const SPEC_TOOLS = [
   {
     name: 'specs.list',
-    description: 'List specification headers from docs/specs without loading bodies.',
+    description:
+      'List use cases from docs/use-cases and specifications from docs/specs without loading bodies.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -86,7 +87,8 @@ const SPEC_TOOLS = [
   },
   {
     name: 'specs.create',
-    description: 'Create a validated specification in docs/specs from structured fields.',
+    description:
+      'Create a validated use case in docs/use-cases or specification in docs/specs from structured fields.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -96,6 +98,7 @@ const SPEC_TOOLS = [
         specKind: { type: 'string', enum: SPEC_KINDS },
         status: { type: 'string' },
         sourceSpec: { type: 'string' },
+        sourceUseCases: { type: 'array', items: { type: 'string' } },
         content: { type: 'string' },
       },
       required: ['slug', 'title', 'description', 'specKind', 'content'],
@@ -112,6 +115,7 @@ const SPEC_TOOLS = [
         description: { type: 'string' },
         status: { type: 'string' },
         sourceSpec: { type: 'string' },
+        sourceUseCases: { type: 'array', items: { type: 'string' } },
       },
       required: ['slug'],
     },
@@ -162,7 +166,8 @@ const SPEC_TOOLS = [
   },
   {
     name: 'specs.validate',
-    description: 'Validate all docs/specs frontmatter, links, and source references.',
+    description:
+      'Validate docs/use-cases and docs/specs frontmatter, links, and source references.',
     inputSchema: { type: 'object', properties: {} },
   },
 ] as const
@@ -171,7 +176,8 @@ const TOOLS = [
   ...SPEC_TOOLS,
   {
     name: 'health.run',
-    description: 'Run the native health check for a task and persist server-owned completion evidence. Run before work and immediately before tasks.update(done).',
+    description:
+      'Run the native health check for a task and persist server-owned completion evidence. Run before work and immediately before tasks.update(done).',
     inputSchema: {
       type: 'object',
       properties: { taskId: { type: 'number', description: 'Positive task ID' } },
@@ -384,11 +390,15 @@ const TOOLS = [
   },
   {
     name: 'tasks.repair.begin',
-    description: 'Enter an audited repair mode after a failed server-owned health run. Requires a bounded reason and scope.',
+    description:
+      'Enter an audited repair mode after a failed server-owned health run. Requires a bounded reason and scope.',
     inputSchema: {
       type: 'object',
       properties: {
-        taskId: { type: 'number' }, actor: { type: 'string' }, reason: { type: 'string' }, scope: { type: 'string' },
+        taskId: { type: 'number' },
+        actor: { type: 'string' },
+        reason: { type: 'string' },
+        scope: { type: 'string' },
       },
       required: ['taskId', 'actor', 'reason', 'scope'],
     },
@@ -672,6 +682,7 @@ export async function dispatch(
         specKind: kind,
         status: (optionalStr(args, 'status') ?? 'draft') as SpecMetadata['status'],
         sourceSpec: optionalStr(args, 'sourceSpec'),
+        sourceUseCases: optionalStringArray(args, 'sourceUseCases') ?? [],
         relatedSpecs: [],
         content: str(args, 'content'),
       })
@@ -683,6 +694,8 @@ export async function dispatch(
       if ('description' in args) changes.description = str(args, 'description')
       if ('status' in args) changes.status = str(args, 'status') as SpecMetadata['status']
       if ('sourceSpec' in args) changes.sourceSpec = str(args, 'sourceSpec')
+      if ('sourceUseCases' in args)
+        changes.sourceUseCases = optionalStringArray(args, 'sourceUseCases') ?? []
       const document = specs.updateMetadata(str(args, 'slug'), changes)
       return ok(JSON.stringify({ metadata: document.metadata }))
     }
@@ -891,7 +904,10 @@ export async function dispatch(
       if (taskId < 1) throw new Error('taskId must be a positive integer')
       const result = await runTaskHealthCheck(db, cwd, config, taskId)
       const task = await db.resolveHealthMode(taskId, result, 'manual')
-      return ok(JSON.stringify({ ...result, executionMode: task?.execution_mode ?? null }), result.state !== 'passed')
+      return ok(
+        JSON.stringify({ ...result, executionMode: task?.execution_mode ?? null }),
+        result.state !== 'passed'
+      )
     }
 
     case 'tasks.claim': {
@@ -903,7 +919,10 @@ export async function dispatch(
       }
       const health = await runTaskHealthCheck(db, cwd, config, task.id)
       const resolved = await db.resolveHealthMode(task.id, health, 'claim')
-      return ok(JSON.stringify({ task: resolved, health, executionMode: resolved?.execution_mode ?? null }), health.state !== 'passed')
+      return ok(
+        JSON.stringify({ task: resolved, health, executionMode: resolved?.execution_mode ?? null }),
+        health.state !== 'passed'
+      )
     }
 
     case 'tasks.add': {
@@ -920,12 +939,21 @@ export async function dispatch(
       const status = str(args, 'status') as TaskStatus
       if (status === 'done') {
         const reserved = await db.beginVerification(id)
-        if (!reserved) return ok(JSON.stringify({ error: 'task_not_open_for_verification', taskId: id }), true)
+        if (!reserved)
+          return ok(JSON.stringify({ error: 'task_not_open_for_verification', taskId: id }), true)
         const health = await runTaskHealthCheck(db, cwd, config, id)
         const afterHealth = await db.resolveHealthMode(id, health, 'verify')
         const task = await db.finalizeVerifiedTask(id, health)
         if (!task) {
-          return ok(JSON.stringify({ error: 'final_health_failed', taskId: id, health, executionMode: afterHealth?.execution_mode ?? null }), true)
+          return ok(
+            JSON.stringify({
+              error: 'final_health_failed',
+              taskId: id,
+              health,
+              executionMode: afterHealth?.execution_mode ?? null,
+            }),
+            true
+          )
         }
         return ok(JSON.stringify({ task, health }))
       }
@@ -941,10 +969,18 @@ export async function dispatch(
       const actor = str(args, 'actor').trim()
       const reason = str(args, 'reason').trim()
       const scope = str(args, 'scope').trim()
-      if (!actor || actor.length > 255 || !reason || reason.length > 2000 || !scope || scope.length > 2000)
+      if (
+        !actor ||
+        actor.length > 255 ||
+        !reason ||
+        reason.length > 2000 ||
+        !scope ||
+        scope.length > 2000
+      )
         return ok(JSON.stringify({ error: 'invalid_repair_audit', taskId }), true)
       const repair = await db.beginRepair(taskId, actor, reason, scope)
-      if (repair === 'duplicate') return ok(JSON.stringify({ error: 'repair_already_active', taskId }), true)
+      if (repair === 'duplicate')
+        return ok(JSON.stringify({ error: 'repair_already_active', taskId }), true)
       if (!repair) return ok(JSON.stringify({ error: 'failed_health_required', taskId }), true)
       return ok(JSON.stringify(repair))
     }
