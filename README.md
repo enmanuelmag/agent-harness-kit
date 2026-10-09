@@ -119,7 +119,7 @@ Everything is stored locally in a SQLite database (`.harness/harness.db`). No cl
 - **Full audit trail** — every action, file touched, tool used, and section written is stored in SQLite and queryable.
 - **Automatic health gate** — `tasks.claim` runs server-owned health automatically. A green result enables normal work; a failed result restricts the task to diagnosis until an audited `tasks.repair.begin` authorizes the bounded repair. `tasks.update(done)` runs fresh final health automatically. `ahk health` remains manual and stateless.
 - **Docs search** — agents can call `docs.search(query)` to find relevant content in your project's docs folder before writing code.
-- **Specification discovery** — `ahk-use-cases`, `ahk-feature`, and `ahk-fix` turn product requests, Jira ideas, and defects into reviewable drafts in `docs/specs/`. `ahk-use-case-tech` creates a linked technical draft only after an approved use case, feature, or fix; MCP can search, read, edit, relate, validate, and approve the documents.
+- **Specification discovery** — `ahk-use-case` grills one actor-goal scenario at a time and saves reviewable drafts in `docs/use-cases/`. `ahk-spec` turns approved cases into functional specs in `docs/specs/`; `ahk-spec-tech` creates a linked technical spec only after an approved spec, feature, or fix. MCP can search, read, edit, relate, validate, and approve both document roots.
 - **Multi-database support** — SQLite by default (uses `better-sqlite3` on Node ≥ 22 or `bun:sqlite` on Bun). Switch to PostgreSQL or MySQL with a single config line — same schema, same MCP tools, same workflow.
 - **Global installation** — `ahk init` can scaffold the harness into your home directory (`~/.claude` or `~/.config/opencode`) to share it across all projects.
 - **Input validation** — CLI prompts validate all inputs (name length, path format, task title, etc.) and retry with the error message instead of silently accepting bad values.
@@ -485,7 +485,7 @@ After a reset, run `ahk init` to scaffold a fresh harness.
 
 ### `ahk migrate`
 
-`ahk migrate` has two subcommands: `provider` (migrate scaffold files to a different AI provider) and `storage` (migrate the harness database between storage backends). `ahk migrate --to <provider>` (no subcommand) is kept as a backward-compatible alias for `ahk migrate provider --to <provider>` — existing scripts/CI using the old form keep working unchanged.
+`ahk migrate` has three subcommands: `provider` (migrate scaffold files to a different AI provider), `storage` (migrate the harness database between storage backends), and `specs` (explicitly migrate legacy document kinds). `ahk migrate --to <provider>` (no subcommand) is kept as a backward-compatible alias for `ahk migrate provider --to <provider>` — existing scripts/CI using the old form keep working unchanged.
 
 #### `ahk migrate provider`
 
@@ -504,6 +504,12 @@ ahk migrate --to opencode
 Migrating always regenerates the target provider's agent files from scratch, so — same as `ahk init` and `ahk build --force` — it also runs and persists that target's native per-role prompt first: Claude model plus model-dependent effort, Codex model plus reasoning effort, or Cursor's verbatim model ID. Migrating to OpenCode or Grok CLI shows no prompt because neither has a supported native per-role selector. Migration does not alter the config's `provider` field; follow the printed instruction after reviewing generated files.
 
 #### `ahk migrate storage` — ⚠️ sensitive, reads/writes real harness data
+
+#### `ahk migrate specs`
+
+`ahk migrate specs` previews legacy `docs/specs` frontmatter changes from `use-case` to `spec` and `technical` to `spec-tech`. It never runs during `build` or `sync`. Use `ahk migrate specs --apply` to make the frontmatter-only change; slugs, body text, statuses, timestamps, and links remain intact.
+
+`ahk build` and `ahk sync` apply registered skill migrations per provider root in version order. Each completed step is checkpointed in `.harness/skills-state.json`; generated legacy skills are backed up before removal, while custom or unverified legacy skills remain in place and are reported for review.
 
 Migrates the harness database between storage backends: **local↔global scope** (moving `.harness/harness.db` in/out of `~/.harness/dbs/<projectId>/`) and **sqlite↔postgres/mysql** (dumping and reloading tasks, acceptance criteria, actions, and action sections inside a single transaction). It is **not interactive** — `agent-harness-kit.config.ts` (`storage.scope`, `storage.sqlitePath` (local scope only), `database.type`/`connectionString`) is the only source of truth for the desired target, compared against the real current state recorded in `.harness/storage-state.json`.
 

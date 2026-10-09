@@ -1556,10 +1556,6 @@ describe('ahk-test — skill materialization across all providers', () => {
   const TMP_SKILL = join(import.meta.dirname, '../../.tmp-skill-materialize')
   const CANONICAL_SRC = join(import.meta.dirname, '../core/materializer/skills/ahk-test/SKILL.md')
   const CANONICAL_RESOURCES = [
-    'ahk-use-cases/resources/discovery-workflow.md',
-    'ahk-use-cases/resources/use-case-template.md',
-    'ahk-use-case-tech/resources/technical-template.md',
-    'ahk-use-case-tech/resources/technical-workflow.md',
     'ahk-feature/resources/feature-workflow.md',
     'ahk-feature/resources/feature-template.md',
     'ahk-fix/resources/fix-workflow.md',
@@ -1580,6 +1576,7 @@ describe('ahk-test — skill materialization across all providers', () => {
     ['opencode', '.opencode/skills'],
     ['codex-cli', '.agents/skills'],
     ['grok-cli', '.grok/skills'],
+    ['cursor', '.cursor/skills'],
   ]
 
   for (const [providerName, skillsSubdir] of providers) {
@@ -1658,7 +1655,7 @@ describe('ahk-test — doctor states', () => {
 
   async function buildProject(
     dir: string,
-    provider: 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' = 'claude-code'
+    provider: 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor' = 'claude-code'
   ): Promise<void> {
     const config = applyConfigDefaults({
       name: 'demo-app',
@@ -1670,7 +1667,7 @@ describe('ahk-test — doctor states', () => {
     const configContent = configMjs({
       name: 'demo-app',
       description: 'demo',
-      provider: provider as 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli',
+      provider: provider as 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor',
       docsPath: './docs',
       tasksAdapter: 'mcp',
       port: config.tools.mcp.port,
@@ -1691,6 +1688,8 @@ describe('ahk-test — doctor states', () => {
         return join(dir, '.agents/skills/ahk-test/SKILL.md')
       case 'grok-cli':
         return join(dir, '.grok/skills/ahk-test/SKILL.md')
+      case 'cursor':
+        return join(dir, '.cursor/skills/ahk-test/SKILL.md')
       default:
         return join(dir, '.claude/skills/ahk-test/SKILL.md')
     }
@@ -1702,7 +1701,13 @@ describe('ahk-test — doctor states', () => {
 
   test('freshly built manifests and resources are ok for every provider', async () => {
     try {
-      for (const provider of ['claude-code', 'opencode', 'codex-cli', 'grok-cli'] as const) {
+      for (const provider of [
+        'claude-code',
+        'opencode',
+        'codex-cli',
+        'grok-cli',
+        'cursor',
+      ] as const) {
         const dir = makeTmp(`skill-ok-${provider}`)
         await buildProject(dir, provider)
         const status = await getDoctorStatus(dir)
@@ -1750,13 +1755,10 @@ describe('ahk-test — doctor states', () => {
     const dir = makeTmp('resource-missing')
     try {
       await buildProject(dir, 'opencode')
-      rmSync(
-        resourcePathForProvider(dir, 'opencode', 'ahk-use-cases/resources/discovery-workflow.md')
-      )
+      rmSync(resourcePathForProvider(dir, 'opencode', 'ahk-feature/resources/feature-workflow.md'))
       const status = await getDoctorStatus(dir)
       assert.equal(
-        status.skills.find((s) => s.name === 'ahk-use-cases/resources/discovery-workflow.md')
-          ?.status,
+        status.skills.find((s) => s.name === 'ahk-feature/resources/feature-workflow.md')?.status,
         'missing'
       )
     } finally {
@@ -1771,13 +1773,12 @@ describe('ahk-test — doctor states', () => {
       const resource = resourcePathForProvider(
         dir,
         'grok-cli',
-        'ahk-use-case-tech/resources/technical-template.md'
+        'ahk-feature/resources/feature-template.md'
       )
       writeFileSync(resource, readFileSync(resource, 'utf8') + '\n<!-- tampered -->\n', 'utf8')
       const status = await getDoctorStatus(dir)
       assert.equal(
-        status.skills.find((s) => s.name === 'ahk-use-case-tech/resources/technical-template.md')
-          ?.status,
+        status.skills.find((s) => s.name === 'ahk-feature/resources/feature-template.md')?.status,
         'outdated'
       )
     } finally {
@@ -1872,8 +1873,9 @@ describe('ahk-test — regression: four existing skills still present and matchi
     'ahk-triage',
     'ahk-review',
     'ahk-test',
-    'ahk-use-cases',
-    'ahk-use-case-tech',
+    'ahk-use-case',
+    'ahk-spec',
+    'ahk-spec-tech',
     'ahk-feature',
     'ahk-fix',
   ]
@@ -1887,6 +1889,7 @@ describe('ahk-test — regression: four existing skills still present and matchi
           ['opencode', '.opencode/skills'],
           ['codex-cli', '.agents/skills'],
           ['grok-cli', '.grok/skills'],
+          ['cursor', '.cursor/skills'],
         ]) {
           writeSkills(TMP_REG, skillsSubdir)
           const path = join(TMP_REG, skillsSubdir, skillName, 'SKILL.md')

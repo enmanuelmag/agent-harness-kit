@@ -8,6 +8,7 @@ import { runExport } from '@/commands/export'
 import { runHealth } from '@/commands/health'
 import { runInit } from '@/commands/init'
 import { runMigrate } from '@/commands/migrate'
+import { runMigrateSpecs } from '@/commands/migrate-specs'
 import { runMigrateStorage } from '@/commands/migrate-storage'
 import { runModels } from '@/commands/models'
 import { runReset } from '@/commands/reset'
@@ -213,6 +214,16 @@ migrate
     }
   })
 
+migrate
+  .command('specs')
+  .description('Preview or explicitly migrate legacy docs/specs kinds to spec and spec-tech')
+  .option('--apply', 'Apply the migration; without this flag the command is a dry run')
+  .option('--dry-run', 'Explicitly request preview mode (the default)')
+  .action(async (opts) => {
+    if (opts.apply && opts['dry-run']) throw new Error('--apply and --dry-run cannot be combined.')
+    await runMigrateSpecs(cwd, { apply: opts.apply, dryRun: opts['dry-run'] })
+  })
+
 // ─── export ───────────────────────────────────────────────────────────────────
 program
   .command('export')
@@ -248,9 +259,7 @@ program
 // ─── models ───────────────────────────────────────────────────────────────────
 program
   .command('models')
-  .description(
-    'Re-prompt per-role native model settings for Claude Code, Codex CLI, or Cursor'
-  )
+  .description('Re-prompt per-role native model settings for Claude Code, Codex CLI, or Cursor')
   .action(async () => {
     await runModels(cwd)
   })

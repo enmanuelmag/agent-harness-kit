@@ -48,6 +48,35 @@ afterEach(() => {
 })
 
 describe('filesystem specifications', () => {
+  test('keeps real use cases in their own root and reconciles a linked spec and tech transitively', () => {
+    const specs = store()
+    createUseCase(specs, 'member-export')
+    specs.create({
+      slug: 'member-export-spec',
+      title: 'Member export',
+      description: 'Scope',
+      specKind: 'spec',
+      status: 'approved',
+      sourceUseCases: ['member-export'],
+      relatedSpecs: [],
+      content: 'Draft first.',
+    })
+    specs.create({
+      slug: 'member-export-tech',
+      title: 'Member export technical',
+      description: 'Design',
+      specKind: 'spec-tech',
+      status: 'approved',
+      sourceSpec: 'member-export-spec',
+      relatedSpecs: [],
+      content: 'Design.',
+    })
+    specs.updateContent('member-export', 'Changed scenario.')
+    assert.equal(specs.get('member-export').metadata.status, 'needs-decision')
+    assert.equal(specs.get('member-export-spec').metadata.status, 'needs-decision')
+    assert.equal(specs.get('member-export-tech').metadata.status, 'needs-reconciliation')
+  })
+
   test('creates a technical spec only from an approved use-case and paginates its body', () => {
     const specs = store()
     createUseCase(specs)

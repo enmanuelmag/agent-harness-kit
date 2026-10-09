@@ -230,8 +230,9 @@ describe('coordination skill injection', () => {
         'ahk-triage',
         'ahk-review',
         'ahk-test',
-        'ahk-use-cases',
-        'ahk-use-case-tech',
+        'ahk-use-case',
+        'ahk-spec',
+        'ahk-spec-tech',
         'ahk-feature',
         'ahk-fix',
       ]) {
@@ -244,10 +245,6 @@ describe('coordination skill injection', () => {
       }
 
       for (const resourcePath of [
-        'ahk-use-cases/resources/discovery-workflow.md',
-        'ahk-use-cases/resources/use-case-template.md',
-        'ahk-use-case-tech/resources/technical-template.md',
-        'ahk-use-case-tech/resources/technical-workflow.md',
         'ahk-feature/resources/feature-workflow.md',
         'ahk-feature/resources/feature-template.md',
         'ahk-fix/resources/fix-workflow.md',
