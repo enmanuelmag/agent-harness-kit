@@ -4,6 +4,7 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
+import { collectOperationalNotices } from '@/core/operational-notices'
 
 import { persistPreferences, toPreferences } from './agent-preferences'
 import { choicesFromPreferences } from './agent-preferences'
@@ -193,6 +194,29 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
           `Re-run with --force to regenerate them from the packaged templates (this DESTROYS your edits;\n  ` +
           `a backup is written first).`
       )
+    }
+
+    // These are actual outcomes from this invocation. Do not imply that an
+    // older, already-completed migration was applied again.
+    if (report.skills.applied.length > 0) {
+      p.log.success(`Applied skill migration(s): ${report.skills.applied.join(', ')}`)
+    }
+    if (report.skills.backupDir) {
+      p.log.info(`Legacy generated skills backed up → ${report.skills.backupDir}`)
+    }
+    if (report.skills.preserved.length > 0 || report.skills.pendingPreservation.length > 0) {
+      const paths = [...new Set([...report.skills.preserved, ...report.skills.pendingPreservation])]
+      p.log.warn(`Preserved customized skill files for review:\n  ${paths.join('\n  ')}`)
+    }
+    try {
+      const notices = await collectOperationalNotices(cwd, config.provider, { waitForUpdate: true })
+      for (const notice of notices) {
+        const line = `${notice.message}${notice.command ? ` Run: ${notice.command}` : ''}`
+        if (notice.severity === 'warning') p.log.warn(line)
+        else p.log.info(line)
+      }
+    } catch {
+      // Reporting is advisory and must never turn a completed build into a failure.
     }
   } catch (err) {
     spinner.stop(pc.red('Build failed'))

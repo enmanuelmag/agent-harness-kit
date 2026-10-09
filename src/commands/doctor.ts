@@ -2,6 +2,7 @@ import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { getDoctorStatus } from '@/core/doctor'
+import { collectOperationalNotices } from '@/core/operational-notices'
 
 import type { AgentStatus, SkillStatus } from '@/core/doctor'
 
@@ -80,8 +81,9 @@ function printSkillsSection(skills: SkillStatus[]): void {
 export async function runDoctor(cwd: string): Promise<void> {
   // Check for config first so we can give a helpful upfront message
   let configFound = true
+  let config: Awaited<ReturnType<typeof loadConfig>> | undefined
   try {
-    await loadConfig(cwd)
+    config = await loadConfig(cwd)
   } catch {
     configFound = false
   }
@@ -106,6 +108,15 @@ export async function runDoctor(cwd: string): Promise<void> {
 
   console.log('')
   printSkillsSection(status.skills)
+
+  if (config) {
+    try {
+      const notices = await collectOperationalNotices(cwd, config.provider, { waitForUpdate: true, doctor: true })
+      for (const notice of notices) warn('notice', notice.message, notice.command ? `run: ${notice.command}` : undefined)
+    } catch {
+      // Doctor's established diagnostics remain useful if optional notices fail.
+    }
+  }
 
   console.log('')
 }
