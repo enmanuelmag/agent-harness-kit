@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#070c18" />
+    <title>Agent Harness Kit — Flow explainer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Agent Harness Kit"><i></i>agent harness kit</a>
+        <div class="top-status"><span></span>orchestrator online</div>
+        <div class="top-controls">
+          <button class="pause" id="pause" type="button" aria-pressed="false" aria-label="Pausar animación">Ⅱ Pause</button>
+          <button class="replay" id="replay" type="button" aria-label="Repetir animación">↻ Replay</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow"><span></span> live coordination model</div>
+        <h1>Del primer <em>“¿qué construimos?”</em><br />a software verificado.</h1>
+        <p>Una conversación humana se transforma en una tarea auditable. El MCP mantiene la memoria operativa, aplica el health gate y conecta a cada especialista.</p>
+        <div class="legend"><span><b class="human-dot"></b>Human direction</span><span><b class="mcp-dot"></b>MCP / source of truth</span><span><b class="agent-dot"></b>Specialist agent</span></div>
+      </section>
+
+      <section class="stage" aria-label="Flujo de coordinación entre agentes">
+        <div class="stage-head"><div><span class="step-counter" id="stepCounter">01 / 08</span><h2 id="stepTitle">The developer starts the conversation</h2></div><p id="stepCopy">A rough idea is enough. The system gives it a path without taking control away from the human.</p></div>
+        <div class="canvas" id="canvas">
+          <svg class="connections" viewBox="0 0 1200 570" preserveAspectRatio="none" aria-hidden="true">
+            <path id="path-dev-lead" d="M164 226 C 250 226, 260 170, 348 170" />
+            <path id="path-lead-mcp" d="M485 170 C 545 170, 560 280, 630 280" />
+            <path id="path-mcp-explorer" d="M755 280 C 820 280, 810 145, 875 145" />
+            <path id="path-explorer-builder" d="M985 145 C 1025 145, 1020 250, 1065 250" />
+            <path id="path-builder-reviewer" d="M1065 300 C 1010 300, 1020 405, 950 405" />
+            <path id="path-reviewer-builder" d="M950 450 C 1010 450, 1020 340, 1065 340" />
+            <path id="path-reviewer-mcp" d="M830 450 C 770 450, 770 345, 735 345" />
+          </svg>
+
+          <div class="node human developer" data-node="developer"><div class="avatar avatar-dev">D</div><div><small>HUMAN</small><strong>Developer</strong><span>idea · feedback · approval</span></div></div>
+          <div class="node agent lead" data-node="lead"><div class="avatar avatar-lead">L</div><div><small>ORCHESTRATES</small><strong>Lead</strong><span>defines & refines the spec</span></div></div>
+          <div class="node mcp" data-node="mcp"><div class="mcp-core"><span></span><span></span><span></span></div><div><small>SYSTEM OF RECORD</small><strong>MCP Harness</strong><span>tasks · actions · health · handoffs</span></div><b class="mcp-pulse"></b></div>
+          <div class="node agent explorer" data-node="explorer"><div class="avatar avatar-explorer">E</div><div><small>READS</small><strong>Explorer</strong><span>maps code & evidence</span></div></div>
+          <div class="node agent builder" data-node="builder"><div class="avatar avatar-builder">B</div><div><small>WRITES</small><strong>Builder</strong><span>implements the scoped change</span></div></div>
+          <div class="node agent reviewer" data-node="reviewer"><div class="avatar avatar-reviewer">R</div><div><small>VERIFIES</small><strong>Reviewer</strong><span>checks the acceptance criteria</span></div></div>
+
+          <div class="packet" id="packet"><span>●</span><strong id="packetLabel">idea</strong></div>
+          <div class="annotation" id="annotation"><span class="annotation-kicker">01 — HUMAN DIRECTION</span><strong>Intent stays with the developer.</strong><p>The lead does not invent the goal; it turns the developer’s direction into a reviewable specification.</p></div>
+          <div class="mcp-console" id="mcpConsole"><div><span>mcp.harness</span><b id="consoleState">waiting for task</b></div><code id="consoleLine">tasks.add(“describe the desired outcome”)</code></div>
+        </div>
+
+        <div class="progress" id="progress" role="tablist" aria-label="Pasos de la explicación"></div>
+        <div class="controls"><button class="back" id="back" type="button">← Back</button><button class="next" id="next" type="button">Continue <span>→</span></button></div>
+      </section>
+
+      <section class="why">
+        <p class="eyebrow"><span></span> WHAT THE HARNESS MAKES POSSIBLE</p>
+        <div class="why-grid"><article><i>01</i><h3>Human direction<br />at every turn.</h3><p>Specs get refined with the developer. Approval is explicit before specialized work starts.</p></article><article><i>02</i><h3>One traceable<br />source of truth.</h3><p>The MCP records tasks, evidence, handoffs, acceptance criteria and the exact next owner.</p></article><article><i>03</i><h3>Evidence before<br />“done”.</h3><p>Native health runs before work and at closure. A failed gate protects implementation with repair mode.</p></article></div>
+      </section>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

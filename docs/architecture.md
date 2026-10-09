@@ -203,8 +203,8 @@ export default defineHarness({
     docsPath: './docs',
   },
   provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
-  // No `agents` key — per-agent settings (model, role instructions) live in
-  // the generated agent file, which is yours to edit.
+  // No `agents` key — role instructions live in the generated agent file;
+  // optional model choices are retained as agentPreferences metadata.
   // `database` never carries a file path — physical location is a `storage`
   // concern (see `storage.sqlitePath` below), not a `database` one.
   database: { type: 'sqlite' },

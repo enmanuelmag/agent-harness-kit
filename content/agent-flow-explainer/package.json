@@ -1,0 +1,9 @@
+{
+  "name": "ahk-flow-explainer",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "pnpm --dir ../../dashboard exec vite ../content/agent-flow-explainer --host 127.0.0.1",
+    "build": "pnpm --dir ../../dashboard exec vite build ../content/agent-flow-explainer"
+  }
+}
