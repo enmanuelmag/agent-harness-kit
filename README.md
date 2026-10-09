@@ -192,15 +192,27 @@ Working inside the `agent-harness-kit` repository itself does **not** count as a
 
 Interactive scaffold. Asks for your project name, description, AI provider, docs path, storage scope, task adapter, and an optional first task. Creates all harness files in the current directory.
 
-Claude Code only, init asks you to pick a model for each of the 5 core roles. The choices are written to the generated agents and saved in `agentPreferences` in the harness config. `inherit` is stored explicitly, so a later forced sync can reliably reproduce the provider default.
+Claude Code only, init asks you to pick a model and an optional native reasoning effort for each of the 5 core roles. Both values are written to the generated agents and saved in `agentPreferences`; `inherit` is stored explicitly, so a later forced sync can reliably reproduce the provider default.
 
-Codex CLI only, init asks for a **model and a reasoning effort** for each role and saves both in `agentPreferences`; optional effort remains optional. Choose `inherit` to omit native overrides while retaining an explicit saved choice for future syncs.
+Codex CLI only, init asks for a **model and a reasoning effort** for each role and saves both in `agentPreferences`; optional effort remains optional. The live catalog uses the newest available Sol/Luna choices and only offers efforts reported as supported by that model:
+
+| Role | Default live family | Effort |
+| --- | --- | --- |
+| Lead, Builder, Reviewer | Sol | medium |
+| Explorer | Luna | low |
+| Consultant | Sol | high |
+
+If a family or requested effort is unavailable, the picker falls back to the catalog default effort or `inherit`; it never pins a hardcoded model ID. Choose `inherit` to omit native overrides while retaining an explicit saved choice for future syncs.
 
 Separately, `.codex/config.toml` always gets a project-wide top-level default — `model = "gpt-5.6-terra"` and `model_reasoning_effort = "medium"` — written once and preserved across every subsequent `ahk build`/`ahk init --force`: if you hand-edit either value in config.toml, your edit is never overwritten. Per-role `model`/`model_reasoning_effort` lines in `.codex/agents/<role>.toml` (above) act as overrides of this baseline for that one role.
 
 OpenCode and Grok Build are unaffected by either prompt — it never appears for those providers, since neither has a closed model enum to prompt against.
 
 Cursor only, init asks for a model for each core role. It runs `agent models` and presents the IDs available to the current Cursor account, plan, and team policy. `auto` is an explicit choice and writes `model: auto`; `inherit` is separate and omits the `model:` line so the subagent uses its parent model. Every other selected ID is persisted verbatim in `.cursor/agents/<role>.md`, without adding a generic effort suffix. If live discovery is unavailable, the CLI reports it and offers `inherit` or a manual model ID; manual IDs reject whitespace, quotes, control characters, and other YAML-breaking syntax. It never silently falls back to `auto`. Cursor's non-builder roles receive `readonly: true`, not a tool allowlist, so available MCP tools do not need to be enumerated manually.
+
+Live catalogs are ordered for scanning: Codex lists Astra, Sol, Terra, then Luna, with newest numeric versions first. Cursor keeps provider groups and orders GPT and Claude families in the same capability order; native effort variants are ordered from ultra down to inherit while preserving their exact IDs.
+
+Native formats follow the providers' references: [Claude Code model configuration](https://docs.anthropic.com/en/docs/claude-code/model-config), [Claude subagents](https://docs.anthropic.com/en/docs/claude-code/sub-agents), [Cursor subagents](https://cursor.com/docs/context/subagents), and the [Codex config reference](https://developers.openai.com/codex/config-reference/). Claude's picker orders Fable, Opus, Sonnet, then Haiku; its effort selector appears only for the selected model's documented support.
 
 
 - `global` (interactive default) — `~/.harness/dbs/<projectId>/harness.db`, outside the project tree (useful to keep the DB out of version control entirely, or to centralize storage for many projects). `<projectId>` is a UUID generated once at init and persisted in `agent-harness-kit.config.ts` — it's never regenerated on subsequent runs.
@@ -271,7 +283,7 @@ ahk build --force
 - **It discards your customizations.** Every agent file is rewritten from the template. Prompt edits, `model:` lines, and restriction tweaks are all lost.
 - **It backs up first.** Before overwriting anything, the current content of every affected file is copied under `.harness/backups/` — agent files to `agents-<timestamp>/`, hand-edited `AGENTS.md`/`CLAUDE.md` to `derived-<timestamp>/`. If that backup cannot be written, the command aborts and **no file is modified** — the same fail-safe as [`ahk migrate storage --force`](#storage-migration).
 - **It names what it touched.** The command prints every file it overwrote and the backup location, so you can diff or restore.
-- **Claude Code and Codex CLI also re-prompt for models.** Before regenerating, `ahk build --force` runs the same per-role prompt as `ahk init` for the current provider — the model prompt on Claude Code, or the model **and** reasoning-effort prompt on Codex CLI (see above) — and injects the fresh choices into the regenerated frontmatter/TOML. Codex proposes `gpt-5.6-terra`/`medium` for lead, consultant, builder, and reviewer, and `gpt-5.6-luna`/`medium` for explorer; accepting those defaults writes them into the regenerated TOMLs. OpenCode and Grok Build are unaffected — no prompt appears for them, since neither has a closed model enum to prompt against.
+- **Claude Code, Codex CLI, and Cursor re-prompt for their native choices.** Before regenerating, `ahk build --force` runs the same per-role prompt as `ahk init` for the current provider: Claude model plus model-dependent effort, Codex model plus reasoning effort, or Cursor's verbatim native model ID (which can include a bracketed parameter such as `[effort=high]`). OpenCode and Grok Build have no supported native per-role prompt.
 
 `--force` also regenerates a hand-edited `AGENTS.md` or `CLAUDE.md` (backing it up first) — the only time you need it for those files, since an *unedited* one already re-generates on its own when config changes.
 
@@ -283,15 +295,15 @@ ahk build --force
 
 ### `ahk models`
 
-Claude Code only. Re-runs `ahk init`'s per-role model prompt and regenerates ONLY the 5 `.claude/agents/*.md` files with the chosen models — nothing else (not `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.claude/settings.json`, your config file, docs path, storage scope, or task adapter).
+Re-runs `ahk init`'s native per-role selection for Claude Code, Codex CLI, or Cursor and regenerates only that provider's five canonical role files. Claude stores `model:` and optional `effort:` frontmatter scalars; Codex stores `model` and `model_reasoning_effort`; Cursor stores its selected `model:` ID verbatim, including native bracket parameters. Selections are persisted in `agentPreferences` before regeneration, so `ahk sync --force --keep-models` reuses them. OpenCode and Grok Build report that they have no supported native per-role prompt.
 
 ```bash
 ahk models
 ```
 
-- Prompts once per role (lead, explorer, consultant, builder, reviewer): `inherit` (default), `haiku`, `sonnet`, `opus`, or `fable` — same prompt as `ahk init`.
+- Prompts once per role (lead, explorer, consultant, builder, reviewer) using the active provider's native selector: Claude model plus supported effort, Codex model plus supported reasoning effort, or Cursor's exact model ID.
 - Always regenerates all 5 agent files, backing up the previous content first under `.harness/backups/agents-<timestamp>/` — the same fail-safe [`--force`](#--force) uses.
-- On a non-Claude-Code project, it prints a one-line no-op message and exits — no prompt.
+- On OpenCode or Grok Build, it prints a one-line unsupported-provider no-op and exits — no prompt.
 - If no `agent-harness-kit.config` is found, it prints a message pointing at `ahk init` and exits — no prompt, no stack trace.
 
 ---
@@ -489,7 +501,7 @@ ahk migrate provider --to grok-cli
 ahk migrate --to opencode
 ```
 
-Migrating always regenerates the target provider's agent files from scratch, so — same as `ahk init` and `ahk build --force` — it also runs that target's per-role prompt first, before anything is written: the model prompt when migrating **to** Claude Code, or the model **and** reasoning-effort prompt when migrating **to** Codex CLI (see [`ahk init`](#ahk-init) above for what each prompt asks). Migrating to OpenCode or Grok CLI shows no prompt at all, since neither has a closed model enum to prompt against.
+Migrating always regenerates the target provider's agent files from scratch, so — same as `ahk init` and `ahk build --force` — it also runs and persists that target's native per-role prompt first: Claude model plus model-dependent effort, Codex model plus reasoning effort, or Cursor's verbatim model ID. Migrating to OpenCode or Grok CLI shows no prompt because neither has a supported native per-role selector. Migration does not alter the config's `provider` field; follow the printed instruction after reviewing generated files.
 
 #### `ahk migrate storage` — ⚠️ sensitive, reads/writes real harness data
 
