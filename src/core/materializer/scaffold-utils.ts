@@ -363,9 +363,13 @@ export interface WriteSkillsResult {
   pendingPreservation: string[]
 }
 
-export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?: string): WriteSkillsResult {
+export function writeSkills(
+  cwd: string,
+  skillsDir: string,
+  delegationGuidance?: string
+): WriteSkillsResult {
   // Migrations are project-local and ordered by the executable package version.
-  // A missing state is bootstrapped by inspecting legacy owned skill names only.
+  // Exact canonical and retired AHK skill names are reserved for the generator.
   const provider = skillsDir.startsWith('.claude')
     ? 'claude-code'
     : skillsDir.startsWith('.agents')
@@ -385,12 +389,13 @@ export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?:
     skillsDir,
     join(__dirname, 'skills'),
     delegationGuidance,
-    migration.state
+    migration.state,
+    migration.backupDir
   )
   return {
     applied: migration.applied,
     preserved: migration.preserved,
-    backupDir: migration.backupDir,
+    backupDir: reconciliation.backupDir ?? migration.backupDir,
     pendingPreservation: reconciliation.pendingPreservation,
   }
 }

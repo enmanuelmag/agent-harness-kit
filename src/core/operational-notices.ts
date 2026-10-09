@@ -23,17 +23,35 @@ export interface OperationalNotice {
   details?: Record<string, string | string[]>
 }
 
-type RootState = { version?: string; migrationVersion?: string; applied?: string[]; pendingInventory?: Record<string, string>; pendingPreservation?: string[] }
+type RootState = {
+  version?: string
+  migrationVersion?: string
+  applied?: string[]
+  pendingInventory?: Record<string, string>
+  pendingPreservation?: string[]
+}
 type State = { roots?: Record<string, RootState> }
-export interface NoticeSession { fingerprints: Map<string, Set<string>> }
+export interface NoticeSession {
+  fingerprints: Map<string, Set<string>>
+}
 const MAX_FINGERPRINTS_PER_SCOPE = 40
 const MAX_SCOPES_PER_SESSION = 20
 
 /** A server owns one session for its lifetime; no notice state crosses MCP servers. */
-export function createNoticeSession(): NoticeSession { return { fingerprints: new Map() } }
+export function createNoticeSession(): NoticeSession {
+  return { fingerprints: new Map() }
+}
 
 function providerSkillsDir(provider: string): string {
-  return provider === 'claude-code' ? '.claude/skills' : provider === 'codex-cli' ? '.agents/skills' : provider === 'cursor' ? '.cursor/skills' : provider === 'grok-cli' ? '.grok/skills' : '.opencode/skills'
+  return provider === 'claude-code'
+    ? '.claude/skills'
+    : provider === 'codex-cli'
+      ? '.agents/skills'
+      : provider === 'cursor'
+        ? '.cursor/skills'
+        : provider === 'grok-cli'
+          ? '.grok/skills'
+          : '.opencode/skills'
 }
 
 function migrationNotices(cwd: string, provider: string): OperationalNotice[] {
@@ -41,65 +59,191 @@ function migrationNotices(cwd: string, provider: string): OperationalNotice[] {
   const skillsDir = providerSkillsDir(provider)
   if (!existsSync(statePath)) {
     return hasOwnedLegacySkills(cwd, skillsDir)
-      ? [{ code: 'skills-migration-pending', severity: 'warning', scope: 'skills', message: 'Legacy skills need migration; run ahk build.', command: 'ahk build' }]
+      ? [
+          {
+            code: 'skills-migration-pending',
+            severity: 'warning',
+            scope: 'skills',
+            message: 'Legacy skills need migration; run ahk build.',
+            command: 'ahk build',
+          },
+        ]
       : []
   }
   try {
     const raw = JSON.parse(readFileSync(statePath, 'utf8')) as State
-    if (!raw || typeof raw !== 'object' || !raw.roots || typeof raw.roots !== 'object' || Array.isArray(raw.roots))
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      !raw.roots ||
+      typeof raw.roots !== 'object' ||
+      Array.isArray(raw.roots)
+    )
       throw new Error('invalid root state')
     const key = skillsDir.replace(/[^a-z0-9]/gi, '_')
     const root = raw.roots?.[key]
     if (!root) {
       return hasOwnedLegacySkills(cwd, skillsDir)
-        ? [{ code: 'skills-migration-pending', severity: 'warning', scope: 'skills', message: 'Legacy skills need migration; run ahk build.', command: 'ahk build' }]
+        ? [
+            {
+              code: 'skills-migration-pending',
+              severity: 'warning',
+              scope: 'skills',
+              message: 'Legacy skills need migration; run ahk build.',
+              command: 'ahk build',
+            },
+          ]
         : []
     }
-    if (typeof root.version !== 'string' || !isValidSemver(root.version) || !Array.isArray(root.applied) || !root.applied.every((value) => typeof value === 'string') || !Array.isArray(root.pendingPreservation) || !root.pendingPreservation.every((value) => typeof value === 'string') || typeof (root as RootState & { inventory?: unknown }).inventory !== 'object' || (root as RootState & { inventory?: unknown }).inventory === null || Array.isArray((root as RootState & { inventory?: unknown }).inventory) || !Object.values((root as RootState & { inventory: Record<string, unknown> }).inventory).every((value) => typeof value === 'string') || (root.migrationVersion !== undefined && (typeof root.migrationVersion !== 'string' || !isValidSemver(root.migrationVersion))) || (root.pendingInventory !== undefined && (typeof root.pendingInventory !== 'object' || root.pendingInventory === null || Array.isArray(root.pendingInventory) || !Object.values(root.pendingInventory).every((value) => typeof value === 'string'))))
-      return [{ code: 'skills-migration-state-invalid', severity: 'warning', scope: 'skills', message: 'Skill migration state is malformed; run ahk doctor before changing generated files.', command: 'ahk doctor' }]
+    if (
+      typeof root.version !== 'string' ||
+      !isValidSemver(root.version) ||
+      !Array.isArray(root.applied) ||
+      !root.applied.every((value) => typeof value === 'string') ||
+      !Array.isArray(root.pendingPreservation) ||
+      !root.pendingPreservation.every((value) => typeof value === 'string') ||
+      typeof (root as RootState & { inventory?: unknown }).inventory !== 'object' ||
+      (root as RootState & { inventory?: unknown }).inventory === null ||
+      Array.isArray((root as RootState & { inventory?: unknown }).inventory) ||
+      !Object.values((root as RootState & { inventory: Record<string, unknown> }).inventory).every(
+        (value) => typeof value === 'string'
+      ) ||
+      (root.migrationVersion !== undefined &&
+        (typeof root.migrationVersion !== 'string' || !isValidSemver(root.migrationVersion))) ||
+      (root.pendingInventory !== undefined &&
+        (typeof root.pendingInventory !== 'object' ||
+          root.pendingInventory === null ||
+          Array.isArray(root.pendingInventory) ||
+          !Object.values(root.pendingInventory).every((value) => typeof value === 'string')))
+    )
+      return [
+        {
+          code: 'skills-migration-state-invalid',
+          severity: 'warning',
+          scope: 'skills',
+          message:
+            'Skill migration state is malformed; run ahk doctor before changing generated files.',
+          command: 'ahk doctor',
+        },
+      ]
     const notices: OperationalNotice[] = []
+    if (hasOwnedLegacySkills(cwd, skillsDir))
+      notices.push({
+        code: 'skills-migration-pending',
+        severity: 'warning',
+        scope: 'skills',
+        message: 'Retired reserved AHK skills need reconciliation; run ahk build.',
+        command: 'ahk build',
+      })
     if (root.pendingInventory && Object.keys(root.pendingInventory).length)
-      notices.push({ code: 'skills-migration-interrupted', severity: 'warning', scope: 'skills', message: 'A generated skills refresh was interrupted; run ahk build to resume it.', command: 'ahk build' })
+      notices.push({
+        code: 'skills-migration-interrupted',
+        severity: 'warning',
+        scope: 'skills',
+        message: 'A generated skills refresh was interrupted; run ahk build to resume it.',
+        command: 'ahk build',
+      })
     if (root.pendingPreservation?.length)
-      notices.push({ code: 'skills-customized-preserved', severity: 'warning', scope: 'skills', message: 'Customized legacy skill files were preserved and need review.', command: 'ahk build', details: { paths: root.pendingPreservation.slice(0, 5) } })
-    if ((root.version && compareSemver(root.version, pkg.version) === 1) || (root.migrationVersion && compareSemver(root.migrationVersion, pkg.version) === 1))
-      notices.push({ code: 'skills-state-newer-than-cli', severity: 'warning', scope: 'skills', message: 'Skills were generated by a newer AHK version. Update this CLI before running build.', command: 'ahk --version' })
-    else if ((root.version && compareSemver(root.version, pkg.version) !== 0) || (root.migrationVersion && compareSemver(root.migrationVersion, pkg.version) !== 0))
-      notices.push({ code: 'skills-migration-pending', severity: 'warning', scope: 'skills', message: 'Skill migrations are pending canonical refresh.', command: 'ahk build' })
+      notices.push({
+        code: 'skills-customized-preserved',
+        severity: 'warning',
+        scope: 'skills',
+        message: 'Customized legacy skill files were preserved and need review.',
+        command: 'ahk build',
+        details: { paths: root.pendingPreservation.slice(0, 5) },
+      })
+    if (
+      (root.version && compareSemver(root.version, pkg.version) === 1) ||
+      (root.migrationVersion && compareSemver(root.migrationVersion, pkg.version) === 1)
+    )
+      notices.push({
+        code: 'skills-state-newer-than-cli',
+        severity: 'warning',
+        scope: 'skills',
+        message:
+          'Skills were generated by a newer AHK version. Update this CLI before running build.',
+        command: 'ahk --version',
+      })
+    else if (
+      !notices.some((notice) => notice.code === 'skills-migration-pending') &&
+      ((root.version && compareSemver(root.version, pkg.version) !== 0) ||
+        (root.migrationVersion && compareSemver(root.migrationVersion, pkg.version) !== 0))
+    )
+      notices.push({
+        code: 'skills-migration-pending',
+        severity: 'warning',
+        scope: 'skills',
+        message: 'Skill migrations are pending canonical refresh.',
+        command: 'ahk build',
+      })
     return notices
   } catch {
-    return [{ code: 'skills-migration-state-invalid', severity: 'warning', scope: 'skills', message: 'Skill migration state could not be read; run ahk doctor for details.', command: 'ahk doctor' }]
+    return [
+      {
+        code: 'skills-migration-state-invalid',
+        severity: 'warning',
+        scope: 'skills',
+        message: 'Skill migration state could not be read; run ahk doctor for details.',
+        command: 'ahk doctor',
+      },
+    ]
   }
 }
 
 /** Reads diagnostics only. It never installs, migrates, or writes state. */
-export function collectOperationalNotices(cwd: string, provider: string, options: { waitForUpdate?: boolean; doctor?: boolean } = {}): Promise<OperationalNotice[]> | OperationalNotice[] {
+export function collectOperationalNotices(
+  cwd: string,
+  provider: string,
+  options: { waitForUpdate?: boolean; doctor?: boolean } = {}
+): Promise<OperationalNotice[]> | OperationalNotice[] {
   const finish = (latest: string | null | undefined) => {
     const notices = migrationNotices(cwd, provider)
-    if (latest && isNewer(latest, pkg.version)) notices.unshift({ code: 'package-update-available', severity: 'info', scope: 'package', message: `agent-harness-kit ${latest} is available.`, command: resolveUpdateCommand(latest, cwd), details: { current: pkg.version, latest } })
+    if (latest && isNewer(latest, pkg.version))
+      notices.unshift({
+        code: 'package-update-available',
+        severity: 'info',
+        scope: 'package',
+        message: `agent-harness-kit ${latest} is available.`,
+        command: resolveUpdateCommand(latest, cwd),
+        details: { current: pkg.version, latest },
+      })
     return notices.slice(0, 5)
   }
-  if (options.waitForUpdate) return lookupUpdate(pkg.version).then((result) => finish(result.latest)).catch(() => finish(undefined))
+  if (options.waitForUpdate)
+    return lookupUpdate(pkg.version)
+      .then((result) => finish(result.latest))
+      .catch(() => finish(undefined))
   const current = cachedUpdate(pkg.version)
   warmUpdateCache(pkg.version)
   return finish(current?.latest)
 }
 
 /** Session-level deterministic suppression for lifecycle results. Doctor is always fresh. */
-export function noticesForDelivery(session: NoticeSession, cwd: string, provider: string, notices: OperationalNotice[], doctor = false): OperationalNotice[] {
+export function noticesForDelivery(
+  session: NoticeSession,
+  cwd: string,
+  provider: string,
+  notices: OperationalNotice[],
+  doctor = false
+): OperationalNotice[] {
   if (doctor) return notices
   const key = `${cwd}\0${provider}`
   let known = session.fingerprints.get(key)
-  if (!known) { if (session.fingerprints.size >= MAX_SCOPES_PER_SESSION) session.fingerprints.delete(session.fingerprints.keys().next().value as string); known = new Set(); session.fingerprints.set(key, known) }
+  if (!known) {
+    if (session.fingerprints.size >= MAX_SCOPES_PER_SESSION)
+      session.fingerprints.delete(session.fingerprints.keys().next().value as string)
+    known = new Set()
+    session.fingerprints.set(key, known)
+  }
   return notices.filter((notice) => {
     // Warnings describe active unresolved work and remain visible at every
     // meaningful lifecycle boundary. Only repeated information is suppressed.
     if (notice.severity === 'warning') return true
     const fingerprint = `${notice.code}:${JSON.stringify(notice.details ?? {})}:${notice.command ?? ''}`
     if (known!.has(fingerprint)) return false
-    if (known!.size >= MAX_FINGERPRINTS_PER_SCOPE) known!.delete(known!.values().next().value as string)
+    if (known!.size >= MAX_FINGERPRINTS_PER_SCOPE)
+      known!.delete(known!.values().next().value as string)
     known!.add(fingerprint)
     return true
   })
 }
-

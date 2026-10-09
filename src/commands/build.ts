@@ -202,7 +202,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
       p.log.success(`Applied skill migration(s): ${report.skills.applied.join(', ')}`)
     }
     if (report.skills.backupDir) {
-      p.log.info(`Legacy generated skills backed up → ${report.skills.backupDir}`)
+      p.log.info(`Previous reserved AHK skill content backed up → ${report.skills.backupDir}`)
     }
     if (report.skills.preserved.length > 0 || report.skills.pendingPreservation.length > 0) {
       const paths = [...new Set([...report.skills.preserved, ...report.skills.pendingPreservation])]

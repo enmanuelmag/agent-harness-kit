@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 
 import { openDB } from '@/core/db'
 import { attachOperationalNotices, dispatch } from '@/core/mcp-server'
-import { collectOperationalNotices, createNoticeSession, noticesForDelivery } from '@/core/operational-notices'
+import {
+  collectOperationalNotices,
+  createNoticeSession,
+  noticesForDelivery,
+} from '@/core/operational-notices'
 import { __configureUpdateCheckForTests } from '@/core/update-check'
 
 import type { HarnessConfig } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-operational-notices')
 
-afterEach(() => { rmSync(TMP, { recursive: true, force: true }) })
+afterEach(() => {
+  rmSync(TMP, { recursive: true, force: true })
+})
 beforeEach(() => {
   __configureUpdateCheckForTests({
     fetch: async () => new Response(JSON.stringify({ version: '2.31.0' }), { status: 200 }),
@@ -21,9 +27,37 @@ beforeEach(() => {
 
 describe('operational notices', () => {
   test('unknown legacy-looking skills without state are not falsely reported pending', () => {
-    mkdirSync(join(TMP, '.opencode/skills/ahk-use-cases'), { recursive: true })
-    const notices = collectOperationalNotices(TMP, 'opencode') as { code: string; command?: string }[]
+    mkdirSync(join(TMP, '.opencode/skills/ahk-foo'), { recursive: true })
+    const notices = collectOperationalNotices(TMP, 'opencode') as {
+      code: string
+      command?: string
+    }[]
     assert.equal(notices.length, 0)
+  })
+
+  test('retired reserved trees are pending even with a completed current checkpoint', () => {
+    mkdirSync(join(TMP, '.agents/skills/ahk-use-cases'), { recursive: true })
+    mkdirSync(join(TMP, '.harness'), { recursive: true })
+    const statePath = join(TMP, '.harness/skills-state.json')
+    const state = JSON.stringify({
+      roots: {
+        _agents_skills: {
+          version: '2.31.0',
+          migrationVersion: '2.31.0',
+          applied: ['2.31.0-use-case-taxonomy'],
+          inventory: {},
+          pendingPreservation: [],
+        },
+      },
+    })
+    writeFileSync(statePath, state)
+    assert.ok(
+      (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).some(
+        (notice) => notice.code === 'skills-migration-pending'
+      )
+    )
+    assert.equal(readFileSync(statePath, 'utf8'), state)
+    assert.ok(existsSync(join(TMP, '.agents/skills/ahk-use-cases')))
   })
 
   test('an active root is inspected even when migration state belongs to another provider', () => {
@@ -34,7 +68,16 @@ describe('operational notices', () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     writeFileSync(
       join(TMP, '.harness/skills-state.json'),
-      JSON.stringify({ roots: { _agents_skills: { version: '2.31.0', applied: [], inventory: {}, pendingPreservation: [] } } })
+      JSON.stringify({
+        roots: {
+          _agents_skills: {
+            version: '2.31.0',
+            applied: [],
+            inventory: {},
+            pendingPreservation: [],
+          },
+        },
+      })
     )
     assert.equal(
       (collectOperationalNotices(TMP, 'opencode') as { code: string }[]).at(0)?.code,
@@ -45,7 +88,18 @@ describe('operational notices', () => {
   test('interrupted and custom migration state is surfaced without changing it', () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     const path = join(TMP, '.harness/skills-state.json')
-    const state = { roots: { _agents_skills: { version: '2.30.0', migrationVersion: '2.31.0', applied: [], inventory: {}, pendingInventory: { 'ahk-spec/SKILL.md': 'x' }, pendingPreservation: ['.agents/skills/old/SKILL.md'] } } }
+    const state = {
+      roots: {
+        _agents_skills: {
+          version: '2.30.0',
+          migrationVersion: '2.31.0',
+          applied: [],
+          inventory: {},
+          pendingInventory: { 'ahk-spec/SKILL.md': 'x' },
+          pendingPreservation: ['.agents/skills/old/SKILL.md'],
+        },
+      },
+    }
     writeFileSync(path, JSON.stringify(state))
     const before = JSON.stringify(state)
     const notices = collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]
@@ -56,8 +110,23 @@ describe('operational notices', () => {
 
   test('a newer skill state asks for a CLI update instead of a rebuild', () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
-    writeFileSync(join(TMP, '.harness/skills-state.json'), JSON.stringify({ roots: { _agents_skills: { version: '99.0.0', applied: [], inventory: {}, pendingPreservation: [] } } }))
-    const notices = collectOperationalNotices(TMP, 'codex-cli') as { code: string; command?: string }[]
+    writeFileSync(
+      join(TMP, '.harness/skills-state.json'),
+      JSON.stringify({
+        roots: {
+          _agents_skills: {
+            version: '99.0.0',
+            applied: [],
+            inventory: {},
+            pendingPreservation: [],
+          },
+        },
+      })
+    )
+    const notices = collectOperationalNotices(TMP, 'codex-cli') as {
+      code: string
+      command?: string
+    }[]
     const notice = notices.find((item) => item.code === 'skills-state-newer-than-cli')
     assert.equal(notice?.command, 'ahk --version')
   })
@@ -66,25 +135,43 @@ describe('operational notices', () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     const statePath = join(TMP, '.harness/skills-state.json')
     const root = { applied: [], inventory: {}, pendingPreservation: [] }
-    writeFileSync(statePath, JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.0-beta.1' } } }))
+    writeFileSync(
+      statePath,
+      JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.0-beta.1' } } })
+    )
     assert.equal(
       (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).at(0)?.code,
       'skills-migration-pending'
     )
-    writeFileSync(statePath, JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.1-beta.1' } } }))
+    writeFileSync(
+      statePath,
+      JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.1-beta.1' } } })
+    )
     assert.equal(
       (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).at(0)?.code,
       'skills-state-newer-than-cli'
     )
-    writeFileSync(statePath, JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.0+local' } } }))
+    writeFileSync(
+      statePath,
+      JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.0+local' } } })
+    )
     assert.deepEqual(collectOperationalNotices(TMP, 'codex-cli'), [])
   })
 
   test('malformed root state is reported safely', () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
-    writeFileSync(join(TMP, '.harness/skills-state.json'), JSON.stringify({ roots: { _agents_skills: { version: 42 } } }))
-    const notices = collectOperationalNotices(TMP, 'codex-cli') as { code: string; command?: string }[]
-    assert.deepEqual(notices.map((notice) => notice.code), ['skills-migration-state-invalid'])
+    writeFileSync(
+      join(TMP, '.harness/skills-state.json'),
+      JSON.stringify({ roots: { _agents_skills: { version: 42 } } })
+    )
+    const notices = collectOperationalNotices(TMP, 'codex-cli') as {
+      code: string
+      command?: string
+    }[]
+    assert.deepEqual(
+      notices.map((notice) => notice.code),
+      ['skills-migration-state-invalid']
+    )
     assert.equal(notices[0]?.command, 'ahk doctor')
   })
 
@@ -92,21 +179,38 @@ describe('operational notices', () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     writeFileSync(
       join(TMP, '.harness/skills-state.json'),
-      JSON.stringify({ roots: { _agents_skills: { version: '1.0.0-01', applied: [], inventory: {}, pendingPreservation: [] } } })
+      JSON.stringify({
+        roots: {
+          _agents_skills: {
+            version: '1.0.0-01',
+            applied: [],
+            inventory: {},
+            pendingPreservation: [],
+          },
+        },
+      })
     )
     assert.deepEqual(
-      (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).map((notice) => notice.code),
+      (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).map(
+        (notice) => notice.code
+      ),
       ['skills-migration-state-invalid']
     )
   })
 
   test('deduplication suppresses only an unchanged lifecycle fingerprint', () => {
-    const notices = [{ code: 'test', severity: 'info' as const, scope: 'skills' as const, message: 'test' }]
-    const one = createNoticeSession(), two = createNoticeSession()
+    const notices = [
+      { code: 'test', severity: 'info' as const, scope: 'skills' as const, message: 'test' },
+    ]
+    const one = createNoticeSession(),
+      two = createNoticeSession()
     assert.equal(noticesForDelivery(one, TMP, 'codex-cli', notices).length, 1)
     assert.equal(noticesForDelivery(one, TMP, 'codex-cli', notices).length, 0)
     assert.equal(noticesForDelivery(two, TMP, 'codex-cli', notices).length, 1)
-    assert.equal(noticesForDelivery(one, TMP, 'codex-cli', [{ ...notices[0], command: 'ahk build' }]).length, 1)
+    assert.equal(
+      noticesForDelivery(one, TMP, 'codex-cli', [{ ...notices[0], command: 'ahk build' }]).length,
+      1
+    )
     const warning = [{ ...notices[0], severity: 'warning' as const }]
     assert.equal(noticesForDelivery(one, TMP, 'codex-cli', warning).length, 1)
     assert.equal(noticesForDelivery(one, TMP, 'codex-cli', warning).length, 1)
@@ -115,8 +219,18 @@ describe('operational notices', () => {
   test('MCP attachment preserves primary text and error state', async () => {
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     writeFileSync(join(TMP, '.harness/skills-state.json'), '{ invalid')
-    const primary = { content: [{ type: 'text' as const, text: '{"error":"original"}' }], isError: true }
-    const result = await attachOperationalNotices('tasks.claim', {}, TMP, 'opencode', primary, createNoticeSession())
+    const primary = {
+      content: [{ type: 'text' as const, text: '{"error":"original"}' }],
+      isError: true,
+    }
+    const result = await attachOperationalNotices(
+      'tasks.claim',
+      {},
+      TMP,
+      'opencode',
+      primary,
+      createNoticeSession()
+    )
     assert.equal(result.isError, true)
     assert.equal(result.content[0]?.type, 'text')
     assert.equal(
@@ -132,8 +246,18 @@ describe('operational notices', () => {
   })
 
   test('non-done task updates never receive a lifecycle notice', async () => {
-    const primary = { content: [{ type: 'text' as const, text: '{"error":"original"}' }], isError: true }
-    const result = await attachOperationalNotices('tasks.update', { status: 'pending' }, TMP, 'opencode', primary, createNoticeSession())
+    const primary = {
+      content: [{ type: 'text' as const, text: '{"error":"original"}' }],
+      isError: true,
+    }
+    const result = await attachOperationalNotices(
+      'tasks.update',
+      { status: 'pending' },
+      TMP,
+      'opencode',
+      primary,
+      createNoticeSession()
+    )
     assert.deepEqual(result, primary)
   })
 
@@ -143,8 +267,18 @@ describe('operational notices', () => {
     mkdirSync(join(TMP, '.agents'), { recursive: true })
     rmSync(join(TMP, '.agents'), { recursive: true, force: true })
     symlinkSync(outside, join(TMP, '.agents'))
-    const primary = { content: [{ type: 'text' as const, text: '{"error":"original"}' }], isError: true }
-    const result = await attachOperationalNotices('tasks.claim', {}, TMP, 'codex-cli', primary, createNoticeSession())
+    const primary = {
+      content: [{ type: 'text' as const, text: '{"error":"original"}' }],
+      isError: true,
+    }
+    const result = await attachOperationalNotices(
+      'tasks.claim',
+      {},
+      TMP,
+      'codex-cli',
+      primary,
+      createNoticeSession()
+    )
     assert.deepEqual(result, primary)
   })
 
@@ -155,13 +289,22 @@ describe('operational notices', () => {
       database: { type: 'sqlite' },
       storage: {
         dir: '.harness',
-        sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
+        sections: {
+          toolsUsed: true,
+          filesModified: true,
+          result: true,
+          blockers: true,
+          nextSteps: false,
+        },
         scope: 'local',
         projectId: 'operational-notices',
         sqlitePath: join(TMP, 'harness.db'),
       },
       health: { scriptPath: './health.sh', required: false },
-      tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
+      tools: {
+        mcp: { enabled: false, port: 3456 },
+        scripts: { enabled: false, outputDir: '.harness/scripts' },
+      },
     }
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     writeFileSync(join(TMP, '.harness/skills-state.json'), '{ invalid')
@@ -171,9 +314,20 @@ describe('operational notices', () => {
       const taskId = (await db.addTask({ slug: 'lifecycle', title: 'Lifecycle' })).id
       const invoke = async (name: string, args: Record<string, unknown>) => {
         const primary = await dispatch(name, args, db, TMP, TMP, config)
-        const attached = await attachOperationalNotices(name, args, TMP, config.provider, primary, createNoticeSession())
+        const attached = await attachOperationalNotices(
+          name,
+          args,
+          TMP,
+          config.provider,
+          primary,
+          createNoticeSession()
+        )
         assert.equal(attached.isError, primary.isError, `${name} preserves isError`)
-        assert.deepEqual(attached.content[0], primary.content[0], `${name} preserves primary content`)
+        assert.deepEqual(
+          attached.content[0],
+          primary.content[0],
+          `${name} preserves primary content`
+        )
         assert.equal(attached.content.length, 2, `${name} receives a lifecycle notice`)
         return primary
       }
@@ -192,11 +346,21 @@ describe('operational notices', () => {
 
   test('a dispatch throw is converted to an error primary that keeps its content when notices attach', async () => {
     const config = {
-      project: { name: 'test', description: 'test', docsPath: './docs' }, provider: 'opencode',
+      project: { name: 'test', description: 'test', docsPath: './docs' },
+      provider: 'opencode',
       database: { type: 'sqlite' },
-      storage: { dir: '.harness', sections: {}, scope: 'local', projectId: 'dispatch-throw', sqlitePath: join(TMP, 'harness.db') },
+      storage: {
+        dir: '.harness',
+        sections: {},
+        scope: 'local',
+        projectId: 'dispatch-throw',
+        sqlitePath: join(TMP, 'harness.db'),
+      },
       health: { scriptPath: './health.sh', required: false },
-      tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
+      tools: {
+        mcp: { enabled: false, port: 3456 },
+        scripts: { enabled: false, outputDir: '.harness/scripts' },
+      },
     } as HarnessConfig
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     writeFileSync(join(TMP, '.harness/skills-state.json'), '{ invalid')
@@ -210,8 +374,18 @@ describe('operational notices', () => {
       }
       if (!error) throw new Error('expected dispatch to throw')
       assert.match(error.message, /id must be a number/)
-      const primary = { content: [{ type: 'text' as const, text: `Error: ${error.message}` }], isError: true }
-      const attached = await attachOperationalNotices('tasks.claim', {}, TMP, config.provider, primary, createNoticeSession())
+      const primary = {
+        content: [{ type: 'text' as const, text: `Error: ${error.message}` }],
+        isError: true,
+      }
+      const attached = await attachOperationalNotices(
+        'tasks.claim',
+        {},
+        TMP,
+        config.provider,
+        primary,
+        createNoticeSession()
+      )
       assert.equal(attached.isError, true)
       assert.deepEqual(attached.content[0], primary.content[0])
       assert.equal(attached.content.length, 2)

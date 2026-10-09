@@ -145,7 +145,7 @@ Draft persistence makes the evolving decision record reviewable. Explicit human 
 
 Use `ahk build` after configuration changes. Use `ahk sync` for its project synchronization workflow. `ahk doctor` is read-only: it checks that agent files exist and byte-checks canonical skill files for missing or outdated content; it does not apply migrations.
 
-Generated-skill migrations are versioned and project-local. They run in order, resume after interruption, and preserve unknown or customized files. Human-authored document migrations are explicit. Review any force operation and back up important state before storage changes. Read [the maintenance guide](src/core/materializer/skills/ahk-docs/resources/maintenance.md) for details.
+Generated-skill migrations are versioned and project-local. They run in order and resume after interruption. Exact canonical AHK skill names and retired `ahk-use-cases` / `ahk-use-case-tech` are reserved: build/sync back up changed content before refreshing canonical files or removing retired trees, even after an applied migration checkpoint. Unknown skill names and extra files are preserved; symlinks are refused. Human-authored document migrations are explicit. Read [the maintenance guide](src/core/materializer/skills/ahk-docs/resources/maintenance.md) for details.
 
 Network is optional for ordinary use. Update checks can run as cached maintenance notices; the CLI, MCP workflow, and bundled `ahk-docs` resources work offline.
 
@@ -157,7 +157,7 @@ The default role design favors a stronger planning and implementation model for 
 
 ### Generated assets versus personal edits
 
-`build` and `sync` recognize the canonical skills they generated and restore a missing or outdated generated resource from the packaged source. `doctor` only reports their state. These commands do not silently discard a user customization or an unknown skill. Read the notices, then decide whether to retain the preserved file or replace it deliberately.
+`build` and `sync` refresh reserved canonical skill files from the packaged source and report backups under `.harness/backups/`. Extra files inside canonical skill directories remain unless a validated prior inventory proves they are stale generated files. Other skill names, including unknown `ahk-*` names, remain untouched. `doctor` only reports their state. Agent files keep their existing user-owned policy.
 
 Keep your project configuration, specifications, and health script under normal version control. Treat database exports and provider configuration according to your team's secret and backup policy. The harness can be local-first while optional provider clients and update checks still make network requests.
 
