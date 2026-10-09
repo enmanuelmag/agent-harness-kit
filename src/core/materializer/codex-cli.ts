@@ -105,13 +105,15 @@ export class CodexCliMaterializer implements Materializer {
     // .codex/agents/ — user-owned: create when missing, never overwrite
     writeAgentFiles(cwd, codexAgentFiles(config, codexAgentModels))
 
-    // .codex/config.toml — MERGE, never overwrite whole file. Detect the
+    // .codex/config.toml — MERGE, never overwrite whole file. An explicit
+    // lead choice becomes the project default. Detect the
     // project's package manager fresh from cwd so the spawned command matches npm/pnpm/yarn.
     mergeCodexConfigToml(
       join(cwd, '.codex/config.toml'),
       config.tools.mcp.port,
       cwd,
-      detectPackageManager(cwd)
+      detectPackageManager(cwd),
+      codexAgentModels?.lead
     )
 
     appendGitignore(cwd)
@@ -143,7 +145,8 @@ export class CodexCliMaterializer implements Materializer {
       join(cwd, '.codex/config.toml'),
       config.tools.mcp.port,
       cwd,
-      detectPackageManager(cwd)
+      detectPackageManager(cwd),
+      opts.force ? opts.codexAgentModels?.lead : undefined
     )
     const skills = writeSkills(cwd, '.agents/skills', renderDelegationGuidance('codex-cli', 'coordination-skill'))
 

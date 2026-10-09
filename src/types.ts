@@ -288,9 +288,9 @@ export interface ScaffoldOptions {
    *  `ahk init`'s provider-conditional prompt (`promptCodexAgentModels`).
    *  Consumed exclusively by `CodexCliMaterializer.scaffold()` to inject
    *  `model = "..."` / `model_reasoning_effort = "..."` lines into each
-   *  role's generated `.codex/agents/<role>.toml` at scaffold time — never
-   *  persisted to config.toml, which carries its own separate top-level
-   *  default (see `ensureTomlTopLevelKey` in mcp-merge.ts). Mirrors
+   *  role's generated `.codex/agents/<role>.toml` at scaffold time. The lead
+   *  choice also becomes the selected project default in `.codex/config.toml`;
+   *  other roles never affect that top-level default. Mirrors
    *  `claudeAgentModels` above; Claude Code's and OpenCode's materializers
    *  simply never read this field, exactly as claude-code.ts's materializer
    *  never reads `claudeAgentModels`'s Codex counterpart. */

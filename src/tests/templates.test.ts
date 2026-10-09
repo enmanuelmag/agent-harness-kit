@@ -334,6 +334,28 @@ describe('mergeCodexConfigToml', () => {
     teardown()
   })
 
+  test('an explicit lead selection becomes the matching project default', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-selected-lead.toml')
+    mergeCodexConfigToml(path, 3456, TMP, 'npm', { model: 'gpt-6.1-sol', effort: 'high' })
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /^model = "gpt-6\.1-sol"$/m)
+    assert.match(content, /^model_reasoning_effort = "high"$/m)
+    teardown()
+  })
+
+  test('an explicit lead selection replaces prior generated project defaults', () => {
+    setupLocalInstall()
+    const path = join(TMP, 'config-selected-lead-replace.toml')
+    mergeCodexConfigToml(path, 3456, TMP)
+    mergeCodexConfigToml(path, 3456, TMP, 'npm', { model: 'gpt-6.1-sol', effort: 'high' })
+    const content = readFileSync(path, 'utf8')
+    assert.match(content, /^model = "gpt-6\.1-sol"$/m)
+    assert.match(content, /^model_reasoning_effort = "high"$/m)
+    assert.doesNotMatch(content, /gpt-5\.6-terra/)
+    teardown()
+  })
+
   test('re-running mergeCodexConfigToml is idempotent — defaults are not duplicated', () => {
     setupLocalInstall()
     const path = join(TMP, 'config-model-idempotent.toml')

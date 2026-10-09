@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { getMcpCommandParts } from './detect-package-manager'
 
 import type { PackageManager } from './detect-package-manager'
+import type { CodexAgentModelChoice } from '@/types'
 
 // ─── Claude Code ──────────────────────────────────────────────────────────────
 
@@ -382,11 +383,29 @@ export function ensureTomlTopLevelKey(content: string, key: string, value: strin
   return newLines.join('\n')
 }
 
+/** Applies an explicit selection to a top-level TOML scalar. Unlike the
+ * merge-safe helper above, this updates an existing value while retaining any
+ * trailing comment. */
+export function setTomlTopLevelKey(content: string, key: string, value: string): string {
+  const lines = content.length > 0 ? content.split('\n') : []
+  const firstSectionIdx = lines.findIndex((line) => /^\s*\[/.test(line))
+  const preambleEnd = firstSectionIdx === -1 ? lines.length : firstSectionIdx
+  const keyRe = new RegExp(`^(\\s*${key}\\s*=\\s*)[^#]*(\\s*(?:#.*)?)$`)
+  const index = lines.slice(0, preambleEnd).findIndex((line) => keyRe.test(line))
+
+  if (index === -1) return ensureTomlTopLevelKey(content, key, value)
+
+  const match = lines[index].match(keyRe)
+  lines[index] = `${match?.[1] ?? `${key} = `}${JSON.stringify(value)}${match?.[2] ?? ''}`
+  return lines.join('\n')
+}
+
 export function mergeCodexConfigToml(
   filePath: string,
   port: number,
   cwd: string,
-  pm: PackageManager = 'npm'
+  pm: PackageManager = 'npm',
+  leadChoice?: CodexAgentModelChoice
 ): void {
   mkdirSync(dirname(filePath), { recursive: true })
 
@@ -406,8 +425,13 @@ export function mergeCodexConfigToml(
   // Top-level defaults — written into the preamble, before any [section]
   // header. Merge-safe: only written once, a user's hand-edit is preserved
   // forever across re-runs (see `ensureTomlTopLevelKey`).
-  content = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
-  content = ensureTomlTopLevelKey(content, 'model_reasoning_effort', 'medium')
+  if (leadChoice?.model) {
+    content = setTomlTopLevelKey(content, 'model', leadChoice.model)
+    if (leadChoice.effort) content = setTomlTopLevelKey(content, 'model_reasoning_effort', leadChoice.effort)
+  } else {
+    content = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
+    content = ensureTomlTopLevelKey(content, 'model_reasoning_effort', 'medium')
+  }
   content = ensureTomlTopLevelKey(content, 'sandbox_mode', 'danger-full-access')
 
   content = mergeTomlSection(content, 'mcp_servers.agent-harness-kit', sectionBody)

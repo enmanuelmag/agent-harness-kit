@@ -164,10 +164,9 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   const claudeAgentModels = await promptClaudeAgentModels(provider)
 
   // Codex CLI only: prompt once per generated role for a model AND a
-  // reasoning-effort preference. Both choices are written straight into that
-  // role's generated `.codex/agents/<role>.toml` at scaffold time — never
-  // into config.toml, which carries its own separate top-level default (see
-  // `ensureTomlTopLevelKey` in mcp-merge.ts). OpenCode and Grok Build are
+  // reasoning-effort preference. Each choice is written into its generated
+  // `.codex/agents/<role>.toml`; the explicit lead selection is also used as
+  // the project default in `.codex/config.toml`. OpenCode and Grok Build are
   // unaffected — same rationale as above.
   //
   // The prompt loop itself lives in `promptCodexAgentModels`

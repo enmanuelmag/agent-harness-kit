@@ -5,6 +5,8 @@ import { findConfigFile, loadConfig } from '@/core/config'
 import { claudeAgentFiles } from '@/core/materializer/claude-code'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { cursorAgentFiles } from '@/core/materializer/cursor'
+import { detectPackageManager } from '@/core/materializer/detect-package-manager'
+import { mergeCodexConfigToml } from '@/core/materializer/mcp-merge'
 import { buildCapabilityHints } from '@/core/materializer/provider-research-capabilities'
 import { writeAgentFiles } from '@/core/materializer/scaffold-utils'
 
@@ -61,6 +63,15 @@ export async function runModels(cwd: string): Promise<void> {
     force: true,
     backupRoot: join(cwd, config.storage.dir, 'backups'),
   })
+  if (config.provider === 'codex-cli') {
+    mergeCodexConfigToml(
+      join(cwd, '.codex/config.toml'),
+      config.tools.mcp.port,
+      cwd,
+      detectPackageManager(cwd),
+      persistedChoices.lead as CodexAgentModelChoice | undefined
+    )
+  }
   const label = config.provider === 'claude-code' ? 'Claude Code' : config.provider === 'codex-cli' ? 'Codex CLI' : 'Cursor'
   console.log('')
   if (agents.overwritten.length) {
