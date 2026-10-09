@@ -130,9 +130,9 @@ export class GrokMaterializer implements Materializer {
       cwd,
       detectPackageManager(cwd)
     )
-    writeSkills(cwd, '.grok/skills', renderDelegationGuidance('grok-cli', 'coordination-skill'))
+    const skills = writeSkills(cwd, '.grok/skills', renderDelegationGuidance('grok-cli', 'coordination-skill'))
 
-    return { agents, derived }
+    return { agents, derived, skills }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

@@ -12,6 +12,7 @@ import { type HarnessDB, openDB } from './db'
 import { getDoctorStatus } from './doctor'
 import { detectPackageManager, getRunOnceCommandParts } from './materializer/detect-package-manager'
 import { slugify } from './materializer/scaffold-utils'
+import { collectOperationalNotices, createNoticeSession, noticesForDelivery } from './operational-notices'
 import { checkPermissionsSync } from './permissions-check'
 import {
   type Relationship,
@@ -22,6 +23,7 @@ import {
   SpecStore,
 } from './specs'
 import { runTaskHealthCheck } from './task-health'
+import { warmUpdateCache } from './update-check'
 
 import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types'
 
@@ -559,6 +561,9 @@ export async function startMcpServer(config: HarnessConfig, cwd: string): Promis
     { name: 'agent-harness-kit', version: VERSION },
     { capabilities: { tools: {} } }
   )
+  // Lifecycle calls use cached facts only; begin the bounded registry lookup now.
+  warmUpdateCache()
+  const noticeSession = createNoticeSession()
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 
@@ -568,9 +573,9 @@ export async function startMcpServer(config: HarnessConfig, cwd: string): Promis
 
     try {
       const result = await dispatch(name, a, db, docsPath, cwd, config)
-      return result
+      return attachOperationalNotices(name, a, cwd, config.provider, result, noticeSession)
     } catch (err) {
-      return ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true)
+      return attachOperationalNotices(name, a, cwd, config.provider, ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true), noticeSession)
     }
   })
 
@@ -1222,6 +1227,30 @@ function collectMarkdownFiles(dir: string): string[] {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const NOTICE_TOOLS = new Set(['tasks.claim', 'health.run', 'tasks.update', 'actions.start', 'actions.complete', 'ahk.doctor'])
+
+/** Adds a second, versioned text block while preserving primary content and isError exactly. */
+export async function attachOperationalNotices(
+  name: string,
+  args: Record<string, unknown>,
+  cwd: string,
+  provider: HarnessConfig['provider'],
+  result: CallToolResult,
+  session: ReturnType<typeof createNoticeSession>,
+  doctor = false
+): Promise<CallToolResult> {
+  const isDoctor = doctor || name === 'ahk.doctor'
+  if (!NOTICE_TOOLS.has(name) || (name === 'tasks.update' && args.status !== 'done')) return result
+  try {
+    const collected = await collectOperationalNotices(cwd, provider, { doctor: isDoctor, waitForUpdate: isDoctor })
+    const notices = noticesForDelivery(session, cwd, provider, collected, isDoctor)
+    if (!notices.length) return result
+    return { ...result, content: [...result.content, { type: 'text', text: JSON.stringify({ noticeSchemaVersion: 1, notices }) }] }
+  } catch {
+    return result
+  }
+}
 
 function ok(text: string, isError = false): CallToolResult {
   return { content: [{ type: 'text' as const, text }], isError }

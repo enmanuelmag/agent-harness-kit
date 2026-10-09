@@ -145,9 +145,9 @@ export class CodexCliMaterializer implements Materializer {
       cwd,
       detectPackageManager(cwd)
     )
-    writeSkills(cwd, '.agents/skills', renderDelegationGuidance('codex-cli', 'coordination-skill'))
+    const skills = writeSkills(cwd, '.agents/skills', renderDelegationGuidance('codex-cli', 'coordination-skill'))
 
-    return { agents, derived }
+    return { agents, derived, skills }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

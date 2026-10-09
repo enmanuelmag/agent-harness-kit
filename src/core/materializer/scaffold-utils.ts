@@ -356,7 +356,14 @@ export function slugify(title: string): string {
     .slice(0, 64)
 }
 
-export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?: string): void {
+export interface WriteSkillsResult {
+  applied: string[]
+  preserved: string[]
+  backupDir?: string
+  pendingPreservation: string[]
+}
+
+export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?: string): WriteSkillsResult {
   // Migrations are project-local and ordered by the executable package version.
   // A missing state is bootstrapped by inspecting legacy owned skill names only.
   const provider = skillsDir.startsWith('.claude')
@@ -373,13 +380,19 @@ export function writeSkills(cwd: string, skillsDir: string, delegationGuidance?:
   // Each completed migration persists its own checkpoint before a later
   // migration or canonical refresh can fail; retries resume safely.
   const migration = migrateSkills(cwd, skillsDir, provider)
-  reconcileCanonicalSkills(
+  const reconciliation = reconcileCanonicalSkills(
     cwd,
     skillsDir,
     join(__dirname, 'skills'),
     delegationGuidance,
     migration.state
   )
+  return {
+    applied: migration.applied,
+    preserved: migration.preserved,
+    backupDir: migration.backupDir,
+    pendingPreservation: reconciliation.pendingPreservation,
+  }
 }
 
 export { CANONICAL_SKILLS }

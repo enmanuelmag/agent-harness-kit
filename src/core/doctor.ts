@@ -7,6 +7,7 @@ import { renderDelegationGuidance } from '@/core/materializer/delegation-guidanc
 import { CANONICAL_SKILLS } from '@/core/materializer/skill-migrations'
 import { injectDelegationGuidance } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
+import { __resetUpdateCacheForTests, isNewer, lookupUpdate } from '@/core/update-check'
 
 import type { Provider } from '@/types'
 
@@ -43,9 +44,6 @@ export interface DoctorStatus {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const REGISTRY_URL = `https://registry.npmjs.org/${pkg.name}/latest`
-const TIMEOUT_MS = 2000
-const LIB_VERSION_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const AGENT_NAMES = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 export type AgentName = (typeof AGENT_NAMES)[number]
 const SKILL_NAMES = CANONICAL_SKILLS
@@ -57,53 +55,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // In-memory TTL cache for the npm registry lookup only. Agent/skill file checks
 // are local and cheap, so they are intentionally NOT cached — only the network
 // call to the npm registry benefits from memoization.
-let libVersionCache: { status: LibStatus; fetchedAt: number } | null = null
-
 /** Clears the in-memory lib version cache. Exposed for tests only. */
 export function __resetLibVersionCacheForTests(): void {
-  libVersionCache = null
+  // The update cache is shared with lifecycle notices. Kept as a compatibility
+  // hook for existing tests; normal callers should never reset it.
+  __resetUpdateCacheForTests()
 }
 
 async function checkLibVersion(): Promise<LibStatus> {
   const current = pkg.version
-
-  if (libVersionCache && Date.now() - libVersionCache.fetchedAt < LIB_VERSION_CACHE_TTL_MS) {
-    // Cache is keyed to the running process's current version. If somehow the
-    // running version changed (unlikely mid-process), fall through to refetch.
-    if (libVersionCache.status.current === current) {
-      return libVersionCache.status
-    }
-  }
-
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-
-    const res = await fetch(REGISTRY_URL, { signal: controller.signal })
-    clearTimeout(timer)
-
-    const data = (await res.json()) as { version: string }
-    const latest = data.version
-    const outdated = isNewer(latest, current)
-    const status: LibStatus = { current, latest, outdated }
-    libVersionCache = { status, fetchedAt: Date.now() }
-    return status
-  } catch {
-    const status: LibStatus = { current, latest: null, outdated: false }
-    // Cache the offline result too, so repeated calls within the TTL don't
-    // keep retrying a network call that just timed out/failed.
-    libVersionCache = { status, fetchedAt: Date.now() }
-    return status
-  }
-}
-
-function isNewer(latest: string, current: string): boolean {
-  const toNum = (v: string) => v.split('.').map(Number)
-  const [lMaj, lMin, lPat] = toNum(latest)
-  const [cMaj, cMin, cPat] = toNum(current)
-  if (lMaj !== cMaj) return lMaj > cMaj
-  if (lMin !== cMin) return lMin > cMin
-  return lPat > cPat
+  const result = await lookupUpdate(current)
+  return { current, latest: result.latest, outdated: Boolean(result.latest && isNewer(result.latest, current)) }
 }
 
 // ─── Agent file check ─────────────────────────────────────────────────────────

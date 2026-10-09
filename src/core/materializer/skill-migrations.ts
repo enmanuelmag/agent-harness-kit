@@ -191,6 +191,12 @@ function legacyOwned(dir: string, name: keyof typeof LEGACY_FILES) {
     new RegExp(`^name:\\s*${name}\\s*$`, 'm').test(readFileSync(manifest, 'utf8'))
   )
 }
+/** Read-only legacy ownership probe for diagnostics; never alters migration state. */
+export function hasOwnedLegacySkills(cwd: string, skillsDir: string): boolean {
+  const root = join(cwd, skillsDir)
+  assertNoSymlink(cwd, root)
+  return RETIRED_231.some((name) => legacyOwned(root, name))
+}
 /** Apply ordered, project-local skill migrations. No global package version is inspected. */
 export function migrateSkills(
   cwd: string,
@@ -289,7 +295,6 @@ export function migrateSkills(
   }
   effective.provider = provider ?? effective.provider
   state.roots[key] = effective
-  result.applied.push(...effective.applied)
   result.state = state
   return result
 }

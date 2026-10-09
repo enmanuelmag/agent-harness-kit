@@ -194,13 +194,13 @@ export class ClaudeCodeMaterializer implements Materializer {
     )
     mergeClaudeSettingsJson(join(cwd, '.claude/settings.json'))
     mergeClaudeSettingsLocalJson(join(cwd, '.claude/settings.local.json'))
-    writeSkills(
+    const skills = writeSkills(
       cwd,
       '.claude/skills',
       renderDelegationGuidance('claude-code', 'coordination-skill')
     )
 
-    return { agents, derived }
+    return { agents, derived, skills }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

@@ -122,8 +122,8 @@ export class CursorMaterializer implements Materializer {
       detectPackageManager(cwd)
     )
     mergeCursorPermissionsJson(join(cwd, '.cursor/permissions.json'))
-    writeSkills(cwd, '.cursor/skills', renderDelegationGuidance('cursor', 'coordination-skill'))
-    return { agents, derived }
+    const skills = writeSkills(cwd, '.cursor/skills', renderDelegationGuidance('cursor', 'coordination-skill'))
+    return { agents, derived, skills }
   }
 
   async migrate(config: HarnessConfig, _to: Provider, _cwd: string): Promise<void> {

@@ -5,6 +5,7 @@ import { GrokMaterializer } from './grok'
 import { OpenCodeMaterializer } from './opencode'
 
 import type { ReconcileResult, WriteAgentFilesResult } from './scaffold-utils'
+import type { WriteSkillsResult } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 
 export interface BuildMaterializerOptions {
@@ -40,6 +41,8 @@ export interface BuildReport {
    *  claude-code) during this build. Untouched files propagate config changes
    *  automatically; hand-edited files are preserved and reported. */
   derived: ReconcileResult
+  /** Actual migration/preservation results from this build, never historical claims. */
+  skills: WriteSkillsResult
 }
 
 export interface Materializer {
