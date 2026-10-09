@@ -21,6 +21,7 @@ import { injectDelegationGuidance } from './templates'
 import type { Provider } from '@/types'
 
 export const CANONICAL_SKILLS = [
+  'ahk-docs',
   'ahk-ask',
   'ahk-consultant',
   'ahk-triage',
