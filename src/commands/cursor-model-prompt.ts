@@ -73,7 +73,8 @@ async function promptCursorModel(
             value: `${MODEL_GROUP_PREFIX}${id}`,
             label: `${label} (${models.length})`,
           }))
-        : [{ value: MANUAL_MODEL, label: 'Enter model ID manually' }]),
+        : []),
+      { value: MANUAL_MODEL, label: 'Enter model ID manually' },
     ],
     initialValue: 'inherit',
   })

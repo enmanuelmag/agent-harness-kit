@@ -12,7 +12,7 @@ import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
-import type { CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
+import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
 
 export interface BuildOptions {
   watch?: boolean
@@ -64,7 +64,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   // Claude Code only, and only when --force is set: re-run the same per-role
   // model prompt `ahk init` and `ahk models` use, before regenerating agent
   // files. Must happen BEFORE the spinner below starts.
-  let claudeAgentModels: Partial<Record<AgentName, string>> | undefined
+  let claudeAgentModels: Partial<Record<AgentName, ClaudeAgentModelChoice>> | undefined
   let codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>> | undefined
   let cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>> | undefined
   // A safe rebuild never prompts, but a deleted role agent should be recreated

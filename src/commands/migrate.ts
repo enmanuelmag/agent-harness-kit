@@ -4,11 +4,14 @@ import pc from 'picocolors'
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
 
+import { persistPreferences, toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
 
+import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { Provider } from '@/types'
+import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
 
 interface MigrateOptions {
   to?: string
@@ -52,6 +55,14 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   const claudeAgentModels = await promptClaudeAgentModels(target)
   const codexAgentModels = await promptCodexAgentModels(target)
   const cursorAgentModels = await promptCursorAgentModels(target)
+  const choices = choicesForMigrationTarget(target, {
+    claudeAgentModels,
+    codexAgentModels,
+    cursorAgentModels,
+  })
+  const preferenceResult = await persistPreferences(cwd, toPreferences(target, choices))
+  if (preferenceResult === 'manual-update-required') return
+  const savedConfig = await loadConfig(cwd)
 
   const spinner = p.spinner()
   spinner.start(`Migrating from ${config.provider} to ${target}...`)
@@ -59,7 +70,8 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   try {
     // Scaffold the new provider's files
     const targetMaterializer = getMaterializer(target)
-    await targetMaterializer.build(config, cwd, {
+    await targetMaterializer.build({ ...savedConfig, provider: target }, cwd, {
+      force: true,
       claudeAgentModels,
       codexAgentModels,
       cursorAgentModels,
@@ -73,4 +85,20 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
     p.log.error(err instanceof Error ? err.message : String(err))
     process.exit(1)
   }
+}
+
+/** Select target-native preferences explicitly: guarded prompts for the other
+ * providers return empty maps, so nullish coalescing would choose the wrong one. */
+export function choicesForMigrationTarget(
+  target: Provider,
+  choices: {
+    claudeAgentModels: Partial<Record<AgentName, ClaudeAgentModelChoice>>
+    codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>>
+    cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>>
+  }
+) {
+  if (target === 'claude-code') return choices.claudeAgentModels
+  if (target === 'codex-cli') return choices.codexAgentModels
+  if (target === 'cursor') return choices.cursorAgentModels
+  return {}
 }

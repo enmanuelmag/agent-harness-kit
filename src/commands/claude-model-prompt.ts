@@ -1,7 +1,7 @@
 import * as p from '@clack/prompts'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
-import type { Provider } from '@/types'
+import type { ClaudeAgentModelChoice, Provider } from '@/types'
 
 const AGENT_LABELS: { key: AgentName; label: string }[] = [
   { key: 'lead', label: 'Lead' },
@@ -10,6 +10,15 @@ const AGENT_LABELS: { key: AgentName; label: string }[] = [
   { key: 'builder', label: 'Builder' },
   { key: 'reviewer', label: 'Reviewer' },
 ]
+const CLAUDE_MODEL_ORDER = ['fable', 'opus', 'sonnet', 'haiku']
+const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+
+/** Claude documents effort support per model. The aliases offered by AHK map
+ * to the current documented family that supports this set; unknown IDs must
+ * not be given an invented effort picker. */
+export function claudeEffortsForModel(model: string): string[] {
+  return CLAUDE_MODEL_ORDER.includes(model) ? CLAUDE_EFFORTS : []
+}
 
 /**
  * Claude Code only: prompt once per generated role (lead, explorer,
@@ -29,8 +38,8 @@ const AGENT_LABELS: { key: AgentName; label: string }[] = [
 export async function promptClaudeAgentModels(
   provider: Provider,
   roles: AgentName[] = AGENT_LABELS.map(({ key }) => key)
-): Promise<Partial<Record<AgentName, string>>> {
-  const claudeAgentModels: Partial<Record<AgentName, string>> = {}
+): Promise<Partial<Record<AgentName, ClaudeAgentModelChoice>>> {
+  const claudeAgentModels: Partial<Record<AgentName, ClaudeAgentModelChoice>> = {}
   if (provider !== 'claude-code') return claudeAgentModels
 
   for (const agent of AGENT_LABELS.filter(({ key }) => roles.includes(key))) {
@@ -38,10 +47,10 @@ export async function promptClaudeAgentModels(
       message: `Model for ${agent.label}`,
       options: [
         { value: 'inherit', label: 'inherit (default)' },
-        { value: 'haiku', label: 'haiku' },
-        { value: 'sonnet', label: 'sonnet' },
-        { value: 'opus', label: 'opus' },
         { value: 'fable', label: 'fable' },
+        { value: 'opus', label: 'opus' },
+        { value: 'sonnet', label: 'sonnet' },
+        { value: 'haiku', label: 'haiku' },
       ],
       initialValue: 'inherit',
     })
@@ -49,7 +58,27 @@ export async function promptClaudeAgentModels(
       p.cancel('Cancelled.')
       process.exit(0)
     }
-    claudeAgentModels[agent.key] = val as string
+    const selectedModel = val as string
+    const efforts = claudeEffortsForModel(selectedModel)
+    let selectedEffort: string | undefined
+    if (efforts.length) {
+      const effort = await p.select({
+        message: `Reasoning effort for ${agent.label} (supported by ${selectedModel})`,
+        options: [{ value: 'inherit', label: 'inherit (model default)' }, ...efforts.map((value) => ({ value, label: value }))],
+        initialValue: 'inherit',
+      })
+      if (p.isCancel(effort)) {
+        p.cancel('Cancelled.')
+        process.exit(0)
+      }
+      selectedEffort = effort as string
+    } else if (selectedModel !== 'inherit') {
+      p.log.warn(`${selectedModel} has no documented effort selector; omitting effort.`)
+    }
+    claudeAgentModels[agent.key] = {
+      ...(selectedModel === 'inherit' ? {} : { model: selectedModel }),
+      ...(selectedEffort && selectedEffort !== 'inherit' ? { effort: selectedEffort } : {}),
+    }
   }
 
   return claudeAgentModels

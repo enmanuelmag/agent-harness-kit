@@ -2,6 +2,7 @@ import * as p from '@clack/prompts'
 
 import {
   discoverCodexModels,
+  selectCodexRoleDefaults,
   validateManualModelId,
   validateManualReasoningEffort,
 } from './model-catalog'
@@ -26,6 +27,7 @@ export async function promptCodexAgentModels(
   if (provider !== 'codex-cli') return choices
 
   const catalog = await discoverCodexModels()
+  const recommendations = catalog.ok ? selectCodexRoleDefaults(catalog.data) : {}
   if (!catalog.ok) {
     p.log.warn(`Could not discover Codex models: ${catalog.error}`)
     p.log.info('Choose inherit or enter a model ID and supported effort manually.')
@@ -40,7 +42,7 @@ export async function promptCodexAgentModels(
           ? catalog.data.map(({ id, label }) => ({ value: id, label: `${id} — ${label}` }))
           : [{ value: MANUAL_MODEL, label: 'Enter model ID manually' }]),
       ],
-      initialValue: 'inherit',
+      initialValue: recommendations[agent.key]?.model ?? 'inherit',
     })
     if (p.isCancel(model)) cancel()
 
@@ -58,7 +60,7 @@ export async function promptCodexAgentModels(
     }
 
     const effort = discovered
-      ? await selectEffort(agent.label, discovered.supportedReasoningEfforts, discovered.defaultReasoningEffort)
+      ? await selectEffort(agent.label, discovered.supportedReasoningEfforts, recommendations[agent.key]?.effort ?? discovered.defaultReasoningEffort)
       : await manualEffort(agent.label)
     choices[agent.key] = { model: modelId, ...(effort ? { effort } : {}) }
   }

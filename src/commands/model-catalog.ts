@@ -24,6 +24,62 @@ export interface CodexModelPage {
   nextCursor?: string | null
 }
 
+export type CodexRole = 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'
+
+/** Choose role defaults from the live catalog, never a baked-in model ID.
+ * Version components compare numerically so 6.1 outranks 6 and 5.10 outranks
+ * 5.9. A family missing from an account remains inherit. */
+export function selectCodexRoleDefaults(models: CodexModel[]): Partial<Record<CodexRole, { model: string; effort?: string }>> {
+  const sol = newestCodexFamily(models, 'sol')
+  const luna = newestCodexFamily(models, 'luna')
+  const defaults: Partial<Record<CodexRole, { model: string; effort?: string }>> = {}
+  for (const role of ['lead', 'builder', 'reviewer'] as const) {
+    if (sol) defaults[role] = choiceWithEffort(sol, 'medium')
+  }
+  if (sol) defaults.consultant = choiceWithEffort(sol, 'high')
+  if (luna) defaults.explorer = choiceWithEffort(luna, 'low')
+  return defaults
+}
+
+function newestCodexFamily(models: CodexModel[], family: 'sol' | 'luna'): CodexModel | undefined {
+  return models
+    .filter((model) => new RegExp(`(?:^|[-_/])${family}(?:$|[-_/])`, 'i').test(model.id))
+    .sort((left, right) => compareCodexVersion(right.id, left.id) || left.id.localeCompare(right.id))[0]
+}
+
+function choiceWithEffort(model: CodexModel, requested: string): { model: string; effort?: string } {
+  const effort = model.supportedReasoningEfforts.includes(requested)
+    ? requested
+    : model.defaultReasoningEffort && model.supportedReasoningEfforts.includes(model.defaultReasoningEffort)
+      ? model.defaultReasoningEffort
+      : undefined
+  return { model: model.id, ...(effort ? { effort } : {}) }
+}
+
+function compareCodexVersion(left: string, right: string): number {
+  const parse = (id: string) => (id.match(/\d+(?:\.\d+)*/)?.[0] ?? '').split('.').filter(Boolean).map(Number)
+  const leftParts = parse(left)
+  const rightParts = parse(right)
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const diff = (leftParts[index] ?? 0) - (rightParts[index] ?? 0)
+    if (diff) return diff
+  }
+  return 0
+}
+
+const GPT_FAMILY_ORDER = ['astra', 'sol', 'terra', 'luna']
+const CLAUDE_FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku']
+const EFFORT_ORDER = ['ultra', 'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none', 'inherit']
+
+/** Sort live Codex candidates in the native selector order. */
+export function orderCodexModels(models: CodexModel[]): CodexModel[] {
+  return [...models].sort((left, right) =>
+    codexFamilyRank(left.id) - codexFamilyRank(right.id) ||
+    compareCodexVersion(right.id, left.id) ||
+    left.id.localeCompare(right.id)
+  )
+}
+
 export type CatalogResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string }
@@ -111,7 +167,33 @@ function compareCursorModels(left: string, right: string): number {
 }
 
 function compareCursorModel(left: CursorModel, right: CursorModel): number {
-  return left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id)
+  const family = nativeModelRank(left.id) - nativeModelRank(right.id)
+  if (family) return family
+  const version = compareCodexVersion(right.id, left.id)
+  if (version) return version
+  const effort = effortRank(left.id) - effortRank(right.id)
+  return effort || left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id)
+}
+
+function codexFamilyRank(id: string): number {
+  const normalized = id.toLowerCase()
+  const family = GPT_FAMILY_ORDER.find((name) => new RegExp(`(?:^|[-_/])${name}(?:$|[-_/\\[])`).test(normalized))
+  return family ? GPT_FAMILY_ORDER.indexOf(family) : GPT_FAMILY_ORDER.length
+}
+
+function nativeModelRank(id: string): number {
+  const normalized = id.toLowerCase()
+  if (normalized.startsWith('claude-')) {
+    const family = CLAUDE_FAMILY_ORDER.find((name) => new RegExp(`(?:^|-)${name}(?:$|[-_\\[])`).test(normalized))
+    return family ? CLAUDE_FAMILY_ORDER.indexOf(family) : CLAUDE_FAMILY_ORDER.length
+  }
+  return codexFamilyRank(id)
+}
+
+function effortRank(id: string): number {
+  const match = id.toLowerCase().match(/(?:\[|,)effort=(ultra|max|xhigh|high|medium|low|minimal|none|inherit)(?:,|\])|[-_](ultra|max|xhigh|high|medium|low|minimal|none|inherit)$/)
+  const effort = match?.[1] ?? match?.[2]
+  return effort ? EFFORT_ORDER.indexOf(effort) : EFFORT_ORDER.length
 }
 
 function cursorModelFamilyRank(id: string): number {
@@ -119,7 +201,8 @@ function cursorModelFamilyRank(id: string): number {
   if (familyId === 'openai') return 0
   if (familyId === 'claude') return 1
   if (familyId === 'grok') return 2
-  return 3
+  if (id === 'auto') return 3
+  return 4
 }
 
 function cursorModelFamilyId(id: string): string | undefined {
@@ -168,7 +251,7 @@ export async function collectCodexModels(
   } while (cursor)
 
   if (models.length === 0) throw new Error('Codex App Server returned no models.')
-  return models
+  return orderCodexModels(models)
 }
 
 export async function discoverCodexModels(): Promise<CatalogResult<CodexModel[]>> {

@@ -88,8 +88,8 @@ export function applyConfigDefaults(params: {
       docsPath: params.docsPath,
       agentsMd: './AGENTS.md',
     },
-    // No `agents` key: per-agent settings (model, role instructions) live in
-    // the generated agent file, which is user-owned. This object is the runtime
+    // No `agents` key: role instructions live in the user-owned agent file;
+    // optional model choices are retained separately as agentPreferences. This object is the runtime
     // twin of the config body emitted by configObjectBody() in templates.ts —
     // drift between the two is the bug this pairing has to keep out.
     database: { type: 'sqlite' as const },

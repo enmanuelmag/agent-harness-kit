@@ -7,6 +7,7 @@ import { findConfigFile, loadConfig } from '@/core/config'
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type {
   AgentModelPreferences,
+  ClaudeAgentModelChoice,
   CodexAgentModelChoice,
   CursorAgentModelChoice,
   HarnessConfig,
@@ -18,17 +19,18 @@ type PreferenceMap = Partial<Record<AgentName, { model: string; reasoningEffort?
 
 export function toPreferences(
   provider: Provider,
-  choices: Partial<Record<AgentName, string | CodexAgentModelChoice | CursorAgentModelChoice>>
+  choices?: Partial<Record<AgentName, string | ClaudeAgentModelChoice | CodexAgentModelChoice | CursorAgentModelChoice>>
 ): AgentModelPreferences {
   const roles: PreferenceMap = {}
   for (const role of ROLES) {
-    const value = choices[role]
+    const value = choices?.[role]
     if (value === undefined) continue
-    if (typeof value === 'string') roles[role] = { model: value || 'inherit' }
-    else {
-      const effort = 'effort' in value ? value.effort : undefined
-      roles[role] = { model: value.model || 'inherit', ...(effort ? { reasoningEffort: effort } : {}) }
+    if (typeof value === 'string') {
+      roles[role] = { model: value || 'inherit' }
+      continue
     }
+    const effort = 'effort' in value ? value.effort : undefined
+    roles[role] = { model: value.model || 'inherit', ...(effort ? { reasoningEffort: effort } : {}) }
   }
   return Object.keys(roles).length ? { [provider]: roles } : {}
 }
@@ -43,17 +45,27 @@ export function mergePreferences(current: AgentModelPreferences | undefined, inc
 }
 
 export function choicesFromPreferences(config: HarnessConfig): {
-  claudeAgentModels?: Partial<Record<AgentName, string>>
+  claudeAgentModels?: Partial<Record<AgentName, ClaudeAgentModelChoice>>
   codexAgentModels?: Partial<Record<AgentName, CodexAgentModelChoice>>
   cursorAgentModels?: Partial<Record<AgentName, CursorAgentModelChoice>>
 } {
   const saved = config.agentPreferences?.[config.provider] as PreferenceMap | undefined
   if (!saved) return {}
   if (config.provider === 'claude-code') {
-    return { claudeAgentModels: Object.fromEntries(Object.entries(saved).map(([r, v]) => [r, v.model === 'inherit' ? 'inherit' : v.model])) }
+    return {
+      claudeAgentModels: Object.fromEntries(
+        Object.entries(saved).map(([r, v]) => [r, {
+          ...(v.model === 'inherit' ? {} : { model: v.model }),
+          ...(v.reasoningEffort ? { effort: v.reasoningEffort } : {}),
+        }])
+      ),
+    }
   }
   if (config.provider === 'codex-cli') {
-    return { codexAgentModels: Object.fromEntries(Object.entries(saved).map(([r, v]) => [r, v.model === 'inherit' ? {} : { model: v.model, ...(v.reasoningEffort ? { effort: v.reasoningEffort } : {}) }])) }
+    return { codexAgentModels: Object.fromEntries(Object.entries(saved).map(([r, v]) => [r, {
+      ...(v.model === 'inherit' ? {} : { model: v.model }),
+      ...(v.reasoningEffort ? { effort: v.reasoningEffort } : {}),
+    }])) }
   }
   if (config.provider === 'cursor') {
     return { cursorAgentModels: Object.fromEntries(Object.entries(saved).map(([r, v]) => [r, v.model === 'inherit' ? {} : { model: v.model }])) }
@@ -80,7 +92,7 @@ export async function persistPreferences(cwd: string, incoming: AgentModelPrefer
   const merged = mergePreferences(current.agentPreferences, incoming)
   if (!configPath.endsWith('.json')) {
     const same = JSON.stringify(current.agentPreferences ?? {}) === JSON.stringify(merged)
-    if (!same) console.log(`Save this in ${basename(configPath)}, then rerun with --keep-models:\n\n${renderPreferenceBlock(merged)}`)
+    if (!same) console.log(`Save this in ${basename(configPath)}, then run: ahk sync --force --keep-models\n\n${renderPreferenceBlock(merged)}`)
     return same ? 'already-current' : 'manual-update-required'
   }
   const raw = readFileSync(configPath, 'utf8')
