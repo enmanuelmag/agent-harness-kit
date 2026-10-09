@@ -16,13 +16,13 @@ import { afterEach, test } from 'node:test'
 import { renderDelegationGuidance } from '@/core/materializer/delegation-guidance'
 import { writeSkills } from '@/core/materializer/scaffold-utils'
 import {
-  __runSkillMigrationRegistryForTests,
   CANONICAL_SKILLS,
   migrateSkills,
   reconcileCanonicalSkills,
 } from '@/core/materializer/skill-migrations'
 import { injectDelegationGuidance } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
+import { parseSemver } from '@/core/update-check'
 
 import type { Provider } from '@/types'
 
@@ -251,31 +251,225 @@ test('migrates each provider root independently and backs up retired reserved na
   assert.match(state, /_cursor_skills/)
 })
 
-test('runs versioned migrations in order and resumes after a later failure', () => {
-  const applied: string[] = []
+function versionedProject(version = pkg.version, applied: string[] = []) {
+  const cwd = mkdtempSync(join(tmpdir(), 'ahk-skill-versions-'))
+  roots.push(cwd)
+  mkdirSync(join(cwd, '.harness'))
+  writeFileSync(
+    join(cwd, '.harness/skills-state.json'),
+    JSON.stringify({
+      roots: {
+        _agents_skills: {
+          version,
+          migrationVersion: version,
+          applied,
+          pendingPreservation: [],
+          inventory: {},
+        },
+      },
+    })
+  )
+  return cwd
+}
+function savedRoot(cwd: string) {
+  return JSON.parse(readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8')).roots
+    ._agents_skills
+}
+const currentVersion = parseSemver(pkg.version)!
+const currentRelease = `${currentVersion.major}.${currentVersion.minor}.${currentVersion.patch}`
+const nextMinor = `${currentVersion.major}.${currentVersion.minor + 1}.0`
+const nextMajor = `${currentVersion.major + 1}.0.0`
+
+test('sparse production registry allows future minor and major releases without phantom checkpoints', () => {
+  for (const target of [nextMinor, nextMajor]) {
+    const cwd = versionedProject()
+    const before = readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8')
+    const result = migrateSkills(cwd, '.agents/skills', 'codex-cli', { target })
+    assert.deepEqual(result.applied, [])
+    assert.equal(result.state!.roots._agents_skills.version, pkg.version)
+    assert.equal(result.state!.roots._agents_skills.migrationVersion, pkg.version)
+    assert.equal(readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8'), before)
+  }
+})
+
+test('no-entry release advances processed version only after canonical refresh completes', () => {
+  const previous = `${currentVersion.major}.${currentVersion.minor}.${currentVersion.patch}-0`
+  const cwd = versionedProject(previous)
+  const before = readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8')
+  const result = migrateSkills(cwd, '.agents/skills', 'codex-cli', { registry: [] })
+  assert.deepEqual(result.applied, [])
+  assert.throws(
+    () =>
+      reconcileCanonicalSkills(
+        cwd,
+        '.agents/skills',
+        join(cwd, 'missing-source'),
+        undefined,
+        result.state
+      ),
+    /canonical skill .* is missing/
+  )
+  assert.equal(readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8'), before)
+  const retry = migrateSkills(cwd, '.agents/skills', 'codex-cli', { registry: [] })
+  reconcileCanonicalSkills(
+    cwd,
+    '.agents/skills',
+    join(process.cwd(), 'src/core/materializer/skills'),
+    undefined,
+    retry.state
+  )
+  assert.equal(savedRoot(cwd).version, pkg.version)
+  assert.equal(savedRoot(cwd).migrationVersion, pkg.version)
+  assert.deepEqual(savedRoot(cwd).applied, [])
+})
+
+test('production migration registry runs real entries in order, skips applied and resumes durably', () => {
+  const cwd = versionedProject(pkg.version, ['already-applied'])
   const calls: string[] = []
   const registry = [
     {
-      id: '2.32',
-      version: '2.32.0',
+      id: 'next-major',
+      version: nextMajor,
       run: () => {
-        calls.push('2.32')
+        calls.push('next-major')
         throw new Error('interrupted')
       },
     },
-    { id: '2.31', version: '2.31.0', run: () => calls.push('2.31') },
+    { id: 'next-minor', version: nextMinor, run: () => calls.push('next-minor') },
+    {
+      id: 'already-applied',
+      version: `${nextMinor}-beta.1`,
+      run: () => assert.fail('already applied'),
+    },
+    { id: 'future', version: `${currentVersion.major + 2}.0.0`, run: () => assert.fail('future') },
   ]
   assert.throws(
-    () => __runSkillMigrationRegistryForTests(registry, applied, '2.32.0'),
+    () => migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMajor, registry }),
     /interrupted/
   )
-  assert.deepEqual(applied, ['2.31'])
-  registry.find((migration) => migration.id === '2.32')!.run = () => calls.push('2.32-resumed')
-  assert.deepEqual(__runSkillMigrationRegistryForTests(registry, applied, '2.32.0'), [
-    '2.31',
-    '2.32',
-  ])
-  assert.deepEqual(calls, ['2.31', '2.32', '2.32-resumed'])
+  assert.deepEqual(savedRoot(cwd).applied, ['already-applied', 'next-minor'])
+  assert.equal(savedRoot(cwd).migrationVersion, nextMinor)
+  assert.equal(savedRoot(cwd).version, pkg.version)
+  registry[0]!.run = () => calls.push('major-resumed')
+  const result = migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMajor, registry })
+  assert.deepEqual(result.applied, ['next-major'])
+  assert.deepEqual(calls, ['next-minor', 'next-major', 'major-resumed'])
+  assert.equal(savedRoot(cwd).migrationVersion, nextMajor)
+  assert.equal(savedRoot(cwd).version, pkg.version)
+  assert.deepEqual(
+    migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMajor, registry }).applied,
+    []
+  )
+  assert.throws(
+    () => migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMinor, registry }),
+    /refusing downgrade/
+  )
+})
+
+test('same-version migration entries checkpoint separately and resume only incomplete IDs', () => {
+  const cwd = versionedProject()
+  const calls: string[] = []
+  const registry = [
+    { id: 'first', version: nextMinor, run: () => calls.push('first') },
+    {
+      id: 'second',
+      version: nextMinor,
+      run: () => {
+        calls.push('second')
+        throw new Error('second interrupted')
+      },
+    },
+  ]
+  assert.throws(
+    () => migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMinor, registry }),
+    /second interrupted/
+  )
+  assert.deepEqual(calls, ['first', 'second'])
+  assert.deepEqual(savedRoot(cwd).applied, ['first'])
+  assert.equal(savedRoot(cwd).migrationVersion, nextMinor)
+  assert.equal(savedRoot(cwd).version, pkg.version)
+
+  registry[1]!.run = () => calls.push('second-resumed')
+  const retry = migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMinor, registry })
+  assert.deepEqual(retry.applied, ['second'])
+  assert.deepEqual(calls, ['first', 'second', 'second-resumed'])
+  assert.deepEqual(savedRoot(cwd).applied, ['first', 'second'])
+  assert.equal(savedRoot(cwd).migrationVersion, nextMinor)
+  assert.equal(savedRoot(cwd).version, pkg.version)
+
+  const before = readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8')
+  assert.deepEqual(
+    migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: nextMinor, registry }).applied,
+    []
+  )
+  assert.deepEqual(calls, ['first', 'second', 'second-resumed'])
+  assert.equal(readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8'), before)
+})
+
+test('production registry honors prerelease precedence and build metadata', () => {
+  const cwd = versionedProject(`${currentRelease}-alpha.1`)
+  const calls: string[] = []
+  const registry = [
+    { id: 'stable', version: currentRelease, run: () => calls.push('stable') },
+    { id: 'beta', version: `${currentRelease}-beta.1`, run: () => calls.push('beta') },
+  ]
+  migrateSkills(cwd, '.agents/skills', 'codex-cli', {
+    target: `${currentRelease}-beta.1+build.7`,
+    registry,
+  })
+  assert.deepEqual(calls, ['beta'])
+  assert.throws(
+    () =>
+      migrateSkills(cwd, '.agents/skills', 'codex-cli', {
+        target: `${currentRelease}-alpha.2`,
+        registry,
+      }),
+    /refusing downgrade/
+  )
+  migrateSkills(cwd, '.agents/skills', 'codex-cli', {
+    target: `${currentRelease}+build.9`,
+    registry,
+  })
+  assert.deepEqual(calls, ['beta', 'stable'])
+  assert.deepEqual(
+    migrateSkills(cwd, '.agents/skills', 'codex-cli', {
+      target: `${currentRelease}+other`,
+      registry,
+    }).applied,
+    []
+  )
+})
+
+test('invalid targets, state and registry versions fail before mutations', () => {
+  for (const invalid of ['2.36', '2.036.0', `${currentRelease}-01`, 'nonsense']) {
+    const cwd = versionedProject()
+    const before = readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8')
+    assert.throws(
+      () => migrateSkills(cwd, '.agents/skills', 'codex-cli', { target: invalid }),
+      /invalid skills migration version/
+    )
+    assert.throws(
+      () =>
+        migrateSkills(cwd, '.agents/skills', 'codex-cli', {
+          target: nextMajor,
+          registry: [
+            {
+              id: 'valid',
+              version: nextMinor,
+              run: () => assert.fail('must preflight whole registry'),
+            },
+            { id: 'invalid', version: invalid, run: () => assert.fail('invalid') },
+          ],
+        }),
+      /invalid skills migration version/
+    )
+    assert.equal(readFileSync(join(cwd, '.harness/skills-state.json'), 'utf8'), before)
+    const invalidCwd = versionedProject(invalid)
+    assert.throws(
+      () => migrateSkills(invalidCwd, '.agents/skills', 'codex-cli'),
+      /invalid skills migration version/
+    )
+  }
 })
 
 test('refuses a symlinked skills root and never follows it', () => {

@@ -10,18 +10,33 @@ import {
   createNoticeSession,
   noticesForDelivery,
 } from '@/core/operational-notices'
-import { __configureUpdateCheckForTests } from '@/core/update-check'
+import { pkg } from '@/core/package-data'
+import { __configureUpdateCheckForTests, parseSemver } from '@/core/update-check'
 
 import type { HarnessConfig } from '@/types'
 
 const TMP = join(import.meta.dirname, '../../.tmp-operational-notices')
+const current = parseSemver(pkg.version)!
+const core = `${current.major}.${current.minor}.${current.patch}`
+const previousCore =
+  current.patch > 0
+    ? `${current.major}.${current.minor}.${current.patch - 1}`
+    : current.minor > 0
+      ? `${current.major}.${current.minor - 1}.0`
+      : `${current.major - 1}.0.0`
+// The lowest same-core prerelease equals a running '-0' CLI, so use
+// an earlier core in that case (build metadata cannot change precedence).
+const olderPrerelease = (version: string) => {
+  const prerelease = parseSemver(version)!.prerelease
+  return `${prerelease.length === 1 && prerelease[0] === '0' ? previousCore : core}-0`
+}
 
 afterEach(() => {
   rmSync(TMP, { recursive: true, force: true })
 })
 beforeEach(() => {
   __configureUpdateCheckForTests({
-    fetch: async () => new Response(JSON.stringify({ version: '2.31.0' }), { status: 200 }),
+    fetch: async () => new Response(JSON.stringify({ version: pkg.version }), { status: 200 }),
   })
 })
 
@@ -115,7 +130,7 @@ describe('operational notices', () => {
       JSON.stringify({
         roots: {
           _agents_skills: {
-            version: '99.0.0',
+            version: `${current.major + 1}.0.0`,
             applied: [],
             inventory: {},
             pendingPreservation: [],
@@ -132,12 +147,17 @@ describe('operational notices', () => {
   })
 
   test('persisted state follows SemVer prerelease precedence', () => {
+    assert.equal(olderPrerelease(`${core}-0`), `${previousCore}-0`)
+    assert.equal(olderPrerelease(`${core}-0+local`), `${previousCore}-0`)
+    assert.equal(olderPrerelease(`${core}-beta.1`), `${core}-0`)
     mkdirSync(join(TMP, '.harness'), { recursive: true })
     const statePath = join(TMP, '.harness/skills-state.json')
     const root = { applied: [], inventory: {}, pendingPreservation: [] }
     writeFileSync(
       statePath,
-      JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.0-beta.1' } } })
+      JSON.stringify({
+        roots: { _agents_skills: { ...root, version: olderPrerelease(pkg.version) } },
+      })
     )
     assert.equal(
       (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).at(0)?.code,
@@ -145,7 +165,14 @@ describe('operational notices', () => {
     )
     writeFileSync(
       statePath,
-      JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.1-beta.1' } } })
+      JSON.stringify({
+        roots: {
+          _agents_skills: {
+            ...root,
+            version: `${current.major}.${current.minor}.${current.patch + 1}-beta.1`,
+          },
+        },
+      })
     )
     assert.equal(
       (collectOperationalNotices(TMP, 'codex-cli') as { code: string }[]).at(0)?.code,
@@ -153,7 +180,9 @@ describe('operational notices', () => {
     )
     writeFileSync(
       statePath,
-      JSON.stringify({ roots: { _agents_skills: { ...root, version: '2.31.0+local' } } })
+      JSON.stringify({
+        roots: { _agents_skills: { ...root, version: `${pkg.version.split('+')[0]}+local` } },
+      })
     )
     assert.deepEqual(collectOperationalNotices(TMP, 'codex-cli'), [])
   })
