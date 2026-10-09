@@ -1,5 +1,7 @@
 # Implementation Guide
 
+> Historical implementation reference. This document may describe retired commands or storage behavior and is not an operating guide. For current workflows, provider paths, MCP lifecycle, and maintenance, use the bundled [`ahk-docs`](../src/core/materializer/skills/ahk-docs/SKILL.md) resources linked from the [documentation index](index.md).
+
 This document provides detailed implementation information for developers and maintainers working with the agent-harness-kit. It covers installation, architecture, configuration, usage patterns, and troubleshooting.
 
 ## System Requirements

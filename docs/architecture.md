@@ -1,5 +1,7 @@
 # Architecture Overview
 
+> Historical design reference. This document may describe retired implementation details and is not an operating guide. For current workflows, provider paths, MCP lifecycle, and maintenance, use the bundled [`ahk-docs`](../src/core/materializer/skills/ahk-docs/SKILL.md) resources linked from the [documentation index](index.md).
+
 ## System Architecture
 
 The agent-harness-kit is built on a structured multi-agent workflow that leverages the Model Communication Protocol (MCP) to coordinate AI agents in software development tasks. The system follows a defined pattern where each agent has distinct roles, responsibilities, and permissions.

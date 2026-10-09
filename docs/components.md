@@ -1,5 +1,7 @@
 # Component Reference
 
+> Historical design reference. This document may describe retired implementation details and is not an operating guide. For current workflows, provider paths, MCP lifecycle, and maintenance, use the bundled [`ahk-docs`](../src/core/materializer/skills/ahk-docs/SKILL.md) resources linked from the [documentation index](index.md).
+
 ## Core System Components
 
 ### 1. Task Management System
