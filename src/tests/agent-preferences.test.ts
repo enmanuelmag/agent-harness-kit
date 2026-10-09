@@ -10,7 +10,10 @@ import {
   persistPreferences,
   toPreferences,
 } from '@/commands/agent-preferences'
+import { runBuild } from '@/commands/build'
 import { captureModels, runSync } from '@/commands/sync'
+import { pkg } from '@/core/package-data'
+import { __configureUpdateCheckForTests, __resetUpdateCacheForTests } from '@/core/update-check'
 
 const TMP = join(import.meta.dirname, '../../.tmp-agent-preferences-test')
 afterEach(() => rmSync(TMP, { recursive: true, force: true }))
@@ -129,4 +132,29 @@ test('complete keep-models force sync regenerates using saved model and effort',
   writeFileSync(path, JSON.stringify(raw, null, 2))
   await runSync(TMP, { force: true, keepModels: true })
   assert.match(readFileSync(join(TMP, '.codex/agents/builder.toml'), 'utf8'), /model = "gpt-kept"/)
+})
+
+test('runBuild then runSync materialize and preserve the actual skill state across every provider', async () => {
+  const original = console.log
+  const lines: string[] = []
+  console.log = (...values: unknown[]) => lines.push(values.map(String).join(' '))
+  __configureUpdateCheckForTests({ fetch: async () => new Response(JSON.stringify({ version: '2.31.0' }), { status: 200 }) })
+  try {
+    for (const provider of ['claude-code', 'opencode', 'codex-cli', 'grok-cli', 'cursor']) {
+      rmSync(TMP, { recursive: true, force: true })
+      writeConfig('json', provider)
+      await runBuild(TMP, {})
+      const firstState = readFileSync(join(TMP, '.harness/skills-state.json'), 'utf8')
+      const first = JSON.parse(firstState)
+      const key = provider === 'claude-code' ? '_claude_skills' : provider === 'codex-cli' ? '_agents_skills' : provider === 'cursor' ? '_cursor_skills' : provider === 'grok-cli' ? '_grok_skills' : '_opencode_skills'
+      assert.equal(first.roots[key].version, pkg.version, `${provider} reports a complete first materialization`)
+      assert.ok(Object.keys(first.roots[key].inventory).length > 0, `${provider} records generated skill output`)
+      await runSync(TMP, {})
+      assert.equal(readFileSync(join(TMP, '.harness/skills-state.json'), 'utf8'), firstState, `${provider} second command is idempotent`)
+    }
+    assert.equal(lines.some((line) => line.includes('Applied skill migration(s)')), false)
+  } finally {
+    console.log = original
+    __resetUpdateCacheForTests()
+  }
 })
