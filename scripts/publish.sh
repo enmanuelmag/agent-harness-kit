@@ -42,15 +42,13 @@ fi
 
 # -- 1. Read package metadata -------------------------------------------------
 info "Reading package metadata..."
-# Use jq if available; otherwise fall back to grep+sed (avoids ESM require() issues)
-if command -v jq &>/dev/null; then
-  PACKAGE_NAME=$(jq -r '.name'    package.json)
-  VERSION=$(jq      -r '.version' package.json)
-else
-  PACKAGE_NAME=$(grep '"name"'    package.json | head -1 | sed 's/.*"name": "\(.*\)".*/\1/')
-  VERSION=$(grep      '"version"' package.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
-fi
-TAG="v${VERSION}"
+# The manifest is authoritative; shared guards enforce branch/channel/tag safety.
+PACKAGE_NAME=$(node scripts/release-metadata.mjs name)
+VERSION=$(node scripts/release-metadata.mjs version)
+TAG=$(node scripts/release-metadata.mjs tag)
+CHANNEL=$(node scripts/release-metadata.mjs channel)
+PRERELEASE=$(node scripts/release-metadata.mjs prerelease)
+PREPARED_TAG=$(node scripts/release-metadata.mjs preparedTag)
 
 echo "  Package : $PACKAGE_NAME"
 echo "  Version : $VERSION"
@@ -63,22 +61,20 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 success "Working tree is clean."
 
-# -- 3. Check tag doesn't already exist ---------------------------------------
-info "Checking git tags..."
-if git tag --list "$TAG" | grep -q "^${TAG}$"; then
-  die "Tag $TAG already exists. Bump the version in package.json first."
+# -- 3. Shared metadata already checked immutable existing tags ---------------
+if [[ "$PREPARED_TAG" == true ]]; then
+  success "Prepared tag $TAG points at HEAD; it will be reused."
+else
+  success "Tag $TAG is available."
 fi
-success "Tag $TAG is available."
 
-# -- 4. Check gh CLI ----------------------------------------------------------
-info "Checking GitHub CLI..."
-if ! command -v gh &>/dev/null; then
-  die "'gh' CLI not found. Install it: https://cli.github.com"
+# -- 4. Check gh CLI only for an actual publication ---------------------------
+if ! $DRY_RUN; then
+  info "Checking GitHub CLI..."
+  command -v gh &>/dev/null || die "'gh' CLI not found. Install it: https://cli.github.com"
+  gh auth status &>/dev/null || die "Not authenticated with gh. Run: gh auth login"
+  success "gh CLI is ready."
 fi
-if ! gh auth status &>/dev/null; then
-  die "Not authenticated with gh. Run: gh auth login"
-fi
-success "gh CLI is ready."
 
 # -- 5. Run tests -------------------------------------------------------------
 if $SKIP_TESTS; then
@@ -96,22 +92,26 @@ success "Build complete."
 
 # -- 7. Publish to npm --------------------------------------------------------
 info "Publishing $PACKAGE_NAME@$VERSION to npm..."
+TARBALL=$(pnpm pack 2>/dev/null | tail -1)
+trap 'rm -f "$TARBALL"' EXIT
 if $DRY_RUN; then
-  pnpm publish --access public --dry-run
+  npm publish "$TARBALL" --access public --tag "$CHANNEL" --dry-run
   warn "Dry run complete — nothing was published to npm."
 else
-  TARBALL=$(pnpm pack 2>/dev/null | tail -1)
-  npm publish "$TARBALL" --access public
-  rm -f "$TARBALL"
+  npm publish "$TARBALL" --access public --tag "$CHANNEL"
   success "Published $PACKAGE_NAME@$VERSION to npm."
 fi
+rm -f "$TARBALL"
+trap - EXIT
 
 # -- 8. Create git tag --------------------------------------------------------
 info "Creating git tag $TAG..."
 if $DRY_RUN; then
   warn "Dry run — skipping tag creation."
 else
-  git tag "$TAG"
+  if [[ "$PREPARED_TAG" != true ]]; then
+    git tag -a "$TAG" -m "Release $TAG"
+  fi
   git push origin "$TAG"
   success "Tag $TAG pushed to origin."
 fi
@@ -144,9 +144,16 @@ info "Creating GitHub release $TAG..."
 if $DRY_RUN; then
   warn "Dry run — skipping GitHub release creation."
 else
+  RELEASE_FLAGS=(--latest)
+  if [[ "$PRERELEASE" == true ]]; then
+    RELEASE_FLAGS=(--prerelease --latest=false)
+  elif [[ "$CHANNEL" == v2 ]]; then
+    RELEASE_FLAGS=(--latest=false)
+  fi
   gh release create "$TAG" \
     --title "$TAG" \
-    --notes "$RELEASE_BODY"
+    --notes "$RELEASE_BODY" \
+    "${RELEASE_FLAGS[@]}"
   success "GitHub release $TAG created."
 fi
 

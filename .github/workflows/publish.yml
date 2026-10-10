@@ -2,84 +2,70 @@ name: Test & Publish
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - main
 
 jobs:
   publish:
     name: Build, Test & Publish
     runs-on: ubuntu-latest
-
     permissions:
-      contents: write # needed to push git tags
-      id-token: write # needed for npm OIDC trusted publishing
-
+      contents: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history required by semantic-version
-
-      - name: Generate Semantic Version
-        id: semantic_version
-        uses: paulhatch/semantic-version@v5.4.0
+          fetch-depth: 0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          tag_prefix: 'v'
-          major_pattern: '/!:|BREAKING CHANGE:/'
-          minor_pattern: '/feat/'
-          bump_each_commit_patch_pattern: '/fix|bugfix|chore|refactor|style|docs|test|perf/'
-          version_format: '${major}.${minor}.${patch}'
-          enable_prerelease_mode: false
-          bump_each_commit: true
-
+          version: 11.1.2
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
-
+          cache: 'pnpm'
+      - name: Validate manifest version, channel and immutable tag
+        id: release
+        env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: node scripts/release-metadata.mjs github >> "$GITHUB_OUTPUT"
       - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
+        run: pnpm install --frozen-lockfile
       - name: Lint (src)
-        run: npm run lint:check
-
+        run: pnpm run lint:check
       - name: Run tests
-        run: npm test
-
-      - name: Set version in package.json
-        run: |
-          VERSION="${{ steps.semantic_version.outputs.version }}"
-          echo "Publishing version: $VERSION"
-          npm pkg set version="$VERSION"
-
-      - name: Pack (dry run — verify bundle)
-        run: npm pack --dry-run
-
+        run: pnpm test
+      - name: Build
+        run: pnpm run build
+      - name: Pack dry run
+        run: pnpm pack --dry-run
       - name: Publish to npm
-        run: npm publish --access public --provenance
-
-      - name: Create and push git tag
+        env:
+          CHANNEL: ${{ steps.release.outputs.channel }}
+        run: npm publish --access public --provenance --tag "$CHANNEL"
+      - name: Create and push immutable git tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          PREPARED_TAG: ${{ steps.release.outputs.preparedTag }}
         run: |
-          VERSION="${{ steps.semantic_version.outputs.version }}"
-
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "Tag v${VERSION} already exists. Skipping."
-            exit 0
+          if [[ "$PREPARED_TAG" != true ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
           fi
-
-          git config user.name "enmanuelmag"
-          git config user.email "enmanuelmag@cardor.dev"
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin "v${VERSION}"
-
-      - name: Log publish info
+          git push origin "$TAG"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
-          echo "🚀 Published @cardor/agent-harness-kit@${{ steps.semantic_version.outputs.version }}"
-          echo "   Branch: ${{ github.ref_name }}"
-          echo "   Commit: ${{ github.sha }}"
+          FLAGS=(--latest)
+          if [[ "$PRERELEASE" == true ]]; then
+            FLAGS=(--prerelease --latest=false)
+          elif [[ "$CHANNEL" == v2 ]]; then
+            FLAGS=(--latest=false)
+          fi
+          gh release create "$TAG" --title "$TAG" --generate-notes "${FLAGS[@]}"

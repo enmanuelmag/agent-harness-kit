@@ -39,4 +39,15 @@ The CLI location and storage scope are independent. Agent and skill files materi
 
 ## Runtime compatibility
 
-The package manifest currently declares Node `>=14`, while the default SQLite driver and the repository's tested development flow target Node 22 or Bun. Treat Node 22 or current Bun as the supported path until runtime compatibility is aligned and verified; the manifest alone is not proof that every feature runs on older Node releases.
+AHK requires Node 22 or newer. The default SQLite driver and the repository build target Node 22.
+
+
+## Stable and release-candidate versions
+
+The v2 maintenance line is `release/v2`; select and backport fixes there without the v3 MCP migration. After publication, pin a stable v2 version such as `@cardor/agent-harness-kit@2.36.2`. The v3 line is `release/v3`, currently `3.0.0-rc.1`; after publication, install `@cardor/agent-harness-kit@rc` or pin its full prerelease version. The isolated v2.36.2 cut changes only the package version from its shared committed baseline, retaining historical release tooling. Future v2 publication must specify `--tag v2` explicitly or selectively backport release guards, so a v2 patch cannot replace v3 stable at `latest`. Local release preparation and tags do not publish packages.
+
+MCP input guidance and compiled tolerant admission are derived from one authored Zod registry. Compatibility recovery stays private and preserves existing numeric/string/JSON-array inputs, omitted keys and explicit null values. Successful responses keep their legacy text and add validated structured DTOs.
+
+Release scripts use the checked-in manifest version. The updated release tooling maps v2 to the `v2` maintenance channel and stable v3 to `latest`; v3 RCs publish to `rc` and create GitHub prereleases that are not marked latest. Prepared tags may be reused only at the same HEAD; version tags must never be moved. After review and commit, fast-forward local `main` to the exact `release/v3` commit as an explicit release step.
+
+Keep generated-skill downgrade protection intact; generating v2 over a v3 tree is refused. The update checker follows stable npm `latest`, so check `rc` explicitly for RC-to-RC updates. Do not regenerate provider files merely to prepare a release.

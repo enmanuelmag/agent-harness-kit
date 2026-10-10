@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+      - release/v2
+      - release/v3
 
 jobs:
   ci:

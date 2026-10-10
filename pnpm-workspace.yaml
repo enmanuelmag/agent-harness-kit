@@ -4,3 +4,8 @@ packages:
 allowBuilds:
   better-sqlite3: true
   esbuild: false
+
+overrides:
+  '@modelcontextprotocol/server>zod': 4.6.5
+  '@modelcontextprotocol/client>zod': 4.6.5
+  '@modelcontextprotocol/core>zod': 4.6.5

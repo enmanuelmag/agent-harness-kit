@@ -1,17 +1,15 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { Server } from '@modelcontextprotocol/sdk/server'
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import {
-  CallToolRequestSchema,
-  type CallToolResult,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js'
+import { type CallToolResult, McpServer } from '@modelcontextprotocol/server'
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 
 import { type HarnessDB, openDB } from './db'
 import { getDoctorStatus } from './doctor'
 import { detectPackageManager, getRunOnceCommandParts } from './materializer/detect-package-manager'
 import { slugify } from './materializer/scaffold-utils'
+import { inputContracts, outputContracts, sdkInputContracts, structuredResult } from './mcp-contracts'
+import { assertNormalized, boundedInt, num, optionalStr, optionalStringArray, requiredStringArray, str } from './mcp-normalizers'
+import { TOOLS } from './mcp-tools'
 import { collectOperationalNotices, createNoticeSession, noticesForDelivery } from './operational-notices'
 import { checkPermissionsSync } from './permissions-check'
 import {
@@ -29,563 +27,51 @@ import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types
 
 const VERSION = '0.1.0'
 
-// ─── Tool schemas ─────────────────────────────────────────────────────────────
-
-const SPEC_TOOLS = [
-  {
-    name: 'specs.list',
-    description:
-      'List use cases from docs/use-cases and specifications from docs/specs without loading bodies.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        specKind: { type: 'string', enum: SPEC_KINDS },
-        status: { type: 'string' },
-        query: { type: 'string' },
-        offset: { type: 'number' },
-        limit: { type: 'number' },
-      },
-    },
-  },
-  {
-    name: 'specs.get',
-    description: 'Read one specification body by slug with an explicit offset and limit.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string' },
-        offset: { type: 'number' },
-        limit: { type: 'number' },
-      },
-      required: ['slug'],
-    },
-  },
-  {
-    name: 'specs.search',
-    description: 'Search specification metadata and body content with bounded excerpts.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' },
-        specKind: { type: 'string', enum: SPEC_KINDS },
-        status: { type: 'string' },
-        offset: { type: 'number' },
-        limit: { type: 'number' },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'specs.related',
-    description: 'List related specification headers and edges without their bodies.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string' },
-        relationships: { type: 'array', items: { type: 'string', enum: RELATIONSHIPS } },
-      },
-      required: ['slug'],
-    },
-  },
-  {
-    name: 'specs.create',
-    description:
-      'Create a validated use case in docs/use-cases or specification in docs/specs from structured fields.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string' },
-        title: { type: 'string' },
-        description: { type: 'string' },
-        specKind: { type: 'string', enum: SPEC_KINDS },
-        status: { type: 'string' },
-        sourceSpec: { type: 'string' },
-        sourceUseCases: { type: 'array', items: { type: 'string' } },
-        content: { type: 'string' },
-      },
-      required: ['slug', 'title', 'description', 'specKind', 'content'],
-    },
-  },
-  {
-    name: 'specs.update_metadata',
-    description: 'Update validated metadata fields without hand-editing frontmatter.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string' },
-        title: { type: 'string' },
-        description: { type: 'string' },
-        status: { type: 'string' },
-        sourceSpec: { type: 'string' },
-        sourceUseCases: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['slug'],
-    },
-  },
-  {
-    name: 'specs.update_content',
-    description: 'Replace a specification body while preserving its validated frontmatter.',
-    inputSchema: {
-      type: 'object',
-      properties: { slug: { type: 'string' }, content: { type: 'string' } },
-      required: ['slug', 'content'],
-    },
-  },
-  {
-    name: 'specs.transition',
-    description: 'Change a specification status while enforcing source approval rules.',
-    inputSchema: {
-      type: 'object',
-      properties: { slug: { type: 'string' }, status: { type: 'string' } },
-      required: ['slug', 'status'],
-    },
-  },
-  {
-    name: 'specs.link',
-    description: 'Create a bidirectional validated relationship between two specifications.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string' },
-        targetSlug: { type: 'string' },
-        relationship: { type: 'string', enum: RELATIONSHIPS },
-      },
-      required: ['slug', 'targetSlug', 'relationship'],
-    },
-  },
-  {
-    name: 'specs.unlink',
-    description: 'Remove a relationship and its inverse from two specifications.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string' },
-        targetSlug: { type: 'string' },
-        relationship: { type: 'string', enum: RELATIONSHIPS },
-      },
-      required: ['slug', 'targetSlug', 'relationship'],
-    },
-  },
-  {
-    name: 'specs.validate',
-    description:
-      'Validate docs/use-cases and docs/specs frontmatter, links, and source references.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-] as const
-
-const TOOLS = [
-  ...SPEC_TOOLS,
-  {
-    name: 'health.run',
-    description:
-      'Run the native health check for a task and persist server-owned completion evidence. Run before work and immediately before tasks.update(done).',
-    inputSchema: {
-      type: 'object',
-      properties: { taskId: { type: 'number', description: 'Positive task ID' } },
-      required: ['taskId'],
-    },
-  },
-  {
-    name: 'actions.start',
-    description: 'Start a new action for a task. Returns an actionId.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'number', description: 'The task ID from tasks.get' },
-        agent: {
-          type: 'string',
-          description:
-            'Agent name: lead | explorer | consultant | builder | reviewer | custom:<name>',
-        },
-      },
-      required: ['taskId', 'agent'],
-    },
-  },
-  {
-    name: 'actions.write',
-    description: 'Record a free-form section in an action.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        actionId: { type: 'number', description: 'The actionId returned by actions.start' },
-        sectionType: {
-          type: 'string',
-          description: 'Section name, such as result, blockers, next_steps, or a custom name.',
-        },
-        content: {
-          type: 'string',
-          description:
-            'Content for this section. No length limit; avoid padding — it costs shared context for other agents.',
-        },
-      },
-      required: ['actionId', 'sectionType', 'content'],
-    },
-  },
-  {
-    name: 'actions.complete',
-    description: 'Close an action with a one-line summary.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        actionId: { type: 'number', description: 'The actionId of the action to close' },
-        summary: { type: 'string', description: 'One-line summary of what was done' },
-      },
-      required: ['actionId', 'summary'],
-    },
-  },
-  {
-    name: 'actions.get',
-    description:
-      'Full task action history, including every action and section. Potentially large; use only for audit or diagnosis.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'number', description: 'Task ID' },
-      },
-      required: ['taskId'],
-    },
-  },
-  {
-    name: 'actions.list',
-    description:
-      'Compact newest-first action index. Use to discover actions before reading a specific action or section.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'number', description: 'Task ID' },
-        agent: { type: 'string', description: 'Optional agent filter' },
-        status: {
-          type: 'string',
-          enum: ['in_progress', 'completed', 'blocked'],
-          description: 'Optional action status filter',
-        },
-        cursor: { type: 'string', description: 'Opaque cursor returned as nextCursor' },
-        limit: { type: 'number', description: 'Maximum items (1-100; default 20)' },
-      },
-      required: ['taskId'],
-    },
-  },
-  {
-    name: 'actions.get_by_id',
-    description:
-      'Get one action and a compact index of its sections; section contents are not included.',
-    inputSchema: {
-      type: 'object',
-      properties: { actionId: { type: 'number', description: 'Action ID' } },
-      required: ['actionId'],
-    },
-  },
-  {
-    name: 'actions.sections.list',
-    description:
-      'Compact newest-first section index for one action. Filter by section types without loading content.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        actionId: { type: 'number', description: 'Action ID' },
-        types: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional section-type filter',
-        },
-        cursor: { type: 'string', description: 'Opaque cursor returned as nextCursor' },
-        limit: { type: 'number', description: 'Maximum items (1-100; default 20)' },
-      },
-      required: ['actionId'],
-    },
-  },
-  {
-    name: 'actions.sections.get',
-    description:
-      'Read one section content with an explicit character range. This is the only generic action reader that returns long text.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sectionId: { type: 'number', description: 'Section ID' },
-        offset: { type: 'number', description: 'Zero-based character offset (default 0)' },
-        length: { type: 'number', description: 'Characters to return (1-12000; default 8000)' },
-      },
-      required: ['sectionId'],
-    },
-  },
-  {
-    name: 'actions.handoff.write',
-    description:
-      'Write a validated, recipient-directed, bounded handoff for a completed action to resume work without loading the full history.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        actionId: { type: 'number', description: 'Producer action ID' },
-        recipient: {
-          type: 'string',
-          enum: ['lead', 'explorer', 'consultant', 'builder', 'reviewer'],
-        },
-        goal: { type: 'string' },
-        completed: { type: 'array', items: { type: 'string' } },
-        decisions: { type: 'array', items: { type: 'string' } },
-        files: { type: 'array', items: { type: 'string' } },
-        verification: { type: 'array', items: { type: 'string' } },
-        blockers: { type: 'array', items: { type: 'string' } },
-        nextStep: { type: 'string' },
-      },
-      required: [
-        'actionId',
-        'recipient',
-        'goal',
-        'completed',
-        'decisions',
-        'files',
-        'verification',
-        'blockers',
-        'nextStep',
-      ],
-    },
-  },
-  {
-    name: 'actions.handoff.get',
-    description:
-      'Get the newest completed canonical handoff addressed to a recipient. Returns HANDOFF_NOT_FOUND instead of falling back to history.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'number', description: 'Task ID' },
-        recipient: {
-          type: 'string',
-          enum: ['lead', 'explorer', 'consultant', 'builder', 'reviewer'],
-          description: 'Recipient role; defaults to builder',
-        },
-      },
-      required: ['taskId'],
-    },
-  },
-  {
-    name: 'tasks.get',
-    description: 'List tasks, optionally filtered by status. Excludes archived tasks by default.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        status: {
-          type: 'string',
-          enum: ['pending', 'in_progress', 'done', 'blocked'],
-          description: 'Filter by status (omit for all tasks)',
-        },
-        includeArchived: {
-          type: 'boolean',
-          description: 'If true, include archived tasks in results',
-        },
-      },
-    },
-  },
-  {
-    name: 'tasks.claim',
-    description:
-      'Atomically claim a pending task and run server-owned health automatically. Returns the task, health result, and execution mode.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'number', description: 'Task ID to claim' },
-        agent: { type: 'string', description: 'Your agent name' },
-      },
-      required: ['id', 'agent'],
-    },
-  },
-  {
-    name: 'tasks.repair.begin',
-    description:
-      'Enter an audited repair mode after a failed server-owned health run. Requires a bounded reason and scope.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'number' },
-        actor: { type: 'string' },
-        reason: { type: 'string' },
-        scope: { type: 'string' },
-      },
-      required: ['taskId', 'actor', 'reason', 'scope'],
-    },
-  },
-  {
-    name: 'tasks.update',
-    description: 'Change the status of a task.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'number', description: 'Task ID' },
-        status: {
-          type: 'string',
-          enum: ['pending', 'in_progress', 'done', 'blocked'],
-        },
-      },
-      required: ['id', 'status'],
-    },
-  },
-  {
-    name: 'docs.search',
-    description: 'Search the project docs folder for content matching a query.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search terms' },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'tasks.acceptance.update',
-    description: 'Mark an acceptance criterion as met. Use the criterion id from tasks.get.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        criterionId: {
-          type: 'number',
-          description: 'The id of the acceptance criterion to mark as met',
-        },
-      },
-      required: ['criterionId'],
-    },
-  },
-  {
-    name: 'tasks.acceptance.get',
-    description:
-      'Given a taskId, returns all acceptance criteria for that task with their id, task_id, criterion text, and met status. Use the returned id values to call tasks.acceptance_update(criterionId).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'number', description: 'Task ID' },
-      },
-      required: ['taskId'],
-    },
-  },
-  {
-    name: 'tasks.add',
-    description:
-      'Create a new task in the harness. Use this when the user describes work in natural language. Infer slug, title, description, and acceptance criteria from the conversation. Ask for missing critical info before calling.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', description: 'Short human-readable title for the task' },
-        slug: {
-          type: 'string',
-          description:
-            'URL-safe identifier (lowercase, hyphens). Auto-derived from title if omitted.',
-        },
-        description: {
-          type: 'string',
-          description:
-            'Longer description of the task goal. No length limit; avoid padding — it costs shared context for other agents.',
-        },
-        acceptance: {
-          type: 'array',
-          items: { type: 'string' },
-          description:
-            'List of acceptance criteria (plain sentences). No length limit; avoid padding — it costs shared context for other agents.',
-        },
-      },
-      required: ['title'],
-    },
-  },
-  {
-    name: 'tasks.edit',
-    description:
-      'Edit an existing task (title, description, acceptance criteria). Omitted fields keep their current values.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'number', description: 'Task ID to edit' },
-        title: { type: 'string', description: 'New title (optional)' },
-        description: { type: 'string', description: 'New description (optional, null to clear)' },
-        acceptance: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'New acceptance criteria list (optional, null to keep existing)',
-        },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'tasks.archive',
-    description:
-      'Archive a task. Archived tasks are hidden from default views (CLI and dashboard).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'number', description: 'Task ID to archive' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'tasks.unarchive',
-    description: 'Unarchive a previously archived task, restoring it to default views.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'number', description: 'Task ID to unarchive' },
-      },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'permissions.check',
-    description:
-      'Check that a .claude/agents/*.md definition file exists for every role. Returns { in_sync, agents } where each agent is { ok } or { ok: false, reason: "missing_file" }. Agent file CONTENTS are never inspected — they are meant to be customised freely — so this never reports drift, only absence. Run `ahk build` to restore a missing file.',
-    inputSchema: { type: 'object', properties: {}, required: [] },
-  },
-  {
-    name: 'deps.snapshot',
-    description: 'Snapshot current package.json dependencies to .harness/deps-lock.json',
-    inputSchema: { type: 'object' as const, properties: {}, required: [] },
-  },
-  {
-    name: 'deps.check',
-    description: 'Compare current package.json against .harness/deps-lock.json and report changes',
-    inputSchema: { type: 'object' as const, properties: {}, required: [] },
-  },
-  {
-    name: 'ahk.doctor',
-    description:
-      'Check lib version, agent files, and harness skills sync status. Returns structured JSON.',
-    inputSchema: { type: 'object', properties: {}, required: [] },
-  },
-] as const
-
 // ─── Server ───────────────────────────────────────────────────────────────────
 
 export async function startMcpServer(config: HarnessConfig, cwd: string): Promise<void> {
   const db = await openDB(config, cwd)
   const docsPath = resolve(cwd, config.project.docsPath)
 
-  const server = new Server(
-    { name: 'agent-harness-kit', version: VERSION },
-    { capabilities: { tools: {} } }
-  )
-  // Lifecycle calls use cached facts only; begin the bounded registry lookup now.
-  warmUpdateCache()
-  const noticeSession = createNoticeSession()
-
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params
-    const a = (args ?? {}) as Record<string, unknown>
-
-    try {
-      const result = await dispatch(name, a, db, docsPath, cwd, config)
-      return attachOperationalNotices(name, a, cwd, config.provider, result, noticeSession)
-    } catch (err) {
-      return attachOperationalNotices(name, a, cwd, config.provider, ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true), noticeSession)
-    }
-  })
-
+  const server = createMcpServer(config, cwd, db, docsPath)
   const transport = new StdioServerTransport()
   await server.connect(transport)
 }
 
+/** Registration is also exposed for real protocol tests with an isolated database. */
+export function createMcpServer(config: HarnessConfig, cwd: string, db: HarnessDB, docsPath = resolve(cwd, config.project.docsPath)): McpServer {
+  const server = new McpServer({ name: 'agent-harness-kit', version: VERSION })
+  warmUpdateCache()
+  const noticeSession = createNoticeSession()
+  for (const tool of TOOLS) {
+    server.registerTool(tool.name, {
+      description: tool.description,
+      inputSchema: sdkInputContracts[tool.name],
+      outputSchema: outputContracts[tool.name],
+    }, async (args) => {
+      const a = args as Record<string, unknown>
+      try {
+        assertNormalized(a)
+        const result = await execute(tool.name, a, db, docsPath, cwd, config)
+        return attachOperationalNotices(tool.name, a, cwd, config.provider, structuredResult(tool.name, result), noticeSession)
+      } catch (err) {
+        return attachOperationalNotices(tool.name, a, cwd, config.provider, ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true), noticeSession)
+      }
+    })
+  }
+  return server
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
-export async function dispatch(
+export async function dispatch(name: string, args: Record<string, unknown>, db: HarnessDB, docsPath: string, cwd: string, config: HarnessConfig): Promise<CallToolResult> {
+  const contract = inputContracts[name]
+  const normalized = contract ? contract.parse(args) : args
+  assertNormalized(normalized)
+  return structuredResult(name, await execute(name, normalized, db, docsPath, cwd, config))
+}
+
+async function execute(
   name: string,
   args: Record<string, unknown>,
   db: HarnessDB,
@@ -1256,72 +742,6 @@ function ok(text: string, isError = false): CallToolResult {
   return { content: [{ type: 'text' as const, text }], isError }
 }
 
-function str(args: Record<string, unknown>, key: string): string {
-  const v = args[key]
-  if (!v) throw new Error(`${key} is required`)
-  return String(v)
-}
-
-function num(args: Record<string, unknown>, key: string): number {
-  const v = Number(args[key])
-  if (typeof v !== 'number' || Number.isNaN(v)) throw new Error(`${key} must be a number`)
-  return v
-}
-
-function optionalStr(args: Record<string, unknown>, key: string): string | undefined {
-  const value = args[key]
-  if (value === undefined) return undefined
-  return String(value)
-}
-function boundedInt(
-  args: Record<string, unknown>,
-  key: string,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  const raw = args[key]
-  if (raw === undefined) return fallback
-
-  const value =
-    typeof raw === 'number'
-      ? raw
-      : typeof raw === 'string' && raw.trim() !== ''
-        ? Number(raw)
-        : Number.NaN
-
-  if (!Number.isInteger(value) || value < min || value > max) {
-    throw new Error(`${key} must be an integer between ${min} and ${max}`)
-  }
-  return value
-}
-function optionalStringArray(args: Record<string, unknown>, key: string): string[] | undefined {
-  const value = args[key]
-
-  if (value === null) return []
-
-  if (value === undefined) return undefined
-
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item)).filter((item) => item.trim() !== '')
-      }
-    } catch {
-      throw new Error(
-        `${key} must be an array of non-empty strings or a JSON string representing such an array`
-      )
-    }
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error(`${key} must be an array of non-empty strings`)
-  }
-
-  return value.map((item) => String(item)).filter((item) => item.trim() !== '')
-}
-
 const RECIPIENTS = ['lead', 'explorer', 'consultant', 'builder', 'reviewer'] as const
 type HandoffRecipient = (typeof RECIPIENTS)[number]
 interface Handoff {
@@ -1337,10 +757,6 @@ function recipientRole(value: unknown): HandoffRecipient {
   if (typeof value !== 'string' || !RECIPIENTS.includes(value as HandoffRecipient))
     throw new Error(`recipient must be one of: ${RECIPIENTS.join(', ')}`)
   return value as HandoffRecipient
-}
-function requiredStringArray(args: Record<string, unknown>, key: string): string[] {
-  if (!(key in args)) throw new Error(`${key} is required`)
-  return optionalStringArray(args, key) ?? []
 }
 function handoffFromArgs(args: Record<string, unknown>): Handoff {
   const goal = str(args, 'goal')
