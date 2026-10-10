@@ -17,6 +17,8 @@ The lead claims work. Each role starts and completes an action. The builder read
 
 - `docs.search` finds project documentation.
 - `specs.list`, `specs.get`, `specs.search`, and `specs.related` read documents and relationships.
+- `specs.list` discovers valid metadata and returns `{ items, nextOffset, diagnostics }`. Each diagnostic has a `path` relative to the configured docs directory and a `message` explaining an invalid or ambiguous document. Diagnostics cover all scanned files in both roots, regardless of item filters or pagination; an empty scan returns `diagnostics: []`.
+- Discovery is nonrecursive and excludes `README.md` indexes case-insensitively. Other `.md` files, including `index.md`, need valid specification frontmatter. Duplicate filenames across roots are excluded with diagnostics for both paths. `specs.get`, search, validation, and mutations remain strict; listing diagnostics do not authorize or silently repair documents.
 - `specs.create`, `specs.update_metadata`, `specs.update_content`, and `specs.transition` manage a specification draft and status.
 - `specs.link`, `specs.unlink`, and `specs.validate` maintain relationships and validate metadata.
 

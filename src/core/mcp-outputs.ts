@@ -71,7 +71,11 @@ const page = (items: z.ZodType) =>
 const version = z.object({ current: string, latest: nullableString, outdated: z.boolean() })
 const names = z.object({ missing: strings, ok: strings })
 export const OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
-  'specs.list': page(metadata),
+  'specs.list': z.object({
+    items: z.array(metadata),
+    nextOffset: number.nullable(),
+    diagnostics: z.array(z.object({ path: string, message: string })),
+  }),
   'specs.get': z.object({
     metadata,
     content: string,

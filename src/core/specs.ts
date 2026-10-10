@@ -6,7 +6,7 @@ import {
   renameSync,
   writeFileSync,
 } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 
 /** Legacy names remain readable so existing project documents never disappear. */
 export const SPEC_KINDS = ['use-case', 'spec', 'feature', 'fix', 'spec-tech', 'technical'] as const
@@ -53,6 +53,14 @@ export interface SpecMetadata {
 export interface SpecDocument {
   metadata: SpecMetadata
   content: string
+}
+export interface SpecListingDiagnostic {
+  path: string
+  message: string
+}
+export interface SpecListingScan {
+  documents: SpecDocument[]
+  diagnostics: SpecListingDiagnostic[]
 }
 export interface SpecSearchResult {
   document: SpecDocument
@@ -207,9 +215,11 @@ function serialize(doc: SpecDocument) {
 }
 const now = () => new Date().toISOString()
 export class SpecStore {
+  private readonly docsPath: string
   readonly root: string
   readonly useCasesRoot: string
   constructor(docsPath: string) {
+    this.docsPath = resolve(docsPath)
     this.root = resolve(docsPath, 'specs')
     this.useCasesRoot = resolve(docsPath, 'use-cases')
   }
@@ -244,27 +254,68 @@ export class SpecStore {
     this.validateRoot(path, d)
     return d
   }
+  private candidates() {
+    return this.roots().flatMap((root) =>
+      existsSync(root)
+        ? readdirSync(root)
+            .filter((file) => file.endsWith('.md') && file.toLowerCase() !== 'readme.md')
+            .sort()
+            .map((file) => ({ file, path: join(root, file) }))
+        : []
+    )
+  }
+  private readCandidate(path: string, file: string) {
+    const document = parseDocument(readFileSync(path, 'utf8'))
+    if (document.metadata.slug !== file.slice(0, -3))
+      throw new Error(`spec filename and slug disagree for '${file}'`)
+    this.validateRoot(path, document)
+    return document
+  }
   list() {
     const docs: SpecDocument[] = []
     const seen = new Set<string>()
-    for (const root of this.roots())
-      if (existsSync(root))
-        for (const file of readdirSync(root)
-          .filter((f) => f.endsWith('.md'))
-          .sort()) {
-          const path = join(root, file),
-            d = parseDocument(readFileSync(path, 'utf8'))
-          if (d.metadata.slug !== file.slice(0, -3))
-            throw new Error(`spec filename and slug disagree for '${file}'`)
-          this.validateRoot(path, d)
-          if (seen.has(d.metadata.slug))
-            throw new Error(
-              `spec slug '${d.metadata.slug}' is ambiguous across docs/use-cases and docs/specs`
-            )
-          seen.add(d.metadata.slug)
-          docs.push(d)
-        }
+    for (const { file, path } of this.candidates()) {
+      const document = this.readCandidate(path, file)
+      if (seen.has(document.metadata.slug))
+        throw new Error(
+          `spec slug '${document.metadata.slug}' is ambiguous across docs/use-cases and docs/specs`
+        )
+      seen.add(document.metadata.slug)
+      docs.push(document)
+    }
     return docs.sort((a, b) => a.metadata.slug.localeCompare(b.metadata.slug))
+  }
+  /** Discovery only: strict domain consumers continue to use list()/get(). */
+  scanForListing(): SpecListingScan {
+    const candidates = this.candidates()
+    const counts = new Map<string, number>()
+    for (const { file } of candidates) counts.set(file, (counts.get(file) ?? 0) + 1)
+    const documents: SpecDocument[] = []
+    const diagnostics: SpecListingDiagnostic[] = []
+    for (const { file, path } of candidates) {
+      const problems: string[] = []
+      let document: SpecDocument | undefined
+      try {
+        document = this.readCandidate(path, file)
+      } catch (error) {
+        problems.push(error instanceof Error ? error.message : String(error))
+      }
+      // get() rejects both paths even if one twin has invalid frontmatter.
+      if (counts.get(file)! > 1)
+        problems.push(
+          `spec slug '${file.slice(0, -3)}' is ambiguous across docs/use-cases and docs/specs`
+        )
+      if (problems.length)
+        diagnostics.push({
+          path: relative(this.docsPath, path).split(sep).join('/'),
+          message: problems.join('; '),
+        })
+      else documents.push(document!)
+    }
+    return {
+      documents: documents.sort((a, b) => a.metadata.slug.localeCompare(b.metadata.slug)),
+      diagnostics,
+    }
   }
   search(query: string) {
     const needle = asString(query, 'query').toLowerCase()

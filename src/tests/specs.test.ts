@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
@@ -174,4 +174,103 @@ describe('filesystem specifications', () => {
       /must be an approved/
     )
   })
+})
+
+test('listing scan keeps valid documents and reports each invalid candidate without recursing', () => {
+  const specs = store()
+  createProductSpec(specs, 'feature', 'alpha', 'draft')
+  createUseCase(specs, 'zulu', 'draft')
+  const raw = readFileSync(join(specs.root, 'alpha.md'), 'utf8')
+  writeFileSync(join(specs.root, 'README.md'), '# Index')
+  writeFileSync(join(specs.useCasesRoot, 'ReAdMe.md'), '# Index')
+  writeFileSync(join(specs.root, 'index.md'), '# Ordinary Markdown')
+  writeFileSync(
+    join(specs.root, 'malformed.md'),
+    raw.replace('spec_kind: feature', 'spec_kind: unknown')
+  )
+  writeFileSync(join(specs.root, 'disagree.md'), raw)
+  writeFileSync(join(specs.useCasesRoot, 'misplaced.md'), raw.replace('"alpha"', '"misplaced"'))
+  mkdirSync(join(specs.root, 'nested'))
+  writeFileSync(join(specs.root, 'nested/ignored.md'), '# Nested')
+  const scan = specs.scanForListing()
+  assert.deepEqual(
+    scan.documents.map(({ metadata }) => metadata.slug),
+    ['alpha', 'zulu']
+  )
+  assert.deepEqual(
+    scan.diagnostics.map(({ path }) => path),
+    ['use-cases/misplaced.md', 'specs/disagree.md', 'specs/index.md', 'specs/malformed.md']
+  )
+  assert.match(scan.diagnostics[0].message, /use-case documents belong/)
+  assert.match(scan.diagnostics[1].message, /filename and slug disagree/)
+  assert.match(scan.diagnostics[2].message, /YAML frontmatter/)
+  assert.match(scan.diagnostics[3].message, /invalid spec_kind/)
+  assert.throws(() => specs.list(), /use-case documents belong/)
+})
+
+test('README indexes are ignored by shared discovery without weakening strict consumers', () => {
+  const specs = store()
+  createProductSpec(specs, 'feature', 'source')
+  mkdirSync(specs.useCasesRoot)
+  writeFileSync(join(specs.root, 'readme.md'), '# Index')
+  writeFileSync(join(specs.useCasesRoot, 'README.md'), '# Index')
+  assert.deepEqual(specs.scanForListing().diagnostics, [])
+  assert.deepEqual(
+    specs.list().map(({ metadata }) => metadata.slug),
+    ['source']
+  )
+  assert.equal(specs.search('searchable evidence').length, 1)
+  assert.deepEqual(specs.validate(), [])
+})
+
+test('duplicate paths exclude every twin, including a valid document with a malformed twin', () => {
+  const specs = store()
+  createUseCase(specs, 'duplicate', 'draft')
+  createUseCase(specs, 'invalid-twin', 'draft')
+  mkdirSync(specs.root)
+  writeFileSync(
+    join(specs.root, 'duplicate.md'),
+    readFileSync(join(specs.useCasesRoot, 'duplicate.md'))
+  )
+  writeFileSync(join(specs.root, 'invalid-twin.md'), '# Malformed twin')
+  const scan = specs.scanForListing()
+  assert.deepEqual(scan.documents, [])
+  assert.equal(scan.diagnostics.length, 4)
+  for (const diagnostic of scan.diagnostics) assert.match(diagnostic.message, /ambiguous/)
+  assert.match(
+    scan.diagnostics.find(({ path }) => path === 'specs/invalid-twin.md')!.message,
+    /YAML frontmatter/
+  )
+  assert.throws(() => specs.get('duplicate'), /ambiguous/)
+  assert.throws(() => specs.get('invalid-twin'), /ambiguous/)
+})
+
+test('invalid files still fail strict validation and guarded mutations leave bytes unchanged', () => {
+  const specs = store()
+  createProductSpec(specs, 'feature', 'source')
+  const sourcePath = join(specs.root, 'source.md')
+  const brokenPath = join(specs.root, 'broken.md')
+  const before = readFileSync(sourcePath, 'utf8')
+  writeFileSync(brokenPath, '# Missing frontmatter')
+  assert.throws(() => specs.validate(), /YAML frontmatter/)
+  assert.throws(() => specs.search('source'), /YAML frontmatter/)
+  assert.throws(() => specs.updateContent('source', 'Changed'), /YAML frontmatter/)
+  assert.throws(() => specs.updateMetadata('broken', { title: 'Changed' }), /YAML frontmatter/)
+  assert.throws(
+    () =>
+      specs.create({
+        slug: 'broken-tech',
+        title: 'Technical',
+        description: 'Design',
+        specKind: 'technical',
+        status: 'draft',
+        sourceSpec: 'broken',
+        relatedSpecs: [],
+        content: '',
+      }),
+    /YAML frontmatter/
+  )
+  assert.equal(readFileSync(sourcePath, 'utf8'), before)
+  assert.equal(readFileSync(brokenPath, 'utf8'), '# Missing frontmatter')
+  assert.equal(existsSync(join(specs.root, 'broken-tech.md')), false)
 })

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, rmSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, test } from 'node:test'
 
@@ -96,4 +96,55 @@ test('MCP creates feature/fix specs, searches body content, and derives technica
   )
   const validation = body(await dispatch('specs.validate', {}, db, TMP, TMP, config))
   assert.equal(validation.valid, true)
+})
+
+test('MCP listing returns partial results and all diagnostics across filters and pages', async () => {
+  for (const slug of ['alpha', 'zulu'])
+    await dispatch(
+      'specs.create',
+      { slug, title: slug, description: 'Valid', specKind: 'feature', content: 'Body' },
+      db,
+      TMP,
+      TMP,
+      config
+    )
+  mkdirSync(join(TMP, 'use-cases'))
+  writeFileSync(join(TMP, 'specs/broken.md'), '# Plain Markdown')
+  writeFileSync(join(TMP, 'use-cases/README.md'), '# Index')
+  const first = await dispatch('specs.list', { limit: 1 }, db, TMP, TMP, config)
+  assert.equal(first.isError, false)
+  const dto = body(first)
+  assert.deepEqual(
+    (dto.items as { slug: string }[]).map(({ slug }) => slug),
+    ['alpha']
+  )
+  assert.equal(dto.nextOffset, 1)
+  assert.deepEqual(dto.diagnostics, [
+    { path: 'specs/broken.md', message: 'spec must begin with a YAML frontmatter block' },
+  ])
+  assert.deepEqual(first.structuredContent, dto)
+  const second = body(await dispatch('specs.list', { offset: 1, limit: 1 }, db, TMP, TMP, config))
+  assert.deepEqual(
+    (second.items as { slug: string }[]).map(({ slug }) => slug),
+    ['zulu']
+  )
+  assert.equal(second.nextOffset, null)
+  assert.deepEqual(second.diagnostics, dto.diagnostics)
+  const filtered = body(
+    await dispatch(
+      'specs.list',
+      { specKind: 'use-case', status: 'approved', query: 'missing', offset: 100 },
+      db,
+      TMP,
+      TMP,
+      config
+    )
+  )
+  assert.deepEqual(filtered.items, [])
+  assert.equal(filtered.nextOffset, null)
+  assert.deepEqual(filtered.diagnostics, dto.diagnostics)
+  await assert.rejects(
+    () => dispatch('specs.get', { slug: 'broken' }, db, TMP, TMP, config),
+    /YAML frontmatter/
+  )
 })

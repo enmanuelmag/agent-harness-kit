@@ -10,7 +10,7 @@ export const TOOLS = [
   {
     name: 'specs.list',
     description:
-      'List use cases from docs/use-cases and specifications from docs/specs without loading bodies.',
+      'List valid use cases and specifications without loading bodies, with path/reason diagnostics for invalid or ambiguous documents. README.md indexes are excluded.',
     inputSchema: z.object({
       specKind: recover(z.enum(SPEC_KINDS).optional(), recovery.optionalStr, 0),
       status: recover(z.string().optional(), recovery.optionalStr, 2),

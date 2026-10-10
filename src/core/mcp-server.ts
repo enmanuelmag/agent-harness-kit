@@ -134,20 +134,20 @@ async function execute(
       const query = optionalStr(args, 'query')?.toLowerCase()
       const offset = boundedInt(args, 'offset', 0, 0, Number.MAX_SAFE_INTEGER)
       const limit = boundedInt(args, 'limit', 50, 1, 100)
-      const matches = specs
-        .list()
-        .filter(
-          ({ metadata }) =>
-            (!specKind || metadata.specKind === specKind) &&
-            (!optionalStr(args, 'status') || metadata.status === optionalStr(args, 'status')) &&
-            (!query ||
-              `${metadata.slug} ${metadata.title} ${metadata.description}`
-                .toLowerCase()
-                .includes(query))
-        )
+      const scan = specs.scanForListing()
+      const matches = scan.documents.filter(
+        ({ metadata }) =>
+          (!specKind || metadata.specKind === specKind) &&
+          (!optionalStr(args, 'status') || metadata.status === optionalStr(args, 'status')) &&
+          (!query ||
+            `${metadata.slug} ${metadata.title} ${metadata.description}`
+              .toLowerCase()
+              .includes(query))
+      )
       return ok(
         JSON.stringify({
           items: matches.slice(offset, offset + limit).map((doc) => doc.metadata),
+          diagnostics: scan.diagnostics,
           nextOffset: offset + limit < matches.length ? offset + limit : null,
         })
       )

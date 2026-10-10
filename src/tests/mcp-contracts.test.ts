@@ -271,6 +271,34 @@ test('real SDK tools/list and tools/call preserve recovery, mutations, errors, n
       arguments: { slug: 'presence', sourceUseCases: null },
     })
     assert.deepEqual(JSON.parse(text(cleared)).metadata.sourceUseCases, [])
+    const cleanListing = await client.callTool({ name: 'specs.list', arguments: {} })
+    assert.deepEqual(JSON.parse(text(cleanListing)).diagnostics, [])
+    writeFileSync(join(TMP, 'docs/use-cases/invalid.md'), '# Plain Markdown')
+    writeFileSync(join(TMP, 'docs/use-cases/README.md'), '# Index')
+    const partial = await client.callTool({ name: 'specs.list', arguments: { limit: 1 } })
+    assert.equal(partial.isError, false)
+    const listing = JSON.parse(text(partial))
+    assert.equal(listing.items[0].slug, 'presence')
+    assert.deepEqual(listing.diagnostics, [
+      {
+        path: 'use-cases/invalid.md',
+        message: 'spec must begin with a YAML frontmatter block',
+      },
+    ])
+    assert.deepEqual(partial.structuredContent, listing)
+    const strictRead = await client.callTool({ name: 'specs.get', arguments: { slug: 'invalid' } })
+    assert.equal(strictRead.isError, true)
+    assert.match(text(strictRead), /YAML frontmatter/)
+    const directListing = await dispatch(
+      'specs.list',
+      { limit: 1 },
+      db,
+      join(TMP, 'docs'),
+      TMP,
+      config
+    )
+    assert.equal(text(directListing), text(partial))
+    assert.deepEqual(directListing.structuredContent, partial.structuredContent)
     const missingArchive = await dispatch('tasks.archive', { id: 999999 }, db, TMP, TMP, config)
     assert.equal(text(missingArchive), 'null')
     assert.deepEqual(missingArchive.structuredContent, { value: null })

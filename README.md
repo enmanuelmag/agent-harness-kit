@@ -103,6 +103,8 @@ A globally installed `ahk` command and global database storage are different set
 
 Specifications are Markdown artifacts: use cases live in `docs/use-cases/`; functional and technical specifications live in `docs/specs/`. Tasks, actions, acceptance evidence, and handoffs are harness data, normally backed by the configured database.
 
+`specs.list` returns valid document metadata, `nextOffset`, and an always-present `diagnostics` array of `{ path, message }` for invalid or ambiguous files. Diagnostic paths are relative to the configured docs directory, for example `specs/broken.md`. Diagnostics cover both document roots even when filters or pagination hide items. Discovery reads only immediate `.md` files and excludes `README.md` indexes case-insensitively; other Markdown files, including `index.md`, must have valid specification frontmatter. Duplicate filenames across the roots are excluded with a diagnostic for each path. Reading, searching, validation, and mutations retain strict document validation.
+
 On a tracked task, `tasks.claim` runs native health. A pass enables normal work. A failure enters blocked mode: diagnosis remains available, while implementation needs a bounded, audited `tasks.repair.begin(...)` authorization. `tasks.update(..., 'done')` runs fresh final health and closes only when it passes.
 
 Operational notices — lifecycle MCP responses, `ahk build`, `ahk sync`, and `ahk doctor` surface cached upgrade and generated-skill migration information without changing task or health results. Suggested commands require developer approval.
