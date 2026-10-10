@@ -16,7 +16,7 @@ const ROOT = join(import.meta.dirname, '../..')
 const SCRIPT = join(ROOT, 'scripts/publish.sh')
 const METADATA = join(ROOT, 'scripts/release-metadata.mjs')
 
-function fixture(version: string, branch = 'release/v3') {
+function fixture(version: string, branch = 'release/v3', environment: Record<string, string> = {}) {
   const cwd = mkdtempSync(join(ROOT, '.tmp-release-preparation-'))
   const bin = join(cwd, '.test-bin')
   mkdirSync(join(cwd, 'scripts'))
@@ -51,6 +51,7 @@ function fixture(version: string, branch = 'release/v3') {
   )
   const env = {
     ...process.env,
+    ...environment,
     RELEASE_BRANCH: branch,
     PATH: `${bin}:${process.env.PATH}`,
     CALL_LOG: join(cwd, 'calls.log'),
@@ -60,6 +61,12 @@ function fixture(version: string, branch = 'release/v3') {
     git,
     run: (...args: string[]) =>
       spawnSync('bash', ['scripts/publish.sh', ...args], { cwd, env, encoding: 'utf8' }),
+    metadata: (field: string) =>
+      spawnSync(process.execPath, ['scripts/release-metadata.mjs', field], {
+        cwd,
+        env,
+        encoding: 'utf8',
+      }),
     log: () => readFileSync(join(cwd, 'calls.log'), 'utf8'),
     cleanup: () => rmSync(cwd, { recursive: true, force: true }),
   }
@@ -81,8 +88,8 @@ test('RC dry-run reuses an annotated HEAD tag without auth, pushes or releases',
   }
 })
 
-test('prepared RC publishes to rc and marks GitHub prerelease, never latest', () => {
-  const f = fixture('3.0.0-rc.1')
+test('prepared RC publishes to rc and marks GitHub prerelease with forced color, never latest', () => {
+  const f = fixture('3.0.0-rc.1', 'release/v3', { FORCE_COLOR: '1' })
   try {
     f.git('tag', '-a', 'v3.0.0-rc.1', '-m', 'Prepared RC')
     const before = f.git('rev-parse', 'v3.0.0-rc.1')
@@ -146,6 +153,35 @@ test('divergent existing tag and branch/version mismatches stop before publishin
       const result = f.run('--dry-run', '--skip-tests')
       assert.notEqual(result.status, 0)
       assert.match(result.stderr, /requires a/)
+    } finally {
+      f.cleanup()
+    }
+  }
+})
+
+test('metadata booleans and GitHub output remain plain machine text with forced color', () => {
+  for (const version of ['3.0.0-rc.1', '3.0.0']) {
+    const f = fixture(version, 'release/v3', { FORCE_COLOR: '1' })
+    try {
+      const prerelease = version.includes('-rc.')
+      for (const [field, expected] of [
+        ['prerelease', `${prerelease}\n`],
+        ['preparedTag', 'false\n'],
+      ]) {
+        const result = f.metadata(field)
+        assert.equal(result.status, 0, result.stderr)
+        assert.equal(result.stdout, expected)
+      }
+      f.git('tag', '-a', `v${version}`, '-m', 'Prepared release')
+      const prepared = f.metadata('preparedTag')
+      assert.equal(prepared.status, 0, prepared.stderr)
+      assert.equal(prepared.stdout, 'true\n')
+      const github = f.metadata('github')
+      assert.equal(github.status, 0, github.stderr)
+      assert.equal(
+        github.stdout,
+        `version=${version}\ntag=v${version}\nchannel=${prerelease ? 'rc' : 'latest'}\nprerelease=${prerelease}\nname=test-package\npreparedTag=true\n`
+      )
     } finally {
       f.cleanup()
     }

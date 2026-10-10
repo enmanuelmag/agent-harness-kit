@@ -57,7 +57,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       for (const [key, value] of Object.entries(metadata)) console.log(`${key}=${value}`)
     } else if (field) {
       if (!(field in metadata)) throw new Error(`Unknown release metadata field: ${field}`)
-      console.log(metadata[field])
+      process.stdout.write(`${String(metadata[field])}\n`)
     } else {
       console.log(JSON.stringify(metadata))
     }
