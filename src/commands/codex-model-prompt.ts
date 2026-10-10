@@ -60,7 +60,11 @@ export async function promptCodexAgentModels(
     }
 
     const effort = discovered
-      ? await selectEffort(agent.label, discovered.supportedReasoningEfforts, recommendations[agent.key]?.effort ?? discovered.defaultReasoningEffort)
+      ? await selectEffort(
+          agent.label,
+          discovered.supportedReasoningEfforts,
+          recommendations[agent.key]?.effort ?? discovered.defaultReasoningEffort
+        )
       : await manualEffort(agent.label)
     choices[agent.key] = { model: modelId, ...(effort ? { effort } : {}) }
   }

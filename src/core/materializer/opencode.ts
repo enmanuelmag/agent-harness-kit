@@ -132,7 +132,11 @@ export class OpenCodeMaterializer implements Materializer {
       cwd,
       detectPackageManager(cwd)
     )
-    const skills = writeSkills(cwd, '.opencode/skills', renderDelegationGuidance('opencode', 'coordination-skill'))
+    const skills = writeSkills(
+      cwd,
+      '.opencode/skills',
+      renderDelegationGuidance('opencode', 'coordination-skill')
+    )
 
     return { agents, derived, skills }
   }

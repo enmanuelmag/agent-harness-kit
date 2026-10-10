@@ -15,13 +15,22 @@ const config: HarnessConfig = {
   database: { type: 'sqlite' },
   storage: {
     dir: '.harness',
-    sections: { toolsUsed: true, filesModified: true, result: true, blockers: true, nextSteps: false },
+    sections: {
+      toolsUsed: true,
+      filesModified: true,
+      result: true,
+      blockers: true,
+      nextSteps: false,
+    },
     scope: 'local',
     projectId: 'mcp-specs-test',
     sqlitePath: join(TMP, 'harness.db'),
   },
   health: { scriptPath: './health.sh', required: false },
-  tools: { mcp: { enabled: false, port: 3456 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
+  tools: {
+    mcp: { enabled: false, port: 3456 },
+    scripts: { enabled: false, outputDir: '.harness/scripts' },
+  },
 }
 
 function body(result: Awaited<ReturnType<typeof dispatch>>) {
@@ -55,8 +64,17 @@ test('MCP creates feature/fix specs, searches body content, and derives technica
     TMP,
     config
   )
-  await dispatch('specs.transition', { slug: 'export-failure', status: 'approved' }, db, TMP, TMP, config)
-  const found = body(await dispatch('specs.search', { query: 'monthly reconciliation' }, db, TMP, TMP, config))
+  await dispatch(
+    'specs.transition',
+    { slug: 'export-failure', status: 'approved' },
+    db,
+    TMP,
+    TMP,
+    config
+  )
+  const found = body(
+    await dispatch('specs.search', { query: 'monthly reconciliation' }, db, TMP, TMP, config)
+  )
   const items = found.items as Array<{ metadata: { slug: string }; excerpt: string }>
   assert.equal(items[0].metadata.slug, 'export-failure')
   assert.match(items[0].excerpt, /monthly reconciliation/)

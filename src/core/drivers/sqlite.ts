@@ -119,18 +119,36 @@ export class SQLiteDriver implements DBDriver {
     } catch {
       // Column already exists — ignore
     }
-    for (const column of ['health_run_id TEXT', 'health_status TEXT', 'health_started_at TEXT', 'health_completed_at TEXT', 'health_log_path TEXT', 'health_script_path TEXT']) {
-      try { this.db.exec(`ALTER TABLE tasks ADD COLUMN ${column}`) } catch (error) {
+    for (const column of [
+      'health_run_id TEXT',
+      'health_status TEXT',
+      'health_started_at TEXT',
+      'health_completed_at TEXT',
+      'health_log_path TEXT',
+      'health_script_path TEXT',
+    ]) {
+      try {
+        this.db.exec(`ALTER TABLE tasks ADD COLUMN ${column}`)
+      } catch (error) {
         if (!/duplicate column|already exists/i.test(String(error))) throw error
       }
     }
-    for (const column of ["execution_mode TEXT NOT NULL DEFAULT 'normal'", 'claim_generation INTEGER NOT NULL DEFAULT 0']) {
-      try { this.db.exec(`ALTER TABLE tasks ADD COLUMN ${column}`) } catch (error) {
+    for (const column of [
+      "execution_mode TEXT NOT NULL DEFAULT 'normal'",
+      'claim_generation INTEGER NOT NULL DEFAULT 0',
+    ]) {
+      try {
+        this.db.exec(`ALTER TABLE tasks ADD COLUMN ${column}`)
+      } catch (error) {
         if (!/duplicate column|already exists/i.test(String(error))) throw error
       }
     }
-    this.db.exec(`CREATE TABLE IF NOT EXISTS task_health_runs (id TEXT PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, claim_generation INTEGER NOT NULL, execution_mode TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT, log_path TEXT, script_path TEXT)`)
-    this.db.exec(`CREATE TABLE IF NOT EXISTS task_repairs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, claim_generation INTEGER NOT NULL, failed_health_run_id TEXT NOT NULL, reason TEXT NOT NULL, scope TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL, closed_at TEXT, final_health_run_id TEXT)`)
+    this.db.exec(
+      `CREATE TABLE IF NOT EXISTS task_health_runs (id TEXT PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, claim_generation INTEGER NOT NULL, execution_mode TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL, completed_at TEXT, log_path TEXT, script_path TEXT)`
+    )
+    this.db.exec(
+      `CREATE TABLE IF NOT EXISTS task_repairs (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, claim_generation INTEGER NOT NULL, failed_health_run_id TEXT NOT NULL, reason TEXT NOT NULL, scope TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL, closed_at TEXT, final_health_run_id TEXT)`
+    )
     // Migration: add updated_at column (safe to run multiple times)
     try {
       this.db.exec(`ALTER TABLE tasks ADD COLUMN updated_at TEXT`)

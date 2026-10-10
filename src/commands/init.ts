@@ -52,7 +52,9 @@ const STORAGE_SCOPE_PROMPT: {
   initialValue: 'global',
 }
 
-export type StorageScopeSelect = (options: typeof STORAGE_SCOPE_PROMPT) => Promise<StorageScope | symbol>
+export type StorageScopeSelect = (
+  options: typeof STORAGE_SCOPE_PROMPT
+) => Promise<StorageScope | symbol>
 
 export async function resolveStorageScope(
   requestedScope: string | undefined,
@@ -81,7 +83,9 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         pc.cyan('ahk build') +
         pc.dim('         — re-sync agent files after updating the library')
     )
-    console.log('  ' + pc.cyan('ahk sync') + pc.dim('         — safely refresh generated files and skills'))
+    console.log(
+      '  ' + pc.cyan('ahk sync') + pc.dim('         — safely refresh generated files and skills')
+    )
     console.log(
       '  ' + pc.cyan('ahk reset') + pc.dim('         — wipe and re-initialize from scratch')
     )
@@ -178,7 +182,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     {},
     mergePreferences(
       toPreferences(provider, claudeAgentModels),
-      mergePreferences(toPreferences(provider, codexAgentModels), toPreferences(provider, cursorAgentModels))
+      mergePreferences(
+        toPreferences(provider, codexAgentModels),
+        toPreferences(provider, cursorAgentModels)
+      )
     )
   )
 
@@ -366,7 +373,10 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   console.log(pc.green('✓ .gitignore entries added'))
 
   console.log('')
-  console.log(pc.cyan('→') + ` Replace the dummy checks in ${pc.cyan(getDefaultHealthScriptPath())} with your project checks`)
+  console.log(
+    pc.cyan('→') +
+      ` Replace the dummy checks in ${pc.cyan(getDefaultHealthScriptPath())} with your project checks`
+  )
   console.log(pc.cyan('→') + ` ${pc.cyan('ahk task add')} to queue work for agents`)
   console.log(
     pc.cyan('→') +

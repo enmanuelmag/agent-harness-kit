@@ -1,12 +1,5 @@
 import assert from 'node:assert/strict'
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
@@ -106,7 +99,10 @@ test('preserves CRLF body bytes and refuses symlinked paths before migration', a
       database: { type: 'sqlite' },
       storage: { dir: '.harness', sections: {}, scope: 'local', projectId: 'x' },
       health: { scriptPath: './health.sh', required: false },
-      tools: { mcp: { enabled: false, port: 1 }, scripts: { enabled: false, outputDir: '.harness/scripts' } },
+      tools: {
+        mcp: { enabled: false, port: 1 },
+        scripts: { enabled: false, outputDir: '.harness/scripts' },
+      },
     })
   )
   const path = join(cwd, 'docs/specs/nested/a.md')
@@ -114,7 +110,10 @@ test('preserves CRLF body bytes and refuses symlinked paths before migration', a
   writeFileSync(path, `---\r\nspec_kind: technical\r\n---\r\n${body}`)
   await runMigrateSpecs(cwd, { apply: true })
   const result = readFileSync(path)
-  assert.equal(result.subarray(result.indexOf(Buffer.from(body))).toString('binary'), Buffer.from(body).toString('binary'))
+  assert.equal(
+    result.subarray(result.indexOf(Buffer.from(body))).toString('binary'),
+    Buffer.from(body).toString('binary')
+  )
   mkdirSync(join(cwd, 'outside'))
   symlinkSync(join(cwd, 'outside'), join(cwd, 'docs/specs/link'))
   await assert.rejects(() => runMigrateSpecs(cwd), /symlinked specification document/)

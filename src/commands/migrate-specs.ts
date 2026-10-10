@@ -55,7 +55,11 @@ function markdownFiles(cwd: string, root: string, prefix = ''): string[] {
     const rel = join(prefix, entry.name)
     const path = join(root, rel)
     assertSafePath(cwd, path, 'specification document')
-    return entry.isDirectory() ? markdownFiles(cwd, root, rel) : entry.name.endsWith('.md') ? [rel] : []
+    return entry.isDirectory()
+      ? markdownFiles(cwd, root, rel)
+      : entry.name.endsWith('.md')
+        ? [rel]
+        : []
   })
 }
 

@@ -20,9 +20,18 @@ afterEach(() => rmSync(TMP, { recursive: true, force: true }))
 
 function writeConfig(ext: 'json' | 'cjs' = 'json', provider = 'codex-cli'): string {
   mkdirSync(TMP, { recursive: true })
-  const config = { provider, project: { name: 'test', description: 'test', docsPath: './docs' }, untouched: { preserve: true } }
+  const config = {
+    provider,
+    project: { name: 'test', description: 'test', docsPath: './docs' },
+    untouched: { preserve: true },
+  }
   const path = join(TMP, `agent-harness-kit.config.${ext}`)
-  writeFileSync(path, ext === 'json' ? JSON.stringify(config, null, 2) : `module.exports = ${JSON.stringify(config)}\n`)
+  writeFileSync(
+    path,
+    ext === 'json'
+      ? JSON.stringify(config, null, 2)
+      : `module.exports = ${JSON.stringify(config)}\n`
+  )
   return path
 }
 
@@ -33,36 +42,59 @@ test('preferences preserve explicit inherit and clear stale effort when replaced
 })
 
 test('stored preferences convert back to native choices without emitting inherit', () => {
-  const values = choicesFromPreferences({ provider: 'codex-cli', agentPreferences: { 'codex-cli': { lead: { model: 'inherit' } } } } as never)
+  const values = choicesFromPreferences({
+    provider: 'codex-cli',
+    agentPreferences: { 'codex-cli': { lead: { model: 'inherit' } } },
+  } as never)
   assert.deepEqual(values.codexAgentModels?.lead, {})
 })
 
 test('effort-only Claude and Codex choices round-trip with inherited model', () => {
-  assert.deepEqual(toPreferences('claude-code', { lead: { effort: 'high' } })['claude-code']?.lead, { model: 'inherit', reasoningEffort: 'high' })
-  const claude = choicesFromPreferences({ provider: 'claude-code', agentPreferences: { 'claude-code': { lead: { model: 'inherit', reasoningEffort: 'high' } } } } as never)
+  assert.deepEqual(
+    toPreferences('claude-code', { lead: { effort: 'high' } })['claude-code']?.lead,
+    { model: 'inherit', reasoningEffort: 'high' }
+  )
+  const claude = choicesFromPreferences({
+    provider: 'claude-code',
+    agentPreferences: { 'claude-code': { lead: { model: 'inherit', reasoningEffort: 'high' } } },
+  } as never)
   assert.deepEqual(claude.claudeAgentModels?.lead, { effort: 'high' })
-  const codex = choicesFromPreferences({ provider: 'codex-cli', agentPreferences: { 'codex-cli': { lead: { model: 'inherit', reasoningEffort: 'high' } } } } as never)
+  const codex = choicesFromPreferences({
+    provider: 'codex-cli',
+    agentPreferences: { 'codex-cli': { lead: { model: 'inherit', reasoningEffort: 'high' } } },
+  } as never)
   assert.deepEqual(codex.codexAgentModels?.lead, { effort: 'high' })
 })
 
 test('explicit inherit is complete whereas an absent role is a gap', () => {
-  const config = { provider: 'claude-code', agentPreferences: { 'claude-code': { lead: { model: 'inherit' } } } } as never
+  const config = {
+    provider: 'claude-code',
+    agentPreferences: { 'claude-code': { lead: { model: 'inherit' } } },
+  } as never
   assert.ok(!missingPreferenceRoles(config).includes('lead'))
   assert.ok(missingPreferenceRoles(config).includes('builder'))
 })
 
 test('JSON persistence atomically merges preferences and preserves raw root keys', async () => {
   const path = writeConfig()
-  await persistPreferences(TMP, { 'codex-cli': { builder: { model: 'gpt-test', reasoningEffort: 'high' } } })
+  await persistPreferences(TMP, {
+    'codex-cli': { builder: { model: 'gpt-test', reasoningEffort: 'high' } },
+  })
   const saved = JSON.parse(readFileSync(path, 'utf8'))
   assert.deepEqual(saved.untouched, { preserve: true })
-  assert.deepEqual(saved.agentPreferences['codex-cli'].builder, { model: 'gpt-test', reasoningEffort: 'high' })
+  assert.deepEqual(saved.agentPreferences['codex-cli'].builder, {
+    model: 'gpt-test',
+    reasoningEffort: 'high',
+  })
 })
 
 test('code config is never rewritten and reports manual update required', async () => {
   const path = writeConfig('cjs')
   const before = readFileSync(path, 'utf8')
-  assert.equal(await persistPreferences(TMP, { 'codex-cli': { lead: { model: 'inherit' } } }), 'manual-update-required')
+  assert.equal(
+    await persistPreferences(TMP, { 'codex-cli': { lead: { model: 'inherit' } } }),
+    'manual-update-required'
+  )
   assert.equal(readFileSync(path, 'utf8'), before)
 })
 
@@ -70,7 +102,10 @@ test('capture imports current-provider canonical TOML metadata and ignores defau
   const path = writeConfig()
   mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
   for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
-    writeFileSync(join(TMP, `.codex/agents/${role}.toml`), `model = "gpt-${role}"\nmodel_reasoning_effort = "medium"\n[agent]\nname = "${role}"\n`)
+    writeFileSync(
+      join(TMP, `.codex/agents/${role}.toml`),
+      `model = "gpt-${role}"\nmodel_reasoning_effort = "medium"\n[agent]\nname = "${role}"\n`
+    )
   }
   writeFileSync(join(TMP, '.codex/agents/default.toml'), 'model = "ignored"\n')
   await captureModels(TMP)
@@ -85,7 +120,10 @@ test('capture rejects duplicate authoritative Codex role names', async () => {
   mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
   for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
     const names = role === 'lead' ? 'name = "lead"\nname = "lead"\n' : `name = "${role}"\n`
-    writeFileSync(join(TMP, `.codex/agents/${role}.toml`), `model = "gpt-${role}"\n[agent]\n${names}`)
+    writeFileSync(
+      join(TMP, `.codex/agents/${role}.toml`),
+      `model = "gpt-${role}"\n[agent]\n${names}`
+    )
   }
   await captureModels(TMP)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
@@ -100,7 +138,10 @@ for (const provider of ['claude-code', 'cursor'] as const) {
     mkdirSync(join(TMP, agentDir), { recursive: true })
     for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
       const names = role === 'lead' ? 'name: lead\nname: lead' : `name: ${role}`
-      writeFileSync(join(TMP, agentDir, `${role}.md`), `---\n${names}\nmodel: ${provider}-${role}\n---\n`)
+      writeFileSync(
+        join(TMP, agentDir, `${role}.md`),
+        `---\n${names}\nmodel: ${provider}-${role}\n---\n`
+      )
     }
     await captureModels(TMP)
     const saved = JSON.parse(readFileSync(path, 'utf8'))
@@ -111,7 +152,10 @@ for (const provider of ['claude-code', 'cursor'] as const) {
 
 test('sync rejects ambiguous flags before touching configuration', async () => {
   await assert.rejects(() => runSync(TMP, { keepModels: true }), /requires --force/)
-  await assert.rejects(() => runSync(TMP, { captureModels: true, force: true }), /cannot be combined/)
+  await assert.rejects(
+    () => runSync(TMP, { captureModels: true, force: true }),
+    /cannot be combined/
+  )
 })
 
 test('safe sync creates missing agents from saved choices without prompting', async () => {
@@ -127,7 +171,12 @@ test('complete keep-models force sync regenerates using saved model and effort',
   const path = writeConfig()
   const raw = JSON.parse(readFileSync(path, 'utf8'))
   raw.agentPreferences = {
-    'codex-cli': Object.fromEntries(['lead', 'explorer', 'consultant', 'builder', 'reviewer'].map((role) => [role, { model: 'gpt-kept', reasoningEffort: 'medium' }])),
+    'codex-cli': Object.fromEntries(
+      ['lead', 'explorer', 'consultant', 'builder', 'reviewer'].map((role) => [
+        role,
+        { model: 'gpt-kept', reasoningEffort: 'medium' },
+      ])
+    ),
   }
   writeFileSync(path, JSON.stringify(raw, null, 2))
   await runSync(TMP, { force: true, keepModels: true })
@@ -138,7 +187,9 @@ test('runBuild then runSync materialize and preserve the actual skill state acro
   const original = console.log
   const lines: string[] = []
   console.log = (...values: unknown[]) => lines.push(values.map(String).join(' '))
-  __configureUpdateCheckForTests({ fetch: async () => new Response(JSON.stringify({ version: '2.31.0' }), { status: 200 }) })
+  __configureUpdateCheckForTests({
+    fetch: async () => new Response(JSON.stringify({ version: '2.31.0' }), { status: 200 }),
+  })
   try {
     for (const provider of ['claude-code', 'opencode', 'codex-cli', 'grok-cli', 'cursor']) {
       rmSync(TMP, { recursive: true, force: true })
@@ -146,13 +197,36 @@ test('runBuild then runSync materialize and preserve the actual skill state acro
       await runBuild(TMP, {})
       const firstState = readFileSync(join(TMP, '.harness/skills-state.json'), 'utf8')
       const first = JSON.parse(firstState)
-      const key = provider === 'claude-code' ? '_claude_skills' : provider === 'codex-cli' ? '_agents_skills' : provider === 'cursor' ? '_cursor_skills' : provider === 'grok-cli' ? '_grok_skills' : '_opencode_skills'
-      assert.equal(first.roots[key].version, pkg.version, `${provider} reports a complete first materialization`)
-      assert.ok(Object.keys(first.roots[key].inventory).length > 0, `${provider} records generated skill output`)
+      const key =
+        provider === 'claude-code'
+          ? '_claude_skills'
+          : provider === 'codex-cli'
+            ? '_agents_skills'
+            : provider === 'cursor'
+              ? '_cursor_skills'
+              : provider === 'grok-cli'
+                ? '_grok_skills'
+                : '_opencode_skills'
+      assert.equal(
+        first.roots[key].version,
+        pkg.version,
+        `${provider} reports a complete first materialization`
+      )
+      assert.ok(
+        Object.keys(first.roots[key].inventory).length > 0,
+        `${provider} records generated skill output`
+      )
       await runSync(TMP, {})
-      assert.equal(readFileSync(join(TMP, '.harness/skills-state.json'), 'utf8'), firstState, `${provider} second command is idempotent`)
+      assert.equal(
+        readFileSync(join(TMP, '.harness/skills-state.json'), 'utf8'),
+        firstState,
+        `${provider} second command is idempotent`
+      )
     }
-    assert.equal(lines.some((line) => line.includes('Applied skill migration(s)')), false)
+    assert.equal(
+      lines.some((line) => line.includes('Applied skill migration(s)')),
+      false
+    )
   } finally {
     console.log = original
     __resetUpdateCacheForTests()

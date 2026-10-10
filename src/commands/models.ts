@@ -16,7 +16,13 @@ import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
-import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice, HarnessConfig, Provider } from '@/types'
+import type {
+  ClaudeAgentModelChoice,
+  CodexAgentModelChoice,
+  CursorAgentModelChoice,
+  HarnessConfig,
+  Provider,
+} from '@/types'
 
 const SUPPORTED_PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor']
 const ROLE_FILES = new Set(['lead', 'explorer', 'consultant', 'builder', 'reviewer'])
@@ -45,11 +51,17 @@ export async function runModels(cwd: string): Promise<void> {
   const ctx = await resolveModelsContext(cwd)
   if (!ctx.ok) {
     if (ctx.reason === 'no-config') {
-      console.log(`\n  ${pc.cyan('config'.padEnd(16))}${pc.yellow('[!]')} no agent-harness-kit.config found`)
+      console.log(
+        `\n  ${pc.cyan('config'.padEnd(16))}${pc.yellow('[!]')} no agent-harness-kit.config found`
+      )
       console.log(`  ${''.padEnd(16)}    ${pc.dim('run: ahk init')}\n`)
       return
     }
-    console.log(pc.dim(`ahk models supports Claude Code, Codex CLI, and Cursor. '${ctx.provider}' has no native per-role model prompt — nothing to do.`))
+    console.log(
+      pc.dim(
+        `ahk models supports Claude Code, Codex CLI, and Cursor. '${ctx.provider}' has no native per-role model prompt — nothing to do.`
+      )
+    )
     return
   }
 
@@ -72,10 +84,19 @@ export async function runModels(cwd: string): Promise<void> {
       persistedChoices.lead as CodexAgentModelChoice | undefined
     )
   }
-  const label = config.provider === 'claude-code' ? 'Claude Code' : config.provider === 'codex-cli' ? 'Codex CLI' : 'Cursor'
+  const label =
+    config.provider === 'claude-code'
+      ? 'Claude Code'
+      : config.provider === 'codex-cli'
+        ? 'Codex CLI'
+        : 'Cursor'
   console.log('')
   if (agents.overwritten.length) {
-    console.log(pc.green(`✓ Regenerated ${agents.overwritten.length} ${label} agent file(s) with updated native choices:`))
+    console.log(
+      pc.green(
+        `✓ Regenerated ${agents.overwritten.length} ${label} agent file(s) with updated native choices:`
+      )
+    )
     for (const file of agents.overwritten) console.log(pc.green(`  ✓ ${file}`))
     if (agents.backupDir) console.log(pc.dim(`  Previous content backed up → ${agents.backupDir}`))
   }
@@ -98,15 +119,27 @@ async function promptChoices(provider: Provider): Promise<ChoiceMap> {
 
 function choicesForCurrentProvider(config: HarnessConfig): ChoiceMap {
   const stored = choicesFromPreferences(config)
-  return (stored.claudeAgentModels ?? stored.codexAgentModels ?? stored.cursorAgentModels ?? {}) as ChoiceMap
+  return (stored.claudeAgentModels ??
+    stored.codexAgentModels ??
+    stored.cursorAgentModels ??
+    {}) as ChoiceMap
 }
 
 /** Exported for focused command tests without mocking interactive prompts. */
 export function filesFor(config: HarnessConfig, choices: ChoiceMap) {
-  const files = config.provider === 'claude-code'
-    ? claudeAgentFiles(config, choices as ChoiceMapFor<ClaudeAgentModelChoice>, buildCapabilityHints('claude-code'))
-    : config.provider === 'codex-cli'
-      ? codexAgentFiles(config, choices as ChoiceMapFor<CodexAgentModelChoice>)
-      : cursorAgentFiles(config, choices as ChoiceMapFor<CursorAgentModelChoice>, buildCapabilityHints('cursor'))
+  const files =
+    config.provider === 'claude-code'
+      ? claudeAgentFiles(
+          config,
+          choices as ChoiceMapFor<ClaudeAgentModelChoice>,
+          buildCapabilityHints('claude-code')
+        )
+      : config.provider === 'codex-cli'
+        ? codexAgentFiles(config, choices as ChoiceMapFor<CodexAgentModelChoice>)
+        : cursorAgentFiles(
+            config,
+            choices as ChoiceMapFor<CursorAgentModelChoice>,
+            buildCapabilityHints('cursor')
+          )
   return files.filter((file) => ROLE_FILES.has(file.relPath.match(/agents\/([^./]+)/)?.[1] ?? ''))
 }

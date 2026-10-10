@@ -7,10 +7,28 @@ import { type HarnessDB, openDB } from './db'
 import { getDoctorStatus } from './doctor'
 import { detectPackageManager, getRunOnceCommandParts } from './materializer/detect-package-manager'
 import { slugify } from './materializer/scaffold-utils'
-import { inputContracts, outputContracts, sdkInputContracts, structuredResult } from './mcp-contracts'
-import { assertNormalized, boundedInt, num, optionalStr, optionalStringArray, requiredStringArray, str } from './mcp-normalizers'
+import {
+  inputContracts,
+  outputContracts,
+  sdkInputContracts,
+  structuredResult,
+} from './mcp-contracts'
+import {
+  assertNormalized,
+  boundedInt,
+  num,
+  optionalStr,
+  optionalStringArray,
+  requiredStringArray,
+  str,
+} from './mcp-normalizers'
 import { TOOLS } from './mcp-tools'
-import { collectOperationalNotices, createNoticeSession, noticesForDelivery } from './operational-notices'
+import {
+  collectOperationalNotices,
+  createNoticeSession,
+  noticesForDelivery,
+} from './operational-notices'
+import { pkg } from './package-data'
 import { checkPermissionsSync } from './permissions-check'
 import {
   type Relationship,
@@ -25,8 +43,6 @@ import { warmUpdateCache } from './update-check'
 
 import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types'
 
-const VERSION = '0.1.0'
-
 // ─── Server ───────────────────────────────────────────────────────────────────
 
 export async function startMcpServer(config: HarnessConfig, cwd: string): Promise<void> {
@@ -39,32 +55,62 @@ export async function startMcpServer(config: HarnessConfig, cwd: string): Promis
 }
 
 /** Registration is also exposed for real protocol tests with an isolated database. */
-export function createMcpServer(config: HarnessConfig, cwd: string, db: HarnessDB, docsPath = resolve(cwd, config.project.docsPath)): McpServer {
-  const server = new McpServer({ name: 'agent-harness-kit', version: VERSION })
+export function createMcpServer(
+  config: HarnessConfig,
+  cwd: string,
+  db: HarnessDB,
+  docsPath = resolve(cwd, config.project.docsPath)
+): McpServer {
+  const server = new McpServer({ name: 'agent-harness-kit', version: pkg.version })
   warmUpdateCache()
   const noticeSession = createNoticeSession()
   for (const tool of TOOLS) {
-    server.registerTool(tool.name, {
-      description: tool.description,
-      inputSchema: sdkInputContracts[tool.name],
-      outputSchema: outputContracts[tool.name],
-    }, async (args) => {
-      const a = args as Record<string, unknown>
-      try {
-        assertNormalized(a)
-        const result = await execute(tool.name, a, db, docsPath, cwd, config)
-        return attachOperationalNotices(tool.name, a, cwd, config.provider, structuredResult(tool.name, result), noticeSession)
-      } catch (err) {
-        return attachOperationalNotices(tool.name, a, cwd, config.provider, ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true), noticeSession)
+    server.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: sdkInputContracts[tool.name],
+        outputSchema: outputContracts[tool.name],
+      },
+      async (args) => {
+        const a = args as Record<string, unknown>
+        try {
+          assertNormalized(a)
+          const result = await execute(tool.name, a, db, docsPath, cwd, config)
+          return attachOperationalNotices(
+            tool.name,
+            a,
+            cwd,
+            config.provider,
+            structuredResult(tool.name, result),
+            noticeSession
+          )
+        } catch (err) {
+          return attachOperationalNotices(
+            tool.name,
+            a,
+            cwd,
+            config.provider,
+            ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true),
+            noticeSession
+          )
+        }
       }
-    })
+    )
   }
   return server
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
-export async function dispatch(name: string, args: Record<string, unknown>, db: HarnessDB, docsPath: string, cwd: string, config: HarnessConfig): Promise<CallToolResult> {
+export async function dispatch(
+  name: string,
+  args: Record<string, unknown>,
+  db: HarnessDB,
+  docsPath: string,
+  cwd: string,
+  config: HarnessConfig
+): Promise<CallToolResult> {
   const contract = inputContracts[name]
   const normalized = contract ? contract.parse(args) : args
   assertNormalized(normalized)
@@ -714,7 +760,14 @@ function collectMarkdownFiles(dir: string): string[] {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const NOTICE_TOOLS = new Set(['tasks.claim', 'health.run', 'tasks.update', 'actions.start', 'actions.complete', 'ahk.doctor'])
+const NOTICE_TOOLS = new Set([
+  'tasks.claim',
+  'health.run',
+  'tasks.update',
+  'actions.start',
+  'actions.complete',
+  'ahk.doctor',
+])
 
 /** Adds a second, versioned text block while preserving primary content and isError exactly. */
 export async function attachOperationalNotices(
@@ -729,10 +782,19 @@ export async function attachOperationalNotices(
   const isDoctor = doctor || name === 'ahk.doctor'
   if (!NOTICE_TOOLS.has(name) || (name === 'tasks.update' && args.status !== 'done')) return result
   try {
-    const collected = await collectOperationalNotices(cwd, provider, { doctor: isDoctor, waitForUpdate: isDoctor })
+    const collected = await collectOperationalNotices(cwd, provider, {
+      doctor: isDoctor,
+      waitForUpdate: isDoctor,
+    })
     const notices = noticesForDelivery(session, cwd, provider, collected, isDoctor)
     if (!notices.length) return result
-    return { ...result, content: [...result.content, { type: 'text', text: JSON.stringify({ noticeSchemaVersion: 1, notices }) }] }
+    return {
+      ...result,
+      content: [
+        ...result.content,
+        { type: 'text', text: JSON.stringify({ noticeSchemaVersion: 1, notices }) },
+      ],
+    }
   } catch {
     return result
   }

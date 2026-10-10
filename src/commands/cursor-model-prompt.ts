@@ -67,7 +67,9 @@ async function promptCursorModel(
     message: `Model for ${agentLabel}`,
     options: [
       { value: 'inherit', label: 'inherit (use parent model)' },
-      ...(autoModel ? [{ value: autoModel.id, label: `${autoModel.id} — ${autoModel.label}` }] : []),
+      ...(autoModel
+        ? [{ value: autoModel.id, label: `${autoModel.id} — ${autoModel.label}` }]
+        : []),
       ...(hasCatalog
         ? modelGroups.map(({ id, label, models }) => ({
             value: `${MODEL_GROUP_PREFIX}${id}`,
@@ -78,7 +80,12 @@ async function promptCursorModel(
     ],
     initialValue: 'inherit',
   })
-  if (p.isCancel(model) || !hasCatalog || typeof model !== 'string' || !model.startsWith(MODEL_GROUP_PREFIX)) {
+  if (
+    p.isCancel(model) ||
+    !hasCatalog ||
+    typeof model !== 'string' ||
+    !model.startsWith(MODEL_GROUP_PREFIX)
+  ) {
     return model
   }
 

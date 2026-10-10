@@ -1,5 +1,12 @@
 import type { DBDriver } from '../drivers/types'
-import type { TaskAcceptanceRow, TaskExecutionMode, TaskHealthRunRow, TaskRepairRow, TaskRow, TaskStatus } from '@/types'
+import type {
+  TaskAcceptanceRow,
+  TaskExecutionMode,
+  TaskHealthRunRow,
+  TaskRepairRow,
+  TaskRow,
+  TaskStatus,
+} from '@/types'
 
 export interface TaskWithAcceptance extends TaskRow {
   acceptance_total: number
@@ -103,11 +110,10 @@ export class TaskRepository {
         [status, extra.completed_at, now, id]
       )
     } else {
-      await this.driver.exec(`UPDATE tasks SET status = ?, health_run_id = NULL, health_status = NULL, health_started_at = NULL, health_completed_at = NULL, health_log_path = NULL, health_script_path = NULL, updated_at = ? WHERE id = ?`, [
-        status,
-        now,
-        id,
-      ])
+      await this.driver.exec(
+        `UPDATE tasks SET status = ?, health_run_id = NULL, health_status = NULL, health_started_at = NULL, health_completed_at = NULL, health_log_path = NULL, health_script_path = NULL, updated_at = ? WHERE id = ?`,
+        [status, now, id]
+      )
     }
   }
 
@@ -177,40 +183,89 @@ export class TaskRepository {
     )
   }
 
-  async reserveHealthRun(id: number, runId: string, startedAt: string, scriptPath: string, claimGeneration: number, mode: TaskExecutionMode): Promise<number> {
+  async reserveHealthRun(
+    id: number,
+    runId: string,
+    startedAt: string,
+    scriptPath: string,
+    claimGeneration: number,
+    mode: TaskExecutionMode
+  ): Promise<number> {
     const changed = await this.driver.exec(
       `UPDATE tasks SET health_run_id = ?, health_status = 'running', health_started_at = ?, health_completed_at = NULL, health_log_path = NULL, health_script_path = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL AND claim_generation = ? AND execution_mode = ?`,
       [runId, startedAt, scriptPath, startedAt, id, claimGeneration, mode]
     )
     if (!changed) return 0
-    await this.driver.exec(`UPDATE task_health_runs SET status = 'superseded', completed_at = ? WHERE task_id = ? AND claim_generation = ? AND status = 'running' AND id != ?`, [startedAt, id, claimGeneration, runId])
-    await this.driver.exec(`INSERT INTO task_health_runs (id, task_id, claim_generation, execution_mode, status, started_at, script_path) VALUES (?, ?, ?, ?, 'running', ?, ?)`, [runId, id, claimGeneration, mode, startedAt, scriptPath])
+    await this.driver.exec(
+      `UPDATE task_health_runs SET status = 'superseded', completed_at = ? WHERE task_id = ? AND claim_generation = ? AND status = 'running' AND id != ?`,
+      [startedAt, id, claimGeneration, runId]
+    )
+    await this.driver.exec(
+      `INSERT INTO task_health_runs (id, task_id, claim_generation, execution_mode, status, started_at, script_path) VALUES (?, ?, ?, ?, 'running', ?, ?)`,
+      [runId, id, claimGeneration, mode, startedAt, scriptPath]
+    )
     return changed
   }
 
-  async finishHealthRun(id: number, runId: string, status: 'passed' | 'failed', completedAt: string, logPath: string | null, scriptPath: string | null, claimGeneration: number, mode: TaskExecutionMode): Promise<number> {
+  async finishHealthRun(
+    id: number,
+    runId: string,
+    status: 'passed' | 'failed',
+    completedAt: string,
+    logPath: string | null,
+    scriptPath: string | null,
+    claimGeneration: number,
+    mode: TaskExecutionMode
+  ): Promise<number> {
     const changed = await this.driver.exec(
       `UPDATE tasks SET health_status = ?, health_completed_at = ?, health_log_path = ?, health_script_path = COALESCE(?, health_script_path), updated_at = ? WHERE id = ? AND health_run_id = ? AND health_status = 'running' AND claim_generation = ? AND execution_mode = ?`,
       [status, completedAt, logPath, scriptPath, completedAt, id, runId, claimGeneration, mode]
     )
-    if (changed) await this.driver.exec(`UPDATE task_health_runs SET status = ?, completed_at = ?, log_path = ?, script_path = COALESCE(?, script_path) WHERE id = ? AND task_id = ? AND claim_generation = ? AND execution_mode = ? AND status = 'running'`, [status, completedAt, logPath, scriptPath, runId, id, claimGeneration, mode])
+    if (changed)
+      await this.driver.exec(
+        `UPDATE task_health_runs SET status = ?, completed_at = ?, log_path = ?, script_path = COALESCE(?, script_path) WHERE id = ? AND task_id = ? AND claim_generation = ? AND execution_mode = ? AND status = 'running'`,
+        [status, completedAt, logPath, scriptPath, runId, id, claimGeneration, mode]
+      )
     return changed
   }
 
-  async setExecutionMode(id: number, mode: TaskExecutionMode, generation: number, now: string, expectedMode: TaskExecutionMode, healthRunId?: string): Promise<number> {
+  async setExecutionMode(
+    id: number,
+    mode: TaskExecutionMode,
+    generation: number,
+    now: string,
+    expectedMode: TaskExecutionMode,
+    healthRunId?: string
+  ): Promise<number> {
     const token = healthRunId ? ` AND health_run_id = ?` : ''
     return this.driver.exec(
       `UPDATE tasks SET execution_mode = ?, updated_at = ? WHERE id = ? AND claim_generation = ? AND execution_mode = ? AND archived_at IS NULL${token}`,
-      healthRunId ? [mode, now, id, generation, expectedMode, healthRunId] : [mode, now, id, generation, expectedMode]
+      healthRunId
+        ? [mode, now, id, generation, expectedMode, healthRunId]
+        : [mode, now, id, generation, expectedMode]
     )
   }
 
-  async getHealthRun(id: string): Promise<TaskHealthRunRow | null> { return this.driver.queryOne<TaskHealthRunRow>('SELECT * FROM task_health_runs WHERE id = ?', [id]) }
+  async getHealthRun(id: string): Promise<TaskHealthRunRow | null> {
+    return this.driver.queryOne<TaskHealthRunRow>('SELECT * FROM task_health_runs WHERE id = ?', [
+      id,
+    ])
+  }
 
-  async createRepair(params: Omit<TaskRepairRow, 'id' | 'closed_at' | 'final_health_run_id'>): Promise<number> {
+  async createRepair(
+    params: Omit<TaskRepairRow, 'id' | 'closed_at' | 'final_health_run_id'>
+  ): Promise<number> {
     return this.driver.insert(
       `INSERT INTO task_repairs (task_id, claim_generation, failed_health_run_id, reason, scope, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [params.task_id, params.claim_generation, params.failed_health_run_id, params.reason, params.scope, params.actor, params.created_at]
+      [
+        params.task_id,
+        params.claim_generation,
+        params.failed_health_run_id,
+        params.reason,
+        params.scope,
+        params.actor,
+        params.created_at,
+      ]
     )
   }
 
@@ -222,10 +277,18 @@ export class TaskRepository {
   }
 
   async release(id: number, now: string): Promise<number> {
-    return this.driver.exec(`UPDATE tasks SET status = 'pending', assigned_to = NULL, started_at = NULL, execution_mode = 'normal', health_run_id = NULL, health_status = NULL, health_started_at = NULL, health_completed_at = NULL, health_log_path = NULL, health_script_path = NULL, updated_at = ? WHERE id = ? AND status != 'done'`, [now, id])
+    return this.driver.exec(
+      `UPDATE tasks SET status = 'pending', assigned_to = NULL, started_at = NULL, execution_mode = 'normal', health_run_id = NULL, health_status = NULL, health_started_at = NULL, health_completed_at = NULL, health_log_path = NULL, health_script_path = NULL, updated_at = ? WHERE id = ? AND status != 'done'`,
+      [now, id]
+    )
   }
 
-  async closeActiveRepair(taskId: number, generation: number, finalHealthRunId: string, now: string): Promise<number> {
+  async closeActiveRepair(
+    taskId: number,
+    generation: number,
+    finalHealthRunId: string,
+    now: string
+  ): Promise<number> {
     return this.driver.exec(
       `UPDATE task_repairs SET closed_at = ?, final_health_run_id = ? WHERE task_id = ? AND claim_generation = ? AND closed_at IS NULL`,
       [now, finalHealthRunId, taskId, generation]

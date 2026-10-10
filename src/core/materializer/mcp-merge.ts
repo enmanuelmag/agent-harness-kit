@@ -427,7 +427,8 @@ export function mergeCodexConfigToml(
   // forever across re-runs (see `ensureTomlTopLevelKey`).
   if (leadChoice?.model) {
     content = setTomlTopLevelKey(content, 'model', leadChoice.model)
-    if (leadChoice.effort) content = setTomlTopLevelKey(content, 'model_reasoning_effort', leadChoice.effort)
+    if (leadChoice.effort)
+      content = setTomlTopLevelKey(content, 'model_reasoning_effort', leadChoice.effort)
   } else {
     content = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
     content = ensureTomlTopLevelKey(content, 'model_reasoning_effort', 'medium')

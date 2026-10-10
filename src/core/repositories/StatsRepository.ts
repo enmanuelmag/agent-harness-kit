@@ -1,9 +1,5 @@
 import type { DBDriver } from '../drivers/types'
-import type {
-  AgentStatRow,
-  CountRow,
-  TimelineRow,
-} from '../server-types'
+import type { AgentStatRow, CountRow, TimelineRow } from '../server-types'
 
 export interface DBCounts {
   totalActions: number

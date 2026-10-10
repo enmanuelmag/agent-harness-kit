@@ -14,7 +14,12 @@ import {
 } from './agent-restrictions'
 
 import type { AgentName } from './agent-restrictions'
-import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice, HarnessConfig } from '@/types'
+import type {
+  ClaudeAgentModelChoice,
+  CodexAgentModelChoice,
+  CursorAgentModelChoice,
+  HarnessConfig,
+} from '@/types'
 
 // ─── Agent template loader ────────────────────────────────────────────────────
 
@@ -716,7 +721,8 @@ export function translateFrontmatterForClaudeCode(
   result = stripFrontmatterBlockSequence(result, 'disallowedTools')
   // A caller collecting fresh choices is regenerating; replace stale native
   // scalars. With no choices this translator still preserves handwritten files.
-  if (opts !== undefined) result = result.replace(/^model:\s*.*\n/m, '').replace(/^effort:\s*.*\n/m, '')
+  if (opts !== undefined)
+    result = result.replace(/^model:\s*.*\n/m, '').replace(/^effort:\s*.*\n/m, '')
   if (opts?.model && opts.model !== 'inherit') {
     result = appendFrontmatterScalar(result, 'model', opts.model)
   }

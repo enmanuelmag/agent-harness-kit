@@ -1,12 +1,6 @@
 // ─── Response types ───────────────────────────────────────────────────────────
 
-import type {
-  AgentStat,
-  StatsOverview,
-  TaskDetail,
-  TaskSummary,
-  TimelineEntry,
-} from '@/schema/api'
+import type { AgentStat, StatsOverview, TaskDetail, TaskSummary, TimelineEntry } from '@/schema/api'
 
 // ─── Fetch helpers ────────────────────────────────────────────────────────────
 

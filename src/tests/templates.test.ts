@@ -1964,9 +1964,7 @@ describe('canonical skill frontmatter', () => {
       const content = readFileSync(join(SKILL_ROOT, skillName, 'SKILL.md'), 'utf8')
       const frontmatter = content.match(/^---\n([\s\S]*?)\n---\n/)?.[1]
       assert.ok(frontmatter, `${skillName} must have YAML frontmatter`)
-      const scalar = frontmatter!
-        .split('\n')
-        .find((line) => line.startsWith('description: '))
+      const scalar = frontmatter!.split('\n').find((line) => line.startsWith('description: '))
       assert.ok(scalar, `${skillName} must declare description`)
       const description = scalar!.slice('description: '.length)
       assert.ok(description.length > 0, `${skillName} description must not be empty`)

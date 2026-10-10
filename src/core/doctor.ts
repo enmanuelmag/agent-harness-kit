@@ -65,7 +65,11 @@ export function __resetLibVersionCacheForTests(): void {
 async function checkLibVersion(): Promise<LibStatus> {
   const current = pkg.version
   const result = await lookupUpdate(current)
-  return { current, latest: result.latest, outdated: Boolean(result.latest && isNewer(result.latest, current)) }
+  return {
+    current,
+    latest: result.latest,
+    outdated: Boolean(result.latest && isNewer(result.latest, current)),
+  }
 }
 
 // ─── Agent file check ─────────────────────────────────────────────────────────

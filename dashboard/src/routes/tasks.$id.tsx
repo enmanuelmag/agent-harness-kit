@@ -282,7 +282,6 @@ function TaskDetailPage() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   )

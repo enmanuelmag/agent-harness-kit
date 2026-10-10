@@ -81,7 +81,8 @@ export async function runHealth(cwd: string): Promise<void> {
   const health = inspectHealthCheck(cwd, config.health.scriptPath)
   if (health.state === 'missing') {
     console.error(pc.red(`✗ Native health check not found: ${health.path}`))
-    if (health.adaptFrom) console.error(`  Adapt the existing opposite-platform script: ${health.adaptFrom}`)
+    if (health.adaptFrom)
+      console.error(`  Adapt the existing opposite-platform script: ${health.adaptFrom}`)
     else console.error('  Create the native health script or run ahk init.')
     process.exit(1)
   }
@@ -90,7 +91,11 @@ export async function runHealth(cwd: string): Promise<void> {
     process.exit(1)
   }
   if (health.state === 'placeholder') {
-    console.error(pc.yellow('! Health check is the scaffold placeholder/dummy. Explore the project and have the builder replace it with real native checks; it cannot verify or close a task.'))
+    console.error(
+      pc.yellow(
+        '! Health check is the scaffold placeholder/dummy. Explore the project and have the builder replace it with real native checks; it cannot verify or close a task.'
+      )
+    )
     process.exit(1)
   }
   const result = executeHealthCheck(cwd, health.path)
@@ -107,7 +112,9 @@ export async function runHealth(cwd: string): Promise<void> {
     console.log(pc.green('✓ Health check passed'))
     process.exit(0)
   } else {
-    console.error(pc.red(`✗ Health check failed (exit ${result.status ?? result.signal ?? 'unknown'})`))
+    console.error(
+      pc.red(`✗ Health check failed (exit ${result.status ?? result.signal ?? 'unknown'})`)
+    )
     console.error(`  Full health log: ${result.logPath}`)
     process.exit(result.status ?? 1)
   }

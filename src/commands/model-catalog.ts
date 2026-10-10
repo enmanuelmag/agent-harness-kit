@@ -29,7 +29,9 @@ export type CodexRole = 'lead' | 'explorer' | 'consultant' | 'builder' | 'review
 /** Choose role defaults from the live catalog, never a baked-in model ID.
  * Version components compare numerically so 6.1 outranks 6 and 5.10 outranks
  * 5.9. A family missing from an account remains inherit. */
-export function selectCodexRoleDefaults(models: CodexModel[]): Partial<Record<CodexRole, { model: string; effort?: string }>> {
+export function selectCodexRoleDefaults(
+  models: CodexModel[]
+): Partial<Record<CodexRole, { model: string; effort?: string }>> {
   const sol = newestCodexFamily(models, 'sol')
   const luna = newestCodexFamily(models, 'luna')
   const defaults: Partial<Record<CodexRole, { model: string; effort?: string }>> = {}
@@ -44,20 +46,27 @@ export function selectCodexRoleDefaults(models: CodexModel[]): Partial<Record<Co
 function newestCodexFamily(models: CodexModel[], family: 'sol' | 'luna'): CodexModel | undefined {
   return models
     .filter((model) => new RegExp(`(?:^|[-_/])${family}(?:$|[-_/])`, 'i').test(model.id))
-    .sort((left, right) => compareCodexVersion(right.id, left.id) || left.id.localeCompare(right.id))[0]
+    .sort(
+      (left, right) => compareCodexVersion(right.id, left.id) || left.id.localeCompare(right.id)
+    )[0]
 }
 
-function choiceWithEffort(model: CodexModel, requested: string): { model: string; effort?: string } {
+function choiceWithEffort(
+  model: CodexModel,
+  requested: string
+): { model: string; effort?: string } {
   const effort = model.supportedReasoningEfforts.includes(requested)
     ? requested
-    : model.defaultReasoningEffort && model.supportedReasoningEfforts.includes(model.defaultReasoningEffort)
+    : model.defaultReasoningEffort &&
+        model.supportedReasoningEfforts.includes(model.defaultReasoningEffort)
       ? model.defaultReasoningEffort
       : undefined
   return { model: model.id, ...(effort ? { effort } : {}) }
 }
 
 function compareCodexVersion(left: string, right: string): number {
-  const parse = (id: string) => (id.match(/\d+(?:\.\d+)*/)?.[0] ?? '').split('.').filter(Boolean).map(Number)
+  const parse = (id: string) =>
+    (id.match(/\d+(?:\.\d+)*/)?.[0] ?? '').split('.').filter(Boolean).map(Number)
   const leftParts = parse(left)
   const rightParts = parse(right)
   for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
@@ -69,20 +78,29 @@ function compareCodexVersion(left: string, right: string): number {
 
 const GPT_FAMILY_ORDER = ['astra', 'sol', 'terra', 'luna']
 const CLAUDE_FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku']
-const EFFORT_ORDER = ['ultra', 'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none', 'inherit']
+const EFFORT_ORDER = [
+  'ultra',
+  'max',
+  'xhigh',
+  'high',
+  'medium',
+  'low',
+  'minimal',
+  'none',
+  'inherit',
+]
 
 /** Sort live Codex candidates in the native selector order. */
 export function orderCodexModels(models: CodexModel[]): CodexModel[] {
-  return [...models].sort((left, right) =>
-    codexFamilyRank(left.id) - codexFamilyRank(right.id) ||
-    compareCodexVersion(right.id, left.id) ||
-    left.id.localeCompare(right.id)
+  return [...models].sort(
+    (left, right) =>
+      codexFamilyRank(left.id) - codexFamilyRank(right.id) ||
+      compareCodexVersion(right.id, left.id) ||
+      left.id.localeCompare(right.id)
   )
 }
 
-export type CatalogResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string }
+export type CatalogResult<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export type CommandRunner = (command: string, args: string[]) => Promise<{ stdout: string }>
 
@@ -101,7 +119,10 @@ export function validateManualReasoningEffort(value: string): string | undefined
     : 'Reasoning effort may contain only letters, numbers, dot, dash, and underscore.'
 }
 
-export function codexInitializedNotification(): { method: 'initialized'; params: Record<string, never> } {
+export function codexInitializedNotification(): {
+  method: 'initialized'
+  params: Record<string, never>
+} {
   return { method: 'initialized', params: {} }
 }
 
@@ -148,7 +169,9 @@ export function groupCursorModels(models: CursorModel[]): CursorModelGroup[] {
 
   const knownGroups = CURSOR_MODEL_FAMILIES.flatMap((family) => {
     const familyModels = grouped.get(family.id)!
-    return familyModels.length === 0 ? [] : [{ ...family, models: familyModels.sort(compareCursorModel) }]
+    return familyModels.length === 0
+      ? []
+      : [{ ...family, models: familyModels.sort(compareCursorModel) }]
   })
 
   return others.length === 0
@@ -172,26 +195,38 @@ function compareCursorModel(left: CursorModel, right: CursorModel): number {
   const version = compareCodexVersion(right.id, left.id)
   if (version) return version
   const effort = effortRank(left.id) - effortRank(right.id)
-  return effort || left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id)
+  return (
+    effort ||
+    left.id.localeCompare(right.id, undefined, { sensitivity: 'base' }) ||
+    left.id.localeCompare(right.id)
+  )
 }
 
 function codexFamilyRank(id: string): number {
   const normalized = id.toLowerCase()
-  const family = GPT_FAMILY_ORDER.find((name) => new RegExp(`(?:^|[-_/])${name}(?:$|[-_/\\[])`).test(normalized))
+  const family = GPT_FAMILY_ORDER.find((name) =>
+    new RegExp(`(?:^|[-_/])${name}(?:$|[-_/\\[])`).test(normalized)
+  )
   return family ? GPT_FAMILY_ORDER.indexOf(family) : GPT_FAMILY_ORDER.length
 }
 
 function nativeModelRank(id: string): number {
   const normalized = id.toLowerCase()
   if (normalized.startsWith('claude-')) {
-    const family = CLAUDE_FAMILY_ORDER.find((name) => new RegExp(`(?:^|-)${name}(?:$|[-_\\[])`).test(normalized))
+    const family = CLAUDE_FAMILY_ORDER.find((name) =>
+      new RegExp(`(?:^|-)${name}(?:$|[-_\\[])`).test(normalized)
+    )
     return family ? CLAUDE_FAMILY_ORDER.indexOf(family) : CLAUDE_FAMILY_ORDER.length
   }
   return codexFamilyRank(id)
 }
 
 function effortRank(id: string): number {
-  const match = id.toLowerCase().match(/(?:\[|,)effort=(ultra|max|xhigh|high|medium|low|minimal|none|inherit)(?:,|\])|[-_](ultra|max|xhigh|high|medium|low|minimal|none|inherit)$/)
+  const match = id
+    .toLowerCase()
+    .match(
+      /(?:\[|,)effort=(ultra|max|xhigh|high|medium|low|minimal|none|inherit)(?:,|\])|[-_](ultra|max|xhigh|high|medium|low|minimal|none|inherit)$/
+    )
   const effort = match?.[1] ?? match?.[2]
   return effort ? EFFORT_ORDER.indexOf(effort) : EFFORT_ORDER.length
 }
@@ -258,7 +293,10 @@ export async function discoverCodexModels(): Promise<CatalogResult<CodexModel[]>
   let transport: JsonRpcTransport | undefined
   try {
     transport = await createCodexTransport()
-    return { ok: true, data: await collectCodexModels((method, params) => transport!.request(method, params)) }
+    return {
+      ok: true,
+      data: await collectCodexModels((method, params) => transport!.request(method, params)),
+    }
   } catch (error) {
     return { ok: false, error: errorMessage(error) }
   } finally {
@@ -272,7 +310,11 @@ function parseCodexModelPage(value: unknown): CodexModelPage {
   }
 
   const data = value.data.map((item): CodexModel => {
-    if (!isRecord(item) || typeof item.model !== 'string' || !Array.isArray(item.supportedReasoningEfforts)) {
+    if (
+      !isRecord(item) ||
+      typeof item.model !== 'string' ||
+      !Array.isArray(item.supportedReasoningEfforts)
+    ) {
       throw new Error('Codex App Server returned an invalid model entry.')
     }
     const supportedReasoningEfforts = item.supportedReasoningEfforts.flatMap((effort) =>
@@ -290,7 +332,11 @@ function parseCodexModelPage(value: unknown): CodexModelPage {
     }
   })
 
-  if (value.nextCursor !== undefined && value.nextCursor !== null && typeof value.nextCursor !== 'string') {
+  if (
+    value.nextCursor !== undefined &&
+    value.nextCursor !== null &&
+    typeof value.nextCursor !== 'string'
+  ) {
     throw new Error('Codex App Server returned an invalid model-list cursor.')
   }
   return { data, nextCursor: value.nextCursor as string | null | undefined }
@@ -318,7 +364,10 @@ interface JsonRpcTransport {
 
 async function createCodexTransport(): Promise<JsonRpcTransport> {
   const child = spawn('codex', ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'pipe'] })
-  const pending = new Map<number, { resolve: (value: unknown) => void; reject: (reason: Error) => void }>()
+  const pending = new Map<
+    number,
+    { resolve: (value: unknown) => void; reject: (reason: Error) => void }
+  >()
   let nextId = 1
   let closed = false
   let startupError = ''
@@ -332,18 +381,26 @@ async function createCodexTransport(): Promise<JsonRpcTransport> {
   child.stderr.on('data', (data: Buffer) => (startupError += data))
   child.once('error', (error) => failAll(error))
   child.once('close', (code) => {
-    if (!closed) failAll(new Error(startupError.trim() || `codex app-server exited with code ${code ?? 'unknown'}.`))
+    if (!closed)
+      failAll(
+        new Error(startupError.trim() || `codex app-server exited with code ${code ?? 'unknown'}.`)
+      )
   })
 
   const lines = createInterface({ input: child.stdout })
   lines.on('line', (line) => {
     try {
-      const message = JSON.parse(line) as { id?: number; result?: unknown; error?: { message?: string } }
+      const message = JSON.parse(line) as {
+        id?: number
+        result?: unknown
+        error?: { message?: string }
+      }
       if (typeof message.id !== 'number') return // Server notifications are expected.
       const call = pending.get(message.id)
       if (!call) return
       pending.delete(message.id)
-      if (message.error) call.reject(new Error(message.error.message || 'Codex App Server request failed.'))
+      if (message.error)
+        call.reject(new Error(message.error.message || 'Codex App Server request failed.'))
       else call.resolve(message.result)
     } catch {
       failAll(new Error('Codex App Server emitted invalid JSON.'))

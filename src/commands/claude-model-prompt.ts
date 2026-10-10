@@ -64,7 +64,10 @@ export async function promptClaudeAgentModels(
     if (efforts.length) {
       const effort = await p.select({
         message: `Reasoning effort for ${agent.label} (supported by ${selectedModel})`,
-        options: [{ value: 'inherit', label: 'inherit (model default)' }, ...efforts.map((value) => ({ value, label: value }))],
+        options: [
+          { value: 'inherit', label: 'inherit (model default)' },
+          ...efforts.map((value) => ({ value, label: value })),
+        ],
         initialValue: 'inherit',
       })
       if (p.isCancel(effort)) {

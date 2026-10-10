@@ -93,11 +93,21 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
     const { choicesFromPreferences, missingPreferenceRoles } = await import('./agent-preferences')
     const missing = missingPreferenceRoles(config)
     if (missing.length) {
-      if (config.provider === 'claude-code') claudeAgentModels = await promptClaudeAgentModels(config.provider, missing)
-      if (config.provider === 'codex-cli') codexAgentModels = await promptCodexAgentModels(config.provider, missing)
-      if (config.provider === 'cursor') cursorAgentModels = await promptCursorAgentModels(config.provider, missing)
-      const result = await persistPreferences(cwd, toPreferences(config.provider, (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never))
-      if (result === 'manual-update-required') throw new Error('Preferences need to be saved before regenerating agent files.')
+      if (config.provider === 'claude-code')
+        claudeAgentModels = await promptClaudeAgentModels(config.provider, missing)
+      if (config.provider === 'codex-cli')
+        codexAgentModels = await promptCodexAgentModels(config.provider, missing)
+      if (config.provider === 'cursor')
+        cursorAgentModels = await promptCursorAgentModels(config.provider, missing)
+      const result = await persistPreferences(
+        cwd,
+        toPreferences(
+          config.provider,
+          (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never
+        )
+      )
+      if (result === 'manual-update-required')
+        throw new Error('Preferences need to be saved before regenerating agent files.')
       config = await loadConfig(cwd)
     }
     const stored = choicesFromPreferences(config)
@@ -107,7 +117,8 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   } else if (force) {
     const choices = (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never
     const result = await persistPreferences(cwd, toPreferences(config.provider, choices))
-    if (result === 'manual-update-required') throw new Error('Preferences need to be saved before regenerating agent files.')
+    if (result === 'manual-update-required')
+      throw new Error('Preferences need to be saved before regenerating agent files.')
     config = await loadConfig(cwd)
   }
 

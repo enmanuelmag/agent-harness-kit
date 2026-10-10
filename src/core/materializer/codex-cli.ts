@@ -148,7 +148,11 @@ export class CodexCliMaterializer implements Materializer {
       detectPackageManager(cwd),
       opts.force ? opts.codexAgentModels?.lead : undefined
     )
-    const skills = writeSkills(cwd, '.agents/skills', renderDelegationGuidance('codex-cli', 'coordination-skill'))
+    const skills = writeSkills(
+      cwd,
+      '.agents/skills',
+      renderDelegationGuidance('codex-cli', 'coordination-skill')
+    )
 
     return { agents, derived, skills }
   }

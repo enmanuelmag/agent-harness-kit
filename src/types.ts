@@ -122,7 +122,12 @@ export interface AgentModelPreference {
 }
 
 export type AgentModelPreferences = Partial<
-  Record<Provider, Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', AgentModelPreference>>>
+  Record<
+    Provider,
+    Partial<
+      Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', AgentModelPreference>
+    >
+  >
 >
 
 export interface HarnessConfig {
@@ -282,7 +287,10 @@ export interface ScaffoldOptions {
    *  exposes one `scaffold(config, opts)` signature across all providers;
    *  OpenCode's and Codex CLI's materializers simply never read this field. */
   claudeAgentModels?: Partial<
-    Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', ClaudeAgentModelChoice | string>
+    Record<
+      'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer',
+      ClaudeAgentModelChoice | string
+    >
   >
   /** Codex CLI only: per-role model + reasoning-effort choice collected by
    *  `ahk init`'s provider-conditional prompt (`promptCodexAgentModels`).

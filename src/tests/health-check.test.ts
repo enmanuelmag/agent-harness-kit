@@ -17,7 +17,10 @@ import { HEALTH_BAT, HEALTH_SH } from '@/core/materializer/templates'
 const TMP = join(import.meta.dirname, '../../.tmp-health-core-test')
 
 describe('portable health checks', () => {
-  beforeEach(() => { rmSync(TMP, { recursive: true, force: true }); mkdirSync(TMP, { recursive: true }) })
+  beforeEach(() => {
+    rmSync(TMP, { recursive: true, force: true })
+    mkdirSync(TMP, { recursive: true })
+  })
   afterEach(() => rmSync(TMP, { recursive: true, force: true }))
 
   test('selects a native reserved filename', () => {
@@ -35,7 +38,12 @@ describe('portable health checks', () => {
 
   test('recognizes the marker and legacy dummy echo but not real checks', () => {
     assert.equal(isHealthPlaceholder('# AHK_HEALTH_CHECK_PLACEHOLDER\n'), true)
-    assert.equal(isHealthPlaceholder('echo "health.sh not implemented yet."\necho "Edit this file with your project checks."\nexit 1\n'), true)
+    assert.equal(
+      isHealthPlaceholder(
+        'echo "health.sh not implemented yet."\necho "Edit this file with your project checks."\nexit 1\n'
+      ),
+      true
+    )
     assert.equal(isHealthPlaceholder('echo "dummy fixture tests"\nnpm test\n'), false)
   })
 
@@ -47,13 +55,21 @@ describe('portable health checks', () => {
 
   test('captures complete output and returns bounded 10/100-line previews', () => {
     const script = join(TMP, 'health.sh')
-    writeFileSync(script, '#!/usr/bin/env bash\nfor i in $(seq 1 150); do echo "line $i"; done\nexit 1\n', 'utf8')
+    writeFileSync(
+      script,
+      '#!/usr/bin/env bash\nfor i in $(seq 1 150); do echo "line $i"; done\nexit 1\n',
+      'utf8'
+    )
     chmodSync(script, 0o755)
     const failed = executeHealthCheck(TMP, script, 'linux')
     assert.equal(failed.status, 1)
     assert.equal(failed.tail.split('\n').length, 100)
     assert.match(failed.tail, /line 150/)
-    writeFileSync(script, '#!/usr/bin/env bash\nfor i in $(seq 1 20); do echo "line $i"; done\n', 'utf8')
+    writeFileSync(
+      script,
+      '#!/usr/bin/env bash\nfor i in $(seq 1 20); do echo "line $i"; done\n',
+      'utf8'
+    )
     const passed = executeHealthCheck(TMP, script, 'linux')
     assert.equal(passed.status, 0)
     assert.equal(passed.tail.split('\n').length, 10)
@@ -71,9 +87,13 @@ describe('portable health checks', () => {
 
   test('generated Bash wrapper keeps the 10-line success contract after checks are implemented', () => {
     const script = join(TMP, 'health.sh')
-    const completed = HEALTH_SH
-      .replace('# AHK_HEALTH_CHECK_PLACEHOLDER — replace this marker when implementing real checks.\n', '')
-      .replace(/  echo "health\.sh not implemented yet\."\n  echo "Edit this file with your project's health checks\."\n  echo "It must exit 0 for agents to start working\."\n  exit 1/, '  for i in $(seq 1 20); do echo "check $i"; done')
+    const completed = HEALTH_SH.replace(
+      '# AHK_HEALTH_CHECK_PLACEHOLDER — replace this marker when implementing real checks.\n',
+      ''
+    ).replace(
+      /  echo "health\.sh not implemented yet\."\n  echo "Edit this file with your project's health checks\."\n  echo "It must exit 0 for agents to start working\."\n  exit 1/,
+      '  for i in $(seq 1 20); do echo "check $i"; done'
+    )
     writeFileSync(script, completed, 'utf8')
     chmodSync(script, 0o755)
     const result = spawnSync('bash', [script], { encoding: 'utf8' })
@@ -93,8 +113,14 @@ describe('portable health checks', () => {
   test('task completion renders the successful compact health tail', () => {
     const messages: string[] = []
     const original = console.log
-    console.log = (...args: unknown[]) => { messages.push(args.join(' ')) }
-    try { printSuccessfulHealthTail('check 11\ncheck 12') } finally { console.log = original }
+    console.log = (...args: unknown[]) => {
+      messages.push(args.join(' '))
+    }
+    try {
+      printSuccessfulHealthTail('check 11\ncheck 12')
+    } finally {
+      console.log = original
+    }
     assert.deepEqual(messages, ['check 11\ncheck 12'])
   })
 

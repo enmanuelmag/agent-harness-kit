@@ -1,17 +1,29 @@
 import { spawnSync } from 'node:child_process'
-import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, statSync } from 'node:fs'
+import {
+  closeSync,
+  existsSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 
 export type HealthCheckState = 'ready' | 'missing' | 'placeholder' | 'incompatible'
 
-export function getDefaultHealthScriptPath(platform = process.platform): './health.sh' | './health.bat' {
+export function getDefaultHealthScriptPath(
+  platform = process.platform
+): './health.sh' | './health.bat' {
   return platform === 'win32' ? './health.bat' : './health.sh'
 }
 
 export function isDefaultHealthScriptPath(path: string): boolean {
-  return path.replace(/\\/g, '/').replace(/^\.\//, '') === 'health.sh' ||
+  return (
+    path.replace(/\\/g, '/').replace(/^\.\//, '') === 'health.sh' ||
     path.replace(/\\/g, '/').replace(/^\.\//, '') === 'health.bat'
+  )
 }
 
 export interface HealthCheckInspection {
@@ -33,10 +45,15 @@ export function isHealthPlaceholder(content: string): boolean {
     .filter(Boolean)
   const echoLines = executable.filter((line) => /^(echo\b|@echo\b)/i.test(line))
   const scaffoldShape = executable.every((line) =>
-    /^(echo\b|@echo\b|exit\b|@exit\b|setlocal\b|endlocal\b|set\b|if\b|for\b|tail\b|type\b|call\s+:|:\w+|\{|\}|status=|LOG_FILE=|\[|fi\b)/i.test(line)
+    /^(echo\b|@echo\b|exit\b|@exit\b|setlocal\b|endlocal\b|set\b|if\b|for\b|tail\b|type\b|call\s+:|:\w+|\{|\}|status=|LOG_FILE=|\[|fi\b)/i.test(
+      line
+    )
   )
-  return scaffoldShape && echoLines.some((line) =>
-    /(?:health\.(?:sh|bat).*not implemented|dummy\s+content|placeholder)/i.test(line)
+  return (
+    scaffoldShape &&
+    echoLines.some((line) =>
+      /(?:health\.(?:sh|bat).*not implemented|dummy\s+content|placeholder)/i.test(line)
+    )
   )
 }
 
@@ -51,7 +68,11 @@ export function inspectHealthCheck(
   const wantsBat = normalized.endsWith('.bat')
   const wantsShell = normalized.endsWith('.sh')
   if ((platform === 'win32' && wantsShell) || (platform !== 'win32' && wantsBat)) {
-    return { path: resolve(cwd, selected), state: 'incompatible', message: `${selected} is not native to this platform` }
+    return {
+      path: resolve(cwd, selected),
+      state: 'incompatible',
+      message: `${selected} is not native to this platform`,
+    }
   }
   const path = resolve(cwd, selected)
   if (!existsSync(path)) {
@@ -91,20 +112,36 @@ export function tailFile(path: string, lines: number): string {
     const rows = chunks.replace(/\r/g, '').split('\n')
     if (rows.at(-1) === '') rows.pop()
     return rows.slice(-lines).join('\n')
-  } finally { closeSync(fd) }
+  } finally {
+    closeSync(fd)
+  }
 }
 
-export function executeHealthCheck(cwd: string, scriptPath: string, platform = process.platform): HealthExecutionResult {
+export function executeHealthCheck(
+  cwd: string,
+  scriptPath: string,
+  platform = process.platform
+): HealthExecutionResult {
   const logDir = mkdtempSync(join(tmpdir(), 'ahk-health-'))
   const logPath = join(logDir, `${basename(scriptPath)}.log`)
   const fd = openSync(logPath, 'w')
   const command = platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'bash'
-  const args = platform === 'win32'
-    ? ['/d', '/v:off', '/s', '/c', `call "${scriptPath.replace(/"/g, '""')}"`]
-    : [scriptPath]
+  const args =
+    platform === 'win32'
+      ? ['/d', '/v:off', '/s', '/c', `call "${scriptPath.replace(/"/g, '""')}"`]
+      : [scriptPath]
   let result: ReturnType<typeof spawnSync>
-  try { result = spawnSync(command, args, { cwd, stdio: ['ignore', fd, fd] }) }
-  finally { closeSync(fd) }
+  try {
+    result = spawnSync(command, args, { cwd, stdio: ['ignore', fd, fd] })
+  } finally {
+    closeSync(fd)
+  }
   const status = result.status
-  return { status, signal: result.signal, error: result.error, logPath, tail: tailFile(logPath, status === 0 ? 10 : 100) }
+  return {
+    status,
+    signal: result.signal,
+    error: result.error,
+    logPath,
+    tail: tailFile(logPath, status === 0 ? 10 : 100),
+  }
 }

@@ -8,6 +8,8 @@ export function canStartAction(mode: TaskExecutionMode, agent: AgentName): boole
 }
 
 export function actionDeniedMessage(mode: TaskExecutionMode, agent: AgentName): string {
-  return `Cannot start ${agent} work while task execution mode is '${mode}'. ` +
+  return (
+    `Cannot start ${agent} work while task execution mode is '${mode}'. ` +
     `Only diagnostic roles may work while blocked/checking/verifying; begin an audited repair to authorize implementation.`
+  )
 }

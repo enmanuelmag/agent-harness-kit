@@ -111,8 +111,12 @@ export async function runDoctor(cwd: string): Promise<void> {
 
   if (config) {
     try {
-      const notices = await collectOperationalNotices(cwd, config.provider, { waitForUpdate: true, doctor: true })
-      for (const notice of notices) warn('notice', notice.message, notice.command ? `run: ${notice.command}` : undefined)
+      const notices = await collectOperationalNotices(cwd, config.provider, {
+        waitForUpdate: true,
+        doctor: true,
+      })
+      for (const notice of notices)
+        warn('notice', notice.message, notice.command ? `run: ${notice.command}` : undefined)
     } catch {
       // Doctor's established diagnostics remain useful if optional notices fail.
     }

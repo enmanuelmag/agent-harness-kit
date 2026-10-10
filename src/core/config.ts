@@ -168,17 +168,28 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
   const c = normalized as Partial<HarnessConfig>
 
   if (c.agentPreferences !== undefined) {
-    if (!c.agentPreferences || typeof c.agentPreferences !== 'object' || Array.isArray(c.agentPreferences)) {
+    if (
+      !c.agentPreferences ||
+      typeof c.agentPreferences !== 'object' ||
+      Array.isArray(c.agentPreferences)
+    ) {
       throw new Error('agentPreferences must be an object keyed by provider and role.')
     }
     for (const [provider, roles] of Object.entries(c.agentPreferences)) {
-      if (!roles || typeof roles !== 'object' || Array.isArray(roles)) throw new Error(`agentPreferences.${provider} must be an object.`)
+      if (!roles || typeof roles !== 'object' || Array.isArray(roles))
+        throw new Error(`agentPreferences.${provider} must be an object.`)
       for (const [role, preference] of Object.entries(roles)) {
-        if (!preference || typeof preference !== 'object' || Array.isArray(preference) || typeof (preference as { model?: unknown }).model !== 'string') {
+        if (
+          !preference ||
+          typeof preference !== 'object' ||
+          Array.isArray(preference) ||
+          typeof (preference as { model?: unknown }).model !== 'string'
+        ) {
           throw new Error(`agentPreferences.${provider}.${role}.model must be a string.`)
         }
         const effort = (preference as { reasoningEffort?: unknown }).reasoningEffort
-        if (effort !== undefined && typeof effort !== 'string') throw new Error(`agentPreferences.${provider}.${role}.reasoningEffort must be a string.`)
+        if (effort !== undefined && typeof effort !== 'string')
+          throw new Error(`agentPreferences.${provider}.${role}.reasoningEffort must be a string.`)
       }
     }
   }

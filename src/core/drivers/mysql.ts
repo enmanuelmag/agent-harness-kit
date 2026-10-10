@@ -119,18 +119,36 @@ export class MySQLDriver implements DBDriver {
       } catch {
         // Column already exists — ignore
       }
-      for (const column of ['health_run_id VARCHAR(36)', 'health_status VARCHAR(16)', 'health_started_at VARCHAR(30)', 'health_completed_at VARCHAR(30)', 'health_log_path TEXT', 'health_script_path TEXT']) {
-        try { await conn.execute(`ALTER TABLE tasks ADD COLUMN ${column}`) } catch (error) {
+      for (const column of [
+        'health_run_id VARCHAR(36)',
+        'health_status VARCHAR(16)',
+        'health_started_at VARCHAR(30)',
+        'health_completed_at VARCHAR(30)',
+        'health_log_path TEXT',
+        'health_script_path TEXT',
+      ]) {
+        try {
+          await conn.execute(`ALTER TABLE tasks ADD COLUMN ${column}`)
+        } catch (error) {
           if (!/duplicate column|already exists/i.test(String(error))) throw error
         }
       }
-      for (const column of ["execution_mode VARCHAR(16) NOT NULL DEFAULT 'normal'", 'claim_generation INT NOT NULL DEFAULT 0']) {
-        try { await conn.execute(`ALTER TABLE tasks ADD COLUMN ${column}`) } catch (error) {
+      for (const column of [
+        "execution_mode VARCHAR(16) NOT NULL DEFAULT 'normal'",
+        'claim_generation INT NOT NULL DEFAULT 0',
+      ]) {
+        try {
+          await conn.execute(`ALTER TABLE tasks ADD COLUMN ${column}`)
+        } catch (error) {
           if (!/duplicate column|already exists/i.test(String(error))) throw error
         }
       }
-      await conn.execute(`CREATE TABLE IF NOT EXISTS task_health_runs (id VARCHAR(36) PRIMARY KEY, task_id INT NOT NULL, claim_generation INT NOT NULL, execution_mode VARCHAR(16) NOT NULL, status VARCHAR(16) NOT NULL, started_at VARCHAR(30) NOT NULL, completed_at VARCHAR(30), log_path TEXT, script_path TEXT, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE)`)
-      await conn.execute(`CREATE TABLE IF NOT EXISTS task_repairs (id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, claim_generation INT NOT NULL, failed_health_run_id VARCHAR(36) NOT NULL, reason TEXT NOT NULL, scope TEXT NOT NULL, actor VARCHAR(255) NOT NULL, created_at VARCHAR(30) NOT NULL, closed_at VARCHAR(30), final_health_run_id VARCHAR(36), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE)`)
+      await conn.execute(
+        `CREATE TABLE IF NOT EXISTS task_health_runs (id VARCHAR(36) PRIMARY KEY, task_id INT NOT NULL, claim_generation INT NOT NULL, execution_mode VARCHAR(16) NOT NULL, status VARCHAR(16) NOT NULL, started_at VARCHAR(30) NOT NULL, completed_at VARCHAR(30), log_path TEXT, script_path TEXT, FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE)`
+      )
+      await conn.execute(
+        `CREATE TABLE IF NOT EXISTS task_repairs (id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, claim_generation INT NOT NULL, failed_health_run_id VARCHAR(36) NOT NULL, reason TEXT NOT NULL, scope TEXT NOT NULL, actor VARCHAR(255) NOT NULL, created_at VARCHAR(30) NOT NULL, closed_at VARCHAR(30), final_health_run_id VARCHAR(36), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE)`
+      )
       // Migration: add updated_at column (safe to run multiple times)
       try {
         await conn.execute(

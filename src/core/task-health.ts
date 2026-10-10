@@ -48,21 +48,55 @@ export async function runTaskHealthCheck(
   const inspection = inspectHealthCheck(cwd, config.health.scriptPath)
   const claimGeneration = task.claim_generation
   const executionMode = task.execution_mode
-  const reserved = await db.tasks.reserveHealthRun(taskId, token, startedAt, inspection.path, claimGeneration, executionMode)
+  const reserved = await db.tasks.reserveHealthRun(
+    taskId,
+    token,
+    startedAt,
+    inspection.path,
+    claimGeneration,
+    executionMode
+  )
   if (!reserved) throw new Error(`Task health run was superseded before it could start: ${taskId}`)
 
   const failed = async (
-    state: Extract<TaskHealthResult['state'], 'missing' | 'placeholder' | 'incompatible' | 'failed'>,
+    state: Extract<
+      TaskHealthResult['state'],
+      'missing' | 'placeholder' | 'incompatible' | 'failed'
+    >,
     details: Pick<TaskHealthResult, 'tail' | 'logPath' | 'message' | 'adaptFrom'>
   ): Promise<TaskHealthResult> => {
     const completedAt = new Date().toISOString()
-    await db.tasks.finishHealthRun(taskId, token, 'failed', completedAt, details.logPath, inspection.path, claimGeneration, executionMode)
-    return { taskId, state, status: null, scriptPath: inspection.path, startedAt, completedAt, expiresAt: null, runId: token, claimGeneration, executionMode, ...details }
+    await db.tasks.finishHealthRun(
+      taskId,
+      token,
+      'failed',
+      completedAt,
+      details.logPath,
+      inspection.path,
+      claimGeneration,
+      executionMode
+    )
+    return {
+      taskId,
+      state,
+      status: null,
+      scriptPath: inspection.path,
+      startedAt,
+      completedAt,
+      expiresAt: null,
+      runId: token,
+      claimGeneration,
+      executionMode,
+      ...details,
+    }
   }
 
   if (inspection.state !== 'ready') {
     return failed(inspection.state, {
-      tail: '', logPath: null, message: inspection.message, adaptFrom: inspection.adaptFrom,
+      tail: '',
+      logPath: null,
+      message: inspection.message,
+      adaptFrom: inspection.adaptFrom,
     })
   }
 
@@ -70,7 +104,16 @@ export async function runTaskHealthCheck(
     const execution = executeHealthCheck(cwd, inspection.path)
     const completedAt = new Date().toISOString()
     const passed = !execution.error && execution.status === 0
-    await db.tasks.finishHealthRun(taskId, token, passed ? 'passed' : 'failed', completedAt, execution.logPath, inspection.path, claimGeneration, executionMode)
+    await db.tasks.finishHealthRun(
+      taskId,
+      token,
+      passed ? 'passed' : 'failed',
+      completedAt,
+      execution.logPath,
+      inspection.path,
+      claimGeneration,
+      executionMode
+    )
     return {
       taskId,
       state: passed ? 'passed' : 'failed',
@@ -80,13 +123,19 @@ export async function runTaskHealthCheck(
       scriptPath: inspection.path,
       startedAt,
       completedAt,
-      expiresAt: passed ? new Date(Date.parse(completedAt) + HEALTH_EVIDENCE_TTL_MS).toISOString() : null,
+      expiresAt: passed
+        ? new Date(Date.parse(completedAt) + HEALTH_EVIDENCE_TTL_MS).toISOString()
+        : null,
       runId: token,
       claimGeneration,
       executionMode,
       ...(execution.error ? { message: execution.error.message } : {}),
     }
   } catch (error) {
-    return failed('failed', { tail: '', logPath: null, message: error instanceof Error ? error.message : String(error) })
+    return failed('failed', {
+      tail: '',
+      logPath: null,
+      message: error instanceof Error ? error.message : String(error),
+    })
   }
 }

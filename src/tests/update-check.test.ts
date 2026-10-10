@@ -5,7 +5,14 @@ import { describe, test } from 'node:test'
 
 import { collectOperationalNotices } from '@/core/operational-notices'
 import { pkg } from '@/core/package-data'
-import { __configureUpdateCheckForTests, __resetUpdateCacheForTests, compareSemver, isNewer, lookupUpdate, printUpdateMessage } from '@/core/update-check'
+import {
+  __configureUpdateCheckForTests,
+  __resetUpdateCacheForTests,
+  compareSemver,
+  isNewer,
+  lookupUpdate,
+  printUpdateMessage,
+} from '@/core/update-check'
 
 const TMP_BASE = join(import.meta.dirname, '../../.tmp-update-check')
 
@@ -108,7 +115,12 @@ describe('shared update lookup', () => {
   })
   test('coalesces concurrent callers and returns the caller current version', async () => {
     let calls = 0
-    __configureUpdateCheckForTests({ fetch: async () => { calls++; return new Response(JSON.stringify({ version: '9.9.9' }), { status: 200 }) } })
+    __configureUpdateCheckForTests({
+      fetch: async () => {
+        calls++
+        return new Response(JSON.stringify({ version: '9.9.9' }), { status: 200 })
+      },
+    })
     const [a, b] = await Promise.all([lookupUpdate('1.0.0'), lookupUpdate('2.0.0')])
     assert.equal(calls, 1)
     assert.equal(a.current, '1.0.0')
@@ -119,7 +131,12 @@ describe('shared update lookup', () => {
 
   test('malformed registry data becomes a short-lived unknown result', async () => {
     let calls = 0
-    __configureUpdateCheckForTests({ fetch: async () => { calls++; return new Response(JSON.stringify({ version: 'not-semver' }), { status: 200 }) } })
+    __configureUpdateCheckForTests({
+      fetch: async () => {
+        calls++
+        return new Response(JSON.stringify({ version: 'not-semver' }), { status: 200 })
+      },
+    })
     assert.equal((await lookupUpdate('1.0.0')).latest, null)
     assert.equal((await lookupUpdate('1.0.0')).latest, null)
     assert.equal(calls, 1)

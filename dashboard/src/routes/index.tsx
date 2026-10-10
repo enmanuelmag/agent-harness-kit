@@ -54,9 +54,7 @@ function Overview() {
 
         {/* Mini stats */}
         <div className="grid grid-cols-1 gap-3">
-          {[
-            { label: 'Total Actions', value: s?.totalActions },
-          ].map(({ label, value }) => (
+          {[{ label: 'Total Actions', value: s?.totalActions }].map(({ label, value }) => (
             <div
               key={label}
               className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-md px-4 py-3 flex items-center gap-3"

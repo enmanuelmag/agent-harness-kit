@@ -117,15 +117,24 @@ describe('runtime model catalogs', () => {
     assert.deepEqual(
       parseCursorModels(
         'gpt-5.9-terra-low - old\n' +
-        'gpt-5.10-luna-low - luna\n' +
-        'gpt-5.10-terra[effort=high] - high\n' +
-        'gpt-5.10-terra-ultra - ultra\n' +
-        'gpt-6-sol-medium - sol\n' +
-        'gpt-6-astra-low - astra\n' +
-        'cursor-grok-4.10-high - grok new\n' +
-        'cursor-grok-4.9-ultra - grok old\n'
+          'gpt-5.10-luna-low - luna\n' +
+          'gpt-5.10-terra[effort=high] - high\n' +
+          'gpt-5.10-terra-ultra - ultra\n' +
+          'gpt-6-sol-medium - sol\n' +
+          'gpt-6-astra-low - astra\n' +
+          'cursor-grok-4.10-high - grok new\n' +
+          'cursor-grok-4.9-ultra - grok old\n'
       ).map(({ id }) => id),
-      ['gpt-6-astra-low', 'gpt-6-sol-medium', 'gpt-5.10-terra-ultra', 'gpt-5.10-terra[effort=high]', 'gpt-5.9-terra-low', 'gpt-5.10-luna-low', 'cursor-grok-4.10-high', 'cursor-grok-4.9-ultra']
+      [
+        'gpt-6-astra-low',
+        'gpt-6-sol-medium',
+        'gpt-5.10-terra-ultra',
+        'gpt-5.10-terra[effort=high]',
+        'gpt-5.9-terra-low',
+        'gpt-5.10-luna-low',
+        'cursor-grok-4.10-high',
+        'cursor-grok-4.9-ultra',
+      ]
     )
   })
 
@@ -258,9 +267,19 @@ describe('runtime model catalogs', () => {
     const choices = selectCodexRoleDefaults([
       { id: 'gpt-5.10-sol', label: 'old', supportedReasoningEfforts: ['medium', 'high'] },
       { id: 'gpt-6-sol', label: 'new', supportedReasoningEfforts: ['medium'] },
-      { id: 'gpt-6.1-sol', label: 'newest', supportedReasoningEfforts: ['medium'], defaultReasoningEffort: 'medium' },
+      {
+        id: 'gpt-6.1-sol',
+        label: 'newest',
+        supportedReasoningEfforts: ['medium'],
+        defaultReasoningEffort: 'medium',
+      },
       { id: 'gpt-5.9-luna', label: 'old luna', supportedReasoningEfforts: ['low'] },
-      { id: 'gpt-5.10-luna', label: 'new luna', supportedReasoningEfforts: ['medium'], defaultReasoningEffort: 'medium' },
+      {
+        id: 'gpt-5.10-luna',
+        label: 'new luna',
+        supportedReasoningEfforts: ['medium'],
+        defaultReasoningEffort: 'medium',
+      },
     ])
     assert.deepEqual(choices.lead, { model: 'gpt-6.1-sol', effort: 'medium' })
     assert.deepEqual(choices.consultant, { model: 'gpt-6.1-sol', effort: 'medium' })
@@ -268,9 +287,17 @@ describe('runtime model catalogs', () => {
   })
 
   test('keeps unavailable live families inherited', () => {
-    assert.deepEqual(selectCodexRoleDefaults([{ id: 'gpt-6.1-sol', label: 'Sol', supportedReasoningEfforts: ['high'] }]), {
-      lead: { model: 'gpt-6.1-sol' }, builder: { model: 'gpt-6.1-sol' }, reviewer: { model: 'gpt-6.1-sol' }, consultant: { model: 'gpt-6.1-sol', effort: 'high' },
-    })
+    assert.deepEqual(
+      selectCodexRoleDefaults([
+        { id: 'gpt-6.1-sol', label: 'Sol', supportedReasoningEfforts: ['high'] },
+      ]),
+      {
+        lead: { model: 'gpt-6.1-sol' },
+        builder: { model: 'gpt-6.1-sol' },
+        reviewer: { model: 'gpt-6.1-sol' },
+        consultant: { model: 'gpt-6.1-sol', effort: 'high' },
+      }
+    )
   })
 
   test('uses the lead choice unchanged for Codex default.toml', () => {
@@ -333,7 +360,9 @@ describe('claudeAgentFiles — direct export used by ahk models', () => {
 
   test('writes Claude native effort independently and clears stale scalar on regeneration', () => {
     const config = configFor('claude-code')
-    const entry = claudeAgentFiles(config, { lead: { effort: 'high' } }).find((file) => file.relPath.endsWith('/lead.md'))!
+    const entry = claudeAgentFiles(config, { lead: { effort: 'high' } }).find((file) =>
+      file.relPath.endsWith('/lead.md')
+    )!
     assert.match(entry.content, /^effort: high$/m)
     assert.doesNotMatch(entry.content, /^model:/m)
   })

@@ -169,5 +169,4 @@ export class ActionRepository {
   async getAllSections(): Promise<ActionSectionRow[]> {
     return this.driver.query<ActionSectionRow>(`SELECT * FROM action_sections ORDER BY created_at`)
   }
-
 }
