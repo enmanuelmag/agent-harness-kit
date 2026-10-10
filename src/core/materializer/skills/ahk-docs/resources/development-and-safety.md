@@ -26,3 +26,10 @@ Before `reset`, `build --force`, storage migration, or an applied document migra
 Do not put secrets in specification text, handoffs, screenshots, or exports. Review provider configuration and exported database content before sharing it. For a security report, follow the repository's `SECURITY.md` rather than opening a public issue.
 
 Static checks prove syntax, types, and exercised behavior. They do not prove deployment, browser visuals, real-device behavior, provider account permissions, external integrations, or production data safety unless those environments were explicitly tested.
+
+
+## Command failures
+
+The CLI awaits asynchronous commands and reports execution failures once on stderr with command context, then exits nonzero. Help/version, cancellation and health commands preserve their normal exit semantics. A fatal `ahk build --watch` rebuild or watcher failure closes the watcher and exits with status 1; automatic rebuilds never force regeneration of existing files.
+
+Update notices are advisory. A reporting failure does not turn a completed command into a failed operation. CLI update banners are suppressed for stdio serving and JSON commands to keep their output machine-readable; MCP operational notices remain available. MCP tools preserve their existing `isError` and text responses and validate successful structured output.

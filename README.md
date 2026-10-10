@@ -109,6 +109,8 @@ On a tracked task, `tasks.claim` runs native health. A pass enables normal work.
 
 Operational notices — lifecycle MCP responses, `ahk build`, `ahk sync`, and `ahk doctor` surface cached upgrade and generated-skill migration information without changing task or health results. Suggested commands require developer approval.
 
+CLI command failures report one contextual diagnostic on stderr and exit nonzero, including awaited asynchronous startup failures. Help, cancellation and health exits keep their existing semantics. A fatal `ahk build --watch` rebuild failure closes the watcher and exits with status 1; automatic rebuilds remain unforced. Update reporting is advisory and cannot change a completed operation into a failure. CLI update banners are suppressed for stdio serving and JSON output; MCP continues delivering its operational notices. MCP tool failures retain their existing text and `isError` responses, while successful structured output is validated.
+
 The full MCP and lifecycle guide is bundled in [`ahk-docs`](src/core/materializer/skills/ahk-docs/resources/mcp-and-lifecycle.md).
 
 ![AHK dashboard task and action view](assets/ahk-dashboard.png)
@@ -179,7 +181,9 @@ Generated skills retain downgrade protection: do not regenerate a v2 provider tr
 
 ## Compatibility and development
 
-AHK requires Node 22 or newer. The default SQLite driver and the repository build target Node 22.
+AHK requires Node 22.14.0 or newer on 22.x, or Node 23.6.0 or newer. Earlier 23.x releases are excluded. The pinned `better-sqlite3` 13.0.3 driver uses Node-API 10; the repository build targets Node 22.
+
+Native installation can still require a working build toolchain. [Upstream issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516) records installation failures on Windows with npm and on Linux with pnpm; those reports do not establish an AHK failure on every platform. CI is configured to test exact Node 22.14.0 and the current 22.x release. Local compatibility evidence applies to the tested OS, architecture and package manager.
 
 ```bash
 pnpm test

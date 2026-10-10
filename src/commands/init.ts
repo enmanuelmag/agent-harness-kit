@@ -337,7 +337,6 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
     spinner.stop('')
   } catch (err) {
     spinner.stop('Failed')
-    p.log.error(err instanceof Error ? err.message : String(err))
     throw err
   }
 

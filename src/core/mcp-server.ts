@@ -30,6 +30,7 @@ import {
 } from './operational-notices'
 import { pkg } from './package-data'
 import { checkPermissionsSync } from './permissions-check'
+import { capture, err, ok as resultOk, type Result } from './result'
 import {
   type Relationship,
   RELATIONSHIPS,
@@ -74,31 +75,50 @@ export function createMcpServer(
       },
       async (args) => {
         const a = args as Record<string, unknown>
-        try {
-          assertNormalized(a)
-          const result = await execute(tool.name, a, db, docsPath, cwd, config)
-          return attachOperationalNotices(
-            tool.name,
-            a,
-            cwd,
-            config.provider,
-            structuredResult(tool.name, result),
-            noticeSession
-          )
-        } catch (err) {
-          return attachOperationalNotices(
-            tool.name,
-            a,
-            cwd,
-            config.provider,
-            ok(`Error: ${err instanceof Error ? err.message : String(err)}`, true),
-            noticeSession
-          )
-        }
+        const result = await executeToolResult(tool.name, a, db, docsPath, cwd, config)
+        return attachOperationalNotices(
+          tool.name,
+          a,
+          cwd,
+          config.provider,
+          result.ok ? result.value : result.error.response,
+          noticeSession
+        )
       }
     )
   }
   return server
+}
+
+export interface ToolFailure {
+  context: string
+  response: CallToolResult
+  cause?: unknown
+}
+
+/** SDK boundary: arguments have already passed tolerant normalization. */
+export async function executeToolResult(
+  name: string,
+  args: Record<string, unknown>,
+  db: HarnessDB,
+  docsPath: string,
+  cwd: string,
+  config: HarnessConfig
+): Promise<Result<CallToolResult, ToolFailure>> {
+  const result = await capture(async () => {
+    assertNormalized(args)
+    return structuredResult(name, await execute(name, args, db, docsPath, cwd, config))
+  }, name)
+  if (!result.ok)
+    return err({
+      context: name,
+      cause: result.error.cause,
+      response: ok(`Error: ${result.error.message}`, true),
+    })
+  // Some domain failures already have a protocol response. Keep it unchanged.
+  return result.value.isError
+    ? err({ context: name, response: result.value })
+    : resultOk(result.value)
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────

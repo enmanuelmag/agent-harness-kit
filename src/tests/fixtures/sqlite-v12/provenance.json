@@ -1,0 +1,19 @@
+{
+  "writer": "12.11.1",
+  "node": "v25.2.1",
+  "napi": "10",
+  "platform": "darwin",
+  "arch": "arm64",
+  "sqlite": "3.53.2",
+  "sourceCommit": "102be0e",
+  "sha256": "e91841bbba78c1dc51cf039ce7688efba373126efd5e5ea49dfe1bedf8cde0b0",
+  "fixture": "harness.sqlite",
+  "capturedBeforeUpgrade": true,
+  "checkpoint": "TRUNCATE, then close",
+  "expectedIds": {
+    "task": 7,
+    "acceptance": 9,
+    "action": 11,
+    "section": 13
+  }
+}

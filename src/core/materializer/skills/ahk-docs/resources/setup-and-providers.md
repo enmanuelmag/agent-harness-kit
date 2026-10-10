@@ -39,7 +39,9 @@ The CLI location and storage scope are independent. Agent and skill files materi
 
 ## Runtime compatibility
 
-AHK requires Node 22 or newer. The default SQLite driver and the repository build target Node 22.
+AHK requires Node 22.14.0 or newer on 22.x, or Node 23.6.0 or newer. Earlier 23.x releases are excluded. The pinned `better-sqlite3` 13.0.3 driver uses Node-API 10; the repository build targets Node 22.
+
+Native installation can still require a working build toolchain. [Upstream issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516) records installation failures on Windows with npm and on Linux with pnpm; those reports do not establish an AHK failure on every platform. CI is configured to test exact Node 22.14.0 and the current 22.x release. Local compatibility evidence applies to the tested OS, architecture and package manager.
 
 
 ## Stable and release-candidate versions

@@ -2,9 +2,11 @@ import { watch } from 'node:fs'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
+import { terminateCliFailure } from '@/core/cli-boundary'
 import { loadConfig } from '@/core/config'
 import { getMaterializer } from '@/core/materializer/index'
 import { collectOperationalNotices } from '@/core/operational-notices'
+import { type BoundaryFailure, capture } from '@/core/result'
 
 import { persistPreferences, toPreferences } from './agent-preferences'
 import { choicesFromPreferences } from './agent-preferences'
@@ -32,16 +34,30 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
   }
 
   if (opts.watch) {
-    p.log.info(`Watching agent-harness-kit.config.ts for changes...`)
-    watch(cwd, { recursive: false }, async (_, filename) => {
+    let failed = false
+    const watcher = watch(cwd, { recursive: false }, async (_, filename) => {
+      if (failed) return
       if (filename?.startsWith('agent-harness-kit.config')) {
-        p.log.step('Config changed — rebuilding...')
         // Deliberately never forced: an automatic rebuild triggered by a file
         // watcher must not destroy agent-file customizations behind the user's
         // back. --force is a one-shot, explicitly requested operation.
-        await buildOnce(cwd, false)
+        const result = await capture(async () => {
+          p.log.step('Config changed — rebuilding...')
+          await buildOnce(cwd, false)
+        }, 'ahk build --watch rebuild')
+        if (!result.ok) failWatch(result.error)
       }
     })
+    const failWatch = (error: BoundaryFailure) => {
+      if (failed) return
+      failed = true
+      watcher.close()
+      terminateCliFailure(error)
+    }
+    watcher.on('error', (cause: Error) => {
+      failWatch({ context: 'ahk build --watch', message: cause.message, cause })
+    })
+    p.log.info(`Watching agent-harness-kit.config.ts for changes...`)
     // Keep process alive
     await new Promise(() => {})
   }
@@ -54,13 +70,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   // render while a p.spinner is active. Loading config is fast (no spinner
   // needed for it in practice), so it moved out of the spinner-wrapped block
   // that used to say "Loading config...".
-  let config: Awaited<ReturnType<typeof loadConfig>>
-  try {
-    config = await loadConfig(cwd)
-  } catch (err) {
-    p.log.error(err instanceof Error ? err.message : String(err))
-    process.exit(1)
-  }
+  let config = await loadConfig(cwd)
 
   // Claude Code only, and only when --force is set: re-run the same per-role
   // model prompt `ahk init` and `ahk models` use, before regenerating agent
@@ -231,7 +241,6 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
     }
   } catch (err) {
     spinner.stop(pc.red('Build failed'))
-    p.log.error(err instanceof Error ? err.message : String(err))
-    process.exit(1)
+    throw err
   }
 }

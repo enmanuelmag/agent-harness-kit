@@ -26,7 +26,7 @@ import {
   requiredStringArray,
   str,
 } from '@/core/mcp-normalizers'
-import { createMcpServer, dispatch } from '@/core/mcp-server'
+import { createMcpServer, dispatch, executeToolResult } from '@/core/mcp-server'
 
 import type { HarnessConfig } from '@/types'
 
@@ -166,7 +166,7 @@ test('one authored Zod definition drives guidance and tolerant recovery without 
   assert.equal(result.renamed, 2.5)
 })
 
-test('real SDK tools/list and tools/call preserve recovery, mutations, errors, notices and output contracts', async () => {
+test('real SDK tools/list and tools/call preserve recovery, mutations, errors, notices and output contracts', async (t) => {
   mkdirSync(TMP, { recursive: true })
   writeFileSync(join(TMP, 'health.sh'), '#!/bin/sh\n# actual test health script\nexit 0\n', {
     mode: 0o755,
@@ -214,6 +214,17 @@ test('real SDK tools/list and tools/call preserve recovery, mutations, errors, n
     assert.equal(invalid.isError, true)
     assert.equal(text(invalid), 'Error: title is required')
     assert.equal((await db.getTasks()).length, 0)
+    const invalidArgs = inputContracts['tasks.add'].parse({ title: false })
+    const failure = await executeToolResult('tasks.add', invalidArgs, db, TMP, TMP, config)
+    assert.equal(failure.ok, false)
+    if (!failure.ok) {
+      assert.ok(failure.error.cause instanceof Error)
+      assert.equal(text(failure.error.response), 'Error: title is required')
+    }
+    await assert.rejects(
+      () => dispatch('tasks.add', { title: false }, db, TMP, TMP, config),
+      /title is required/
+    )
     const invalidClaim = await client.callTool({ name: 'tasks.claim', arguments: {} })
     assert.equal(text(invalidClaim), 'Error: id must be a number')
     assert.equal((invalidClaim.content as unknown[]).length, 2)
@@ -307,6 +318,35 @@ test('real SDK tools/list and tools/call preserve recovery, mutations, errors, n
       arguments: { id: String(task.id), agent: 'lead' },
     })
     assert.equal(claimed.isError, false)
+    const missingAction = await executeToolResult(
+      'actions.get_by_id',
+      { actionId: 999999 },
+      db,
+      TMP,
+      TMP,
+      config
+    )
+    assert.equal(missingAction.ok, false)
+    if (!missingAction.ok) {
+      assert.equal(
+        text(missingAction.error.response),
+        '{"error":"ACTION_NOT_FOUND","actionId":999999}'
+      )
+      assert.equal(missingAction.error.response.isError, true)
+    }
+    const alreadyClaimed = await executeToolResult(
+      'tasks.claim',
+      { id: task.id, agent: 'lead' },
+      db,
+      TMP,
+      TMP,
+      config
+    )
+    assert.equal(alreadyClaimed.ok, true)
+    if (alreadyClaimed.ok) {
+      assert.equal(alreadyClaimed.value.isError, false)
+      assert.equal(JSON.parse(text(alreadyClaimed.value)).error, 'task_already_claimed')
+    }
     const action = await client.callTool({
       name: 'actions.start',
       arguments: { taskId: String(task.id), agent: 'lead' },
@@ -378,6 +418,53 @@ test('real SDK tools/list and tools/call preserve recovery, mutations, errors, n
     })
     assert.equal(completed.isError, false)
     assert.equal(JSON.parse(text(completed)).task.status, 'done')
+    const invalidOutput = t.mock.method(db, 'addTask', async () => ({ invalid: true }) as never)
+    const outputFailure = await executeToolResult(
+      'tasks.add',
+      { title: 'Bad provider output' },
+      db,
+      TMP,
+      TMP,
+      config
+    )
+    assert.equal(outputFailure.ok, false)
+    const invalidWire = await client.callTool({
+      name: 'tasks.add',
+      arguments: { title: 'Bad provider output' },
+    })
+    assert.equal(invalidWire.isError, true)
+    if (!outputFailure.ok) {
+      assert.ok(outputFailure.error.cause instanceof Error)
+      assert.equal(text(invalidWire), text(outputFailure.error.response))
+    }
+    await assert.rejects(() =>
+      dispatch('tasks.add', { title: 'Bad provider output' }, db, TMP, TMP, config)
+    )
+    invalidOutput.mock.restore()
+    const cause = { code: 'DATABASE_FAILURE' }
+    const thrown = t.mock.method(db, 'addTask', async () => {
+      throw cause
+    })
+    const thrownResult = await executeToolResult(
+      'tasks.add',
+      { title: 'Failed write' },
+      db,
+      TMP,
+      TMP,
+      config
+    )
+    assert.equal(thrownResult.ok, false)
+    if (!thrownResult.ok) {
+      assert.equal(thrownResult.error.cause, cause)
+      assert.equal(text(thrownResult.error.response), 'Error: [object Object]')
+    }
+    const thrownWire = await client.callTool({
+      name: 'tasks.add',
+      arguments: { title: 'Failed write' },
+    })
+    assert.equal(thrownWire.isError, true)
+    assert.equal(text(thrownWire), 'Error: [object Object]')
+    thrown.mock.restore()
     await assert.rejects(
       () => client.callTool({ name: 'does.not.exist', arguments: {} }),
       /not found/

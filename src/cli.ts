@@ -1,5 +1,4 @@
 import { Command, InvalidArgumentError } from 'commander'
-import pc from 'picocolors'
 
 import { runBuild } from '@/commands/build'
 import { runDashboard } from '@/commands/dashboard'
@@ -16,9 +15,11 @@ import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
 import { runSync } from '@/commands/sync'
 import { runTaskAdd, runTaskDone, runTaskEdit, runTaskList } from '@/commands/task/index'
+import { reportCliAdvisory, runCliBoundary } from '@/core/cli-boundary'
 import { isLocalInstallSatisfied } from '@/core/local-install-guard'
 import { pkg } from '@/core/package-data'
 import { isExecutableOnPath, printMissingGlobalBinaryWarning } from '@/core/path-probe'
+import { capture } from '@/core/result'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
 
 const cwd = process.cwd()
@@ -47,7 +48,8 @@ function parsePort(raw: string): number {
   return port
 }
 
-const updateCheck = checkForUpdate(pkg.version)
+const updateCheck = capture(() => checkForUpdate(pkg.version), 'update check')
+let commandContext = 'ahk'
 
 const program = new Command()
 
@@ -206,12 +208,7 @@ migrate
   .option('--force', 'Required to overwrite a non-empty destination (a backup is written first)')
   .option('--dry-run', 'Preview what would migrate without applying any changes')
   .action(async (opts) => {
-    try {
-      await runMigrateStorage(cwd, { force: opts.force, dryRun: opts['dry-run'] })
-    } catch (err) {
-      console.error(pc.red(`✗ ${err instanceof Error ? err.message : String(err)}`))
-      process.exit(1)
-    }
+    await runMigrateStorage(cwd, { force: opts.force, dryRun: opts['dry-run'] })
   })
 
 migrate
@@ -270,7 +267,11 @@ program
 // and would therefore fail later at spawn time. This is purely
 // informational — the command continues its normal flow regardless of the
 // check's result.
-program.hook('preAction', () => {
+program.hook('preAction', (_, actionCommand) => {
+  const names: string[] = []
+  for (let command: Command | null = actionCommand; command; command = command.parent)
+    names.unshift(command.name())
+  commandContext = names.join(' ')
   if (!isLocalInstallSatisfied(cwd)) {
     if (!isExecutableOnPath('ahk')) {
       printMissingGlobalBinaryWarning()
@@ -278,9 +279,13 @@ program.hook('preAction', () => {
   }
 })
 
-program.hook('postAction', async () => {
-  const update = await updateCheck
-  if (update) printUpdateMessage(update, cwd)
+program.hook('postAction', async (_, actionCommand) => {
+  // Protocol and JSON output must remain machine-readable. MCP delivers its
+  // own update notices rather than a CLI banner on the stdio stream.
+  if (actionCommand.name() === 'serve' || actionCommand.opts().json) return
+  await reportCliAdvisory(updateCheck, (update) => {
+    if (update) printUpdateMessage(update, cwd)
+  })
 })
 
 // ─── backward-compat argv rewrite for `ahk migrate` ────────────────────────
@@ -299,4 +304,7 @@ function rewriteLegacyMigrateArgv(argv: string[]): string[] {
   return rewritten
 }
 
-program.parse(rewriteLegacyMigrateArgv(process.argv))
+await runCliBoundary(
+  () => program.parseAsync(rewriteLegacyMigrateArgv(process.argv)),
+  () => commandContext
+)
