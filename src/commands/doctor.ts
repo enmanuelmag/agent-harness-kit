@@ -1,8 +1,12 @@
+import { existsSync } from 'node:fs'
 import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
 import { getDoctorStatus } from '@/core/doctor'
 import { collectOperationalNotices } from '@/core/operational-notices'
+
+import { normalizeDatabaseDiagnostics } from '../core/database-diagnostics'
+import { openDB, resolveSqlitePath } from '../core/db'
 
 import type { AgentStatus, SkillStatus } from '@/core/doctor'
 
@@ -78,7 +82,7 @@ function printSkillsSection(skills: SkillStatus[]): void {
 
 // ─── Main command ─────────────────────────────────────────────────────────────
 
-export async function runDoctor(cwd: string): Promise<void> {
+export async function runDoctor(cwd: string, opts: { db?: boolean } = {}): Promise<void> {
   // Check for config first so we can give a helpful upfront message
   let configFound = true
   let config: Awaited<ReturnType<typeof loadConfig>> | undefined
@@ -92,6 +96,25 @@ export async function runDoctor(cwd: string): Promise<void> {
   console.log(pc.bold(`● ahk doctor ` + '─'.repeat(44)))
   console.log('')
 
+  if (opts.db) {
+    let db: Awaited<ReturnType<typeof openDB>> | undefined
+    try {
+      const config = await loadConfig(cwd)
+      if (!normalizeDatabaseDiagnostics(config.databaseDiagnostics).enabled) {
+        process.stderr.write('[agent-harness-kit] Database diagnostics are disabled.\n')
+      } else if (config.database.type === 'sqlite' && !existsSync(resolveSqlitePath(config, cwd))) {
+        process.stderr.write('[agent-harness-kit] Optional database diagnostics are unavailable: SQLite file does not exist.\n')
+      } else {
+        db = await openDB(config, cwd, undefined, { initializeSchema: false })
+        const notice = await db.databaseDiagnosticNotice()
+        process.stderr.write(`[agent-harness-kit] ${notice.message} ${JSON.stringify(notice.details ?? {})}\n`)
+      }
+    } catch {
+      process.stderr.write('[agent-harness-kit] Optional database diagnostics are unavailable.\n')
+    } finally {
+      try { await db?.close() } catch { /* optional diagnostic cleanup */ }
+    }
+  }
   const status = await getDoctorStatus(cwd)
 
   printLibSection(status.lib)
