@@ -27,3 +27,5 @@ Use cases are `use-case` documents in `docs/use-cases/`. Functional `spec`, spec
 ## Health and limits
 
 `health.run` reruns native health for diagnosis. It is not a replacement for the automatic claim and final-health gates. A tool response can prove only the operation it reports; inspect live task status and logs before making a wider claim.
+
+`ahk.doctor` accepts optional `db: true` for cached database history/storage diagnostics in an additive notice. Its metadata DTO and default metadata-only behavior remain unchanged. Database-backed task/action/health tools may include passive latency notices in the same operational-notice block; filesystem tools do not. Notice eligibility performs no SQL or file-size probe on normal responses. See maintenance documentation for thresholds, cache policy and manual-retention caveats.

@@ -493,8 +493,8 @@ export const TOOLS = [
   {
     name: 'ahk.doctor',
     description:
-      'Check lib version, agent files, and harness skills sync status. Returns structured JSON.',
-    inputSchema: z.object({}),
+      'Check lib version, agent files, and harness skills sync status. Returns structured JSON. Set db=true for optional cached database history diagnostics in an additive notice.',
+    inputSchema: z.object({ db: z.boolean().optional() }),
     outputSchema: OUTPUT_SCHEMAS['ahk.doctor'],
   },
 ] as const

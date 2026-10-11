@@ -5,6 +5,8 @@ import { createJiti } from 'jiti'
 
 import { getDefaultHealthScriptPath } from '@/core/health-check'
 
+import { normalizeDatabaseDiagnostics } from './database-diagnostics'
+
 import type { HarnessConfig } from '@/types'
 
 /** Order is precedence: the first file that exists wins. `.json` is appended
@@ -235,6 +237,7 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
       agentsMd: './AGENTS.md',
       ...c.project,
     } as HarnessConfig['project'],
+    databaseDiagnostics: normalizeDatabaseDiagnostics(c.databaseDiagnostics),
     database: c.database ?? { type: 'sqlite' as const },
     storage,
     health: {

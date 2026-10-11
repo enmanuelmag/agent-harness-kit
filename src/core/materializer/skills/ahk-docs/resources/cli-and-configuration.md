@@ -12,7 +12,7 @@ Run commands from the project that contains `agent-harness-kit.config.*`.
 | `ahk status` | Show tasks and active actions; `--json` is available. |
 | `ahk dashboard` | Serve the local dashboard; `--port` accepts 1–65535 and `--no-open` avoids opening a browser. |
 | `ahk serve` | Start the stdio MCP server; `--port` stores an optional port hint. |
-| `ahk doctor` | Read-only check of package version, agent-file presence, and generated skill state. Agent files are existence-only checks; canonical skill manifests/resources are byte-checked for missing or outdated bytes. |
+| `ahk doctor` | Read-only check of package version, agent-file presence, and generated skill state. Optional `--db` reports cached history/storage diagnostics on stderr. Agent files are existence-only checks; canonical skill manifests/resources are byte-checked for missing or outdated bytes. |
 | `ahk export` | Export database content. Use `--sql` or `--json`, with `--output` for a file. |
 | `ahk reset` | Clear harness data or provider agent files. `--force` skips confirmation. |
 | `ahk migrate provider` | Migrate provider-specific material; the legacy `ahk migrate` form remains an alias. |

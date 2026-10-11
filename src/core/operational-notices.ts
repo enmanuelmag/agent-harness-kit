@@ -18,7 +18,7 @@ export interface OperationalNotice {
   code: string
   severity: NoticeSeverity
   message: string
-  scope: 'package' | 'skills'
+  scope: 'package' | 'skills' | 'database'
   command?: string
   details?: Record<string, string | string[]>
 }

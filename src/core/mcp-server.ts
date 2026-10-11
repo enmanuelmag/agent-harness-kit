@@ -82,7 +82,9 @@ export function createMcpServer(
           cwd,
           config.provider,
           result.ok ? result.value : result.error.response,
-          noticeSession
+          noticeSession,
+          false,
+          db
         )
       }
     )
@@ -797,27 +799,26 @@ export async function attachOperationalNotices(
   provider: HarnessConfig['provider'],
   result: CallToolResult,
   session: ReturnType<typeof createNoticeSession>,
-  doctor = false
+  doctor = false,
+  db?: HarnessDB
 ): Promise<CallToolResult> {
   const isDoctor = doctor || name === 'ahk.doctor'
-  if (!NOTICE_TOOLS.has(name) || (name === 'tasks.update' && args.status !== 'done')) return result
-  try {
-    const collected = await collectOperationalNotices(cwd, provider, {
-      doctor: isDoctor,
-      waitForUpdate: isDoctor,
-    })
-    const notices = noticesForDelivery(session, cwd, provider, collected, isDoctor)
-    if (!notices.length) return result
-    return {
-      ...result,
-      content: [
-        ...result.content,
-        { type: 'text', text: JSON.stringify({ noticeSchemaVersion: 1, notices }) },
-      ],
-    }
-  } catch {
-    return result
+  const notices: Awaited<ReturnType<typeof collectOperationalNotices>> = []
+  if (NOTICE_TOOLS.has(name) && !(name === 'tasks.update' && args.status !== 'done')) {
+    try {
+      const collected = await collectOperationalNotices(cwd, provider, { doctor: isDoctor, waitForUpdate: isDoctor })
+      notices.push(...noticesForDelivery(session, cwd, provider, collected, isDoctor))
+    } catch { /* existing advisory remains fail-open */ }
   }
+  try {
+    if (db && name === 'ahk.doctor' && args.db === true) notices.push(await db.databaseDiagnosticNotice())
+    else if (db && /^(tasks\.|actions\.|health\.)/.test(name)) {
+      const notice = db.diagnostics.takeNotice()
+      if (notice) notices.push(notice)
+    }
+    if (!notices.length) return result
+    return { ...result, content: [...result.content, { type: 'text', text: JSON.stringify({ noticeSchemaVersion: 1, notices }) }] }
+  } catch { return result }
 }
 
 function ok(text: string, isError = false): CallToolResult {

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
+import { currentDatabaseNoticeSink,DatabaseDiagnostics } from './database-diagnostics'
 import { ActionRepository } from './repositories/ActionRepository'
 import { StatsRepository } from './repositories/StatsRepository'
 import { TaskRepository } from './repositories/TaskRepository'
@@ -88,9 +89,17 @@ export class HarnessDB {
   readonly actions: ActionRepository
   readonly stats: StatsRepository
   private driver: DBDriver
+  private diagnosticDriver: DBDriver
   private config: HarnessConfig
+  readonly diagnostics: DatabaseDiagnostics
+  private sqliteDiagnosticsPath?: string
+  private noticeSink = currentDatabaseNoticeSink()
 
-  constructor(driver: DBDriver, config: HarnessConfig, _homeDir: string = homedir()) {
+  constructor(driver: DBDriver, config: HarnessConfig, _homeDir: string = homedir(), diagnostics = new DatabaseDiagnostics(config.databaseDiagnostics), sqliteDiagnosticsPath?: string) {
+    this.diagnosticDriver = driver
+    this.diagnostics = diagnostics
+    this.sqliteDiagnosticsPath = sqliteDiagnosticsPath
+    driver = diagnostics.wrap(driver)
     this.driver = driver
     this.config = config
     this.tasks = new TaskRepository(driver)
@@ -504,8 +513,17 @@ export class HarnessDB {
     await this.driver.reconnect()
   }
 
+  async databaseDiagnosticNotice() {
+    return this.diagnostics.inspect(this.diagnosticDriver, this.sqliteDiagnosticsPath)
+  }
+
   async close(): Promise<void> {
-    await this.driver.close()
+    try { await this.driver.close() } finally {
+      try {
+        const notice = this.diagnostics.takeNotice()
+        if (notice) this.noticeSink?.(notice)
+      } catch { /* advisory delivery must not mask close failure */ }
+    }
   }
 
   // ─── storage-state.json (real storage state, for `ahk migrate storage`) ──
@@ -781,7 +799,8 @@ export function readStorageStateFile(cwd: string, storageDir: string): StorageSt
 export async function openDB(
   config: HarnessConfig,
   cwd: string,
-  homeDir: string = homedir()
+  homeDir: string = homedir(),
+  options: { initializeSchema?: boolean } = {}
 ): Promise<HarnessDB> {
   const dbConfig = config.database
   let driver: DBDriver
@@ -819,15 +838,15 @@ export async function openDB(
           // Malformed/unreadable state file — ignore and proceed, mkdirSync below is idempotent.
         }
       }
-      mkdirSync(globalDir, { recursive: true })
+      if (options.initializeSchema !== false) mkdirSync(globalDir, { recursive: true })
       dbPath = join(globalDir, 'harness.db')
     } else {
       dbPath = resolve(cwd, config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH)
     }
 
-    driver = new SQLiteDriver(dbPath)
+    driver = new SQLiteDriver(dbPath, options.initializeSchema === false)
   }
 
-  await driver.ensureSchema()
-  return new HarnessDB(driver, config, homeDir)
+  if (options.initializeSchema !== false) await driver.ensureSchema()
+  return new HarnessDB(driver, config, homeDir, new DatabaseDiagnostics(config.databaseDiagnostics), dbConfig.type === 'sqlite' ? resolveSqlitePath(config, cwd, homeDir) : undefined)
 }

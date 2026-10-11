@@ -22,16 +22,16 @@ export interface SQLiteDB {
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
-export function openSQLite(path: string): SQLiteDB {
+export function openSQLite(path: string, readonly = false): SQLiteDB {
   if (isBun) {
     const { Database } = _require('bun:sqlite') as {
-      Database: new (path: string) => unknown
+      Database: new (path: string, options?: Record<string, boolean>) => unknown
     }
-    return new Database(path) as unknown as SQLiteDB
+    return new Database(path, readonly ? { readonly: true, create: false } : undefined) as unknown as SQLiteDB
   }
 
-  const Database = _require('better-sqlite3') as new (path: string) => unknown
-  return new Database(path) as unknown as SQLiteDB
+  const Database = _require('better-sqlite3') as new (path: string, options?: Record<string, boolean>) => unknown
+  return new Database(path, readonly ? { readonly: true, fileMustExist: true } : undefined) as unknown as SQLiteDB
 }
 
 // ─── last_insert_rowid() helper ───────────────────────────────────────────────

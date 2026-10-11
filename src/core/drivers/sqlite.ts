@@ -93,8 +93,12 @@ export class SQLiteDriver implements DBDriver {
   private db: SQLiteDB
   private dbPath: string
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, private readonly diagnosticsOnly = false) {
     this.dbPath = dbPath
+    if (diagnosticsOnly) {
+      this.db = openSQLite(dbPath, true)
+      return
+    }
     mkdirSync(dirname(dbPath), { recursive: true })
     // Remove stale WAL/SHM files left by a crashed session — they cause SQLITE_IOERR.
     // A 0-byte WAL alongside a non-empty SHM means the last checkpoint never completed.
@@ -188,7 +192,8 @@ export class SQLiteDriver implements DBDriver {
 
   async reconnect(): Promise<void> {
     this.db.close()
-    this.db = openSQLite(this.dbPath)
+    this.db = openSQLite(this.dbPath, this.diagnosticsOnly)
+    if (this.diagnosticsOnly) return
     this.db.exec('PRAGMA journal_mode = WAL')
     this.db.exec('PRAGMA foreign_keys = ON')
   }
