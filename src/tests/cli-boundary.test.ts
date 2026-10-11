@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { after, before, test } from 'node:test'
@@ -202,4 +202,31 @@ test('watch async reload failure is consumed once, closes and terminates without
   assert.match(stderr, /is not valid JSON/)
   assert.doesNotMatch(stderr, /UnhandledPromise|uncaught|\n\s+at /i)
   assert.equal(readFileSync(custom, 'utf8'), '# User-owned builder\nPreserve this content.\n')
+})
+
+
+test('doctor DB diagnostics are opt-in, stderr-only and do not create a missing SQLite database', () => {
+  const cwd = project('optional-db-doctor')
+  const result = cli(['doctor', '--db'], cwd)
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stderr, /Optional database diagnostics are unavailable/)
+  assert.equal(existsSync(join(cwd, '.harness/harness.db')), false)
+  const ordinary = cli(['doctor'], cwd)
+  assert.equal(ordinary.status, 0)
+  assert.doesNotMatch(ordinary.stderr, /database diagnostics/)
+})
+
+test('actual JSON CLI keeps stdout parseable and passive DB notices on stderr', () => {
+  const cwd = project('json-db-notice')
+  const config = {
+    project: { name: 'json', description: '', docsPath: './docs' }, provider: 'codex-cli', database: { type: 'sqlite' },
+    databaseDiagnostics: { minSamples: 1, minSlow: 1, slowMs: 1 },
+    storage: { scope: 'local', projectId: 'json-db', dir: '.harness' },
+  }
+  writeFileSync(join(cwd, 'agent-harness-kit.config.mjs'), `let time=0; Object.defineProperty(performance, 'now', { value: () => (time += 600) }); export default ${JSON.stringify(config)}`)
+  const result = cli(['task', 'list', '--json'], cwd)
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(JSON.parse(result.stdout), [])
+  assert.match(result.stderr, /Recent database calls were repeatedly slow \(1\/1 calls >=1ms/)
+  assert.doesNotMatch(result.stdout, /database|slow/)
 })

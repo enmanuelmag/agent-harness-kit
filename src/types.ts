@@ -1,3 +1,5 @@
+import type { DatabaseDiagnosticsConfig } from './core/database-diagnostics'
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export type Provider = 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
@@ -134,6 +136,7 @@ export interface HarnessConfig {
   project: ProjectConfig
   provider: Provider
   storage: StorageConfig
+  databaseDiagnostics?: DatabaseDiagnosticsConfig
   database: DatabaseConfig
   health: HealthConfig
   tools: ToolsConfig

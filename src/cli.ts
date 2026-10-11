@@ -22,6 +22,8 @@ import { isExecutableOnPath, printMissingGlobalBinaryWarning } from '@/core/path
 import { capture } from '@/core/result'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
 
+import { withDatabaseNoticeSink } from './core/database-diagnostics'
+
 const cwd = process.cwd()
 
 /**
@@ -249,8 +251,9 @@ program
 program
   .command('doctor')
   .description('Check lib version, agent files, and harness skills sync status')
-  .action(async () => {
-    await runDoctor(cwd)
+  .option('--db', 'Inspect cached database history and storage diagnostics')
+  .action(async (opts: { db?: boolean }) => {
+    await runDoctor(cwd, opts)
   })
 
 // ─── models ───────────────────────────────────────────────────────────────────
@@ -305,6 +308,8 @@ function rewriteLegacyMigrateArgv(argv: string[]): string[] {
 }
 
 await runCliBoundary(
-  () => program.parseAsync(rewriteLegacyMigrateArgv(process.argv)),
+  () => withDatabaseNoticeSink(notice => {
+    if (commandContext !== 'ahk serve') process.stderr.write(`[agent-harness-kit] ${notice.message}\n`)
+  }, () => program.parseAsync(rewriteLegacyMigrateArgv(process.argv))),
   () => commandContext
 )
