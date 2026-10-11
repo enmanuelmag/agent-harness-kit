@@ -17,6 +17,8 @@ Yarn Modern (Berry) removed `yarn global`; install AHK globally through pnpm, np
 
 For the complete offline product guide after installation, ask: “Use `ahk-docs` to explain how AHK works.” The same bundled guide is in [the source skill](src/core/materializer/skills/ahk-docs/SKILL.md).
 
+See [CHANGELOG.md](CHANGELOG.md) for versioned changes and migration requirements.
+
 ## Choose a workflow
 
 Ask explicitly for a skill when predictable routing matters. Natural-language routing can help, but provider skill selection is not guaranteed.
