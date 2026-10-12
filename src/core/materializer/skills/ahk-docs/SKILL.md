@@ -17,6 +17,7 @@ Answer product and operating questions about Agent Harness Kit using the install
 - Read [workflows](resources/workflows.md) for choosing a skill, use cases, specifications, and implementation.
 - Read [setup and providers](resources/setup-and-providers.md) for installation, initialization, provider files, model preferences, and storage.
 - Read [MCP and lifecycle](resources/mcp-and-lifecycle.md) for tasks, actions, handoffs, health gates, and repair.
+- Read [local sound notifications](resources/notifications.md) for optional audio, provider hooks, deduplication, global ledger and delivery limits.
 - Read [maintenance](resources/maintenance.md) for build, sync, doctor, updates, and skill migrations.
 - Read [CLI and configuration](resources/cli-and-configuration.md) for commands, flags, generated files, and configuration shape.
 - Read [MCP tools](resources/mcp-tools.md) when exact tool families or document operations matter.

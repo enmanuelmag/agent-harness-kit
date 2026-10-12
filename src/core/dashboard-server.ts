@@ -102,14 +102,15 @@ export function awaitServerListening(server: ClosableServer, port: number): Prom
 
 export interface DashboardServerResult {
   url: string
-  close: () => void
+  close: () => Promise<void>
 }
 
 export async function startDashboardServer(
   db: HarnessDB,
   dbPath: string | null,
   staticPath: string,
-  port: number
+  port: number,
+  log: (message: string) => void = console.log
 ): Promise<DashboardServerResult> {
   const app = new Hono()
   const { tasks, actions, stats } = db
@@ -234,7 +235,7 @@ export async function startDashboardServer(
   // report an occupied port as free (see DASHBOARD_BIND_HOST).
   const resolvedPort = await findFreePort(port, { host: DASHBOARD_BIND_HOST })
   if (resolvedPort !== port) {
-    console.log(`Port ${port} in use, using ${resolvedPort}`)
+    log(`Port ${port} in use, using ${resolvedPort}`)
   }
 
   const httpServer = serve({
@@ -252,7 +253,7 @@ export async function startDashboardServer(
   // Keep a handler attached for the server's lifetime so a later runtime error
   // is reported rather than crashing the process as an unhandled event.
   httpServer.on('error', (err: NodeJS.ErrnoException) => {
-    console.error(`Dashboard server error: ${err.message}`)
+    log(`Dashboard server error: ${err.message}`)
   })
 
   // ─── WebSocket ────────────────────────────────────────────────────────────
@@ -292,11 +293,13 @@ export async function startDashboardServer(
 
   return {
     url: `http://localhost:${resolvedPort}`,
-    close: () => {
+    close: async () => {
       clearTimeout(debounce)
       watcher?.close()
-      wss.close()
-      httpServer.close()
+      for (const client of wss.clients) client.terminate()
+      await new Promise<void>((resolveClose) => wss.close(() => resolveClose()))
+      if ('closeAllConnections' in httpServer) httpServer.closeAllConnections()
+      await new Promise<void>((resolveClose) => httpServer.close(() => resolveClose()))
     },
   }
 }

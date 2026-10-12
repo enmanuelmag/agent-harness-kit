@@ -206,5 +206,6 @@ export const OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
     lib: version,
     agents: names,
     skills: names.extend({ outdated: strings }),
+    database: z.record(z.string(), z.unknown()).optional(),
   }),
 }

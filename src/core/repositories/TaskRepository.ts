@@ -58,6 +58,20 @@ export class TaskRepository {
     return this.driver.query<TaskRow>(sql, params)
   }
 
+  /** Explicit status-report query; pagination is applied by SQL, not after loading history. */
+  async getStatusPage(limit: number, offset: number, archived = false): Promise<TaskRow[]> {
+    return this.driver.query<TaskRow>(
+      `SELECT * FROM tasks WHERE archived_at IS ${archived ? 'NOT ' : ''}NULL ORDER BY CASE status WHEN 'pending' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'blocked' THEN 3 WHEN 'done' THEN 4 ELSE 5 END, updated_at DESC, id DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    )
+  }
+  async countStatusTasks(archived = false): Promise<number> {
+    return Number((await this.driver.queryOne<{ total: number }>(`SELECT COUNT(*) total FROM tasks WHERE archived_at IS ${archived ? 'NOT ' : ''}NULL`))?.total ?? 0)
+  }
+  async getAcceptancePage(taskId: number, limit = 100): Promise<TaskAcceptanceRow[]> {
+    return this.driver.query<TaskAcceptanceRow>('SELECT * FROM task_acceptance WHERE task_id = ? ORDER BY id LIMIT ?', [taskId, limit])
+  }
+
   async getAllWithAcceptanceCounts(includeArchived = false): Promise<TaskWithAcceptance[]> {
     let sql = `
       SELECT t.*,

@@ -3,8 +3,13 @@ import { join, resolve } from 'node:path'
 import { type CallToolResult, McpServer } from '@modelcontextprotocol/server'
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 
+import { findConfigFile, loadConfig } from './config'
 import { type HarnessDB, openDB } from './db'
 import { getDoctorStatus } from './doctor'
+import { configureNotifications, notificationConfigurationStatus } from './maintenance/config'
+import { MaintenanceService } from './maintenance/operations'
+import { withMaintenanceLock } from './maintenance/plans'
+import { MAINTENANCE_OPERATIONS, MAINTENANCE_TOOLS } from './maintenance-tools'
 import { detectPackageManager, getRunOnceCommandParts } from './materializer/detect-package-manager'
 import { slugify } from './materializer/scaffold-utils'
 import {
@@ -23,6 +28,10 @@ import {
   str,
 } from './mcp-normalizers'
 import { TOOLS } from './mcp-tools'
+import { installNotificationHooks, uninstallNotificationHooks } from './notifications/install'
+import { appendNotificationMarker, captureNotificationEvents } from './notifications/marker'
+import { resolveSoundAsset } from './notifications/player'
+import { notificationCliPath,NotificationService } from './notifications/runtime'
 import {
   collectOperationalNotices,
   createNoticeSession,
@@ -46,25 +55,99 @@ import type { ActionStatus, AgentName, HarnessConfig, TaskStatus } from '@/types
 
 // ─── Server ───────────────────────────────────────────────────────────────────
 
-export async function startMcpServer(config: HarnessConfig, cwd: string): Promise<void> {
-  const db = await openDB(config, cwd)
-  const docsPath = resolve(cwd, config.project.docsPath)
+export async function startMcpServer(config: HarnessConfig | undefined, cwd: string): Promise<void> {
+  let db: HarnessDB | undefined
+  let initialDatabaseError: { code: 'database_busy' | 'restart_required'; message: string } | undefined
+  if (config) {
+    try { db = await openDB(config, cwd) }
+    catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause)
+      if (!/^(database_busy|restart_required):/.test(message)) throw cause
+      initialDatabaseError = { code: message.startsWith('database_busy:') ? 'database_busy' : 'restart_required', message }
+    }
+  }
+  const docsPath = resolve(cwd, config?.project.docsPath ?? './docs')
 
-  const server = createMcpServer(config, cwd, db, docsPath)
+  const server = createMcpServer(config, cwd, db, docsPath, { initialDatabaseError })
   const transport = new StdioServerTransport()
   await server.connect(transport)
 }
 
 /** Registration is also exposed for real protocol tests with an isolated database. */
 export function createMcpServer(
-  config: HarnessConfig,
+  config: HarnessConfig | undefined,
   cwd: string,
-  db: HarnessDB,
-  docsPath = resolve(cwd, config.project.docsPath)
+  db?: HarnessDB,
+  docsPath = resolve(cwd, config?.project.docsPath ?? './docs'),
+  runtimeOptions: { homeDir?: string; initialDatabaseError?: { code: 'database_busy' | 'restart_required'; message: string } } = {}
 ): McpServer {
   const server = new McpServer({ name: 'agent-harness-kit', version: pkg.version })
   warmUpdateCache()
   const noticeSession = createNoticeSession()
+  let fenced = !!runtimeOptions.initialDatabaseError
+  let databaseError = runtimeOptions.initialDatabaseError
+  let queue: Promise<unknown> = Promise.resolve()
+  const serialized = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = queue.then(operation, operation)
+    queue = result.catch(() => undefined)
+    return result
+  }
+  const reload = async () => {
+    config = await loadConfig(cwd)
+    docsPath = resolve(cwd, config.project.docsPath)
+    if (!db) db = await openDB(config, cwd, runtimeOptions.homeDir)
+    fenced = false
+    databaseError = undefined
+  }
+  const maintenance = new MaintenanceService(cwd, {
+    homeDir: runtimeOptions.homeDir,
+    getConfig: async () => { if (findConfigFile(cwd)) return loadConfig(cwd); if (!config) throw new Error('not_initialized'); return config },
+    beforeStorageChange: async () => { fenced = true; await db?.close(); db = undefined },
+    afterStorageChange: reload,
+  })
+  const executeMaintenance = async (name: string, args: Record<string, unknown>): Promise<CallToolResult> => {
+    const operation = name.slice(4)
+    let outcome: { ok: boolean; operation: string; code: string; message?: string; data?: Record<string, unknown>; required?: string[]; notices?: string[] }
+    try {
+      assertNormalized(args)
+      if (operation === 'capabilities') outcome = { ok: true, operation, code: 'ok', data: { version: pkg.version, tools: MAINTENANCE_TOOLS.map(tool => ({ name: tool.name, description: tool.description })), tasks: ['tasks.add', 'tasks.get', 'tasks.edit', 'tasks.update'], internalTransportOnly: ['notifications hook', 'notifications deliver'], migrations: 'Only registered provider, storage, specs and skills migrations are supported', databaseWarnings: 'Informational timings; no automatic archive or deletion' } }
+      else if (operation === 'serve') {
+        const stored = findConfigFile(cwd) ? await loadConfig(cwd) : undefined
+        outcome = { ok: true, operation, code: 'already_running', data: { transport: 'stdio', configuredPort: config?.tools.mcp.port ?? null, requestedPort: args.port ?? null, restartRequired: fenced || (args.port !== undefined && args.port !== config?.tools.mcp.port), mode: !config ? 'setup' : fenced || !db ? 'maintenance' : 'normal', storedProvider: stored?.provider ?? null, effectiveProvider: config?.provider ?? null, databaseAvailable: !!db && !fenced, databaseError: databaseError ?? null } }
+      }
+      else if (/^notifications\.(configure|enable|disable)$/.test(operation)) {
+        outcome = await configureNotifications(cwd, { scope: args.scope as 'project' | 'global', patch: operation === 'notifications.configure' ? args.patch as never : { enabled: operation === 'notifications.enable' }, unset: args.unset as string[] | undefined }, runtimeOptions.homeDir ? { globalPath: join(runtimeOptions.homeDir, '.config/agent-harness-kit/notifications.json') } : {})
+        if (outcome.ok && findConfigFile(cwd)) {
+          config = await loadConfig(cwd)
+          docsPath = resolve(cwd, config.project.docsPath)
+        }
+      } else if (operation === 'notifications.install' || operation === 'notifications.uninstall') {
+        const result = await withMaintenanceLock(cwd, () => operation.endsWith('uninstall') ? uninstallNotificationHooks(cwd, args.provider as never) : installNotificationHooks(cwd, args.provider as never, { node: process.execPath, cli: notificationCliPath() }))
+        outcome = result.ok ? { ok: true, operation, code: 'ok', data: { ...result.value } } : { ok: false, operation, code: 'hook_failed', message: result.error.message }
+      } else if (operation === 'notifications.status' || operation === 'notify.attention') {
+        const instance = new NotificationService(config ?? { storage: { projectId: '' } }, cwd, { homeDir: runtimeOptions.homeDir })
+        if (operation === 'notify.attention') {
+          const result = instance.publish('attention.requested', `workflow:${String(args.requestId)}`)
+          outcome = result.ok ? { ok: true, operation, code: instance.settings.enabled ? 'requested' : 'disabled', data: { eventId: result.value?.id ?? null } } : { ok: false, operation, code: 'notification_failed', message: result.error.message }
+        } else {
+          const status = await notificationConfigurationStatus(cwd, runtimeOptions.homeDir ? { globalPath: join(runtimeOptions.homeDir, '.config/agent-harness-kit/notifications.json') } : {})
+          outcome = status.ok ? { ...status, operation, data: { ...status.data, ledgerPath: instance.ledgerPath, projectKey: instance.projectKey, assets: Object.fromEntries(Object.entries(instance.settings.sounds).map(([kind, sound]) => [kind, resolveSoundAsset(sound)])) } } : status
+        }
+      } else {
+        outcome = await maintenance.execute(operation, args)
+        if (outcome.ok && ['init', 'models', 'migrate.provider.apply', 'sync.apply', 'migrate.storage.apply', 'reset.apply'].includes(operation)) await reload()
+        if (operation === 'status') outcome.data = { ...outcome.data, runtime: { mode: !config ? 'setup' : fenced || !db ? 'maintenance' : 'normal', databaseAvailable: !!db && !fenced, effectiveProvider: config?.provider ?? null, error: databaseError ?? null } }
+      }
+    } catch (cause) {
+      outcome = { ok: false, operation, code: fenced ? 'restart_required' : 'operation_failed', message: cause instanceof Error ? cause.message : String(cause) }
+    }
+    outcome.operation = operation
+    const validated = outputContracts[name].safeParse(outcome)
+    const dto = validated.success ? validated.data as Record<string, unknown> : { ok: false, operation, code: 'invalid_output', message: `Maintenance output failed ${operation} validation: ${validated.error.message}` }
+    return { content: [{ type: 'text', text: JSON.stringify(dto) }], structuredContent: dto, isError: dto.ok !== true }
+  }
+  const originalClose = server.close.bind(server)
+  server.close = async () => { await serialized(async () => { await maintenance.dispose(); await db?.close(); db = undefined }); await originalClose() }
   for (const tool of TOOLS) {
     server.registerTool(
       tool.name,
@@ -73,10 +156,26 @@ export function createMcpServer(
         inputSchema: sdkInputContracts[tool.name],
         outputSchema: outputContracts[tool.name],
       },
-      async (args) => {
+      async (args) => serialized(async () => {
         const a = args as Record<string, unknown>
-        const result = await executeToolResult(tool.name, a, db, docsPath, cwd, config)
-        return attachOperationalNotices(
+        const captured = await captureNotificationEvents(async () => {
+          if (MAINTENANCE_OPERATIONS.has(tool.name)) return executeMaintenance(tool.name, a)
+          const databaseIndependent = tool.name.startsWith('specs.') || ['docs.search','permissions.check','deps.check','deps.snapshot'].includes(tool.name) || (tool.name === 'ahk.doctor' && a.db !== true)
+          if (!config || ((!db || fenced) && !databaseIndependent)) {
+            const dto = { ok: false, code: !config ? 'not_initialized' : databaseError?.code ?? 'restart_required', operation: tool.name, message: !config ? 'Initialize this workspace with ahk.init.' : databaseError?.message ?? 'Database maintenance requires a verified reopen before business operations.' }
+            return { content: [{ type: 'text' as const, text: JSON.stringify(dto) }], structuredContent: dto, isError: true }
+          }
+          // The bounded database-independent set never dereferences this argument.
+          const result = await executeToolResult(tool.name, a, db as HarnessDB, docsPath, cwd, config)
+          const failureDto = !result.ok ? result.error.response.structuredContent as Record<string, unknown> | undefined : undefined
+          if (failureDto && ['database_busy','restart_required'].includes(String(failureDto.code))) {
+            const dto = failureDto
+            fenced = true
+            databaseError = { code: dto.code as 'database_busy' | 'restart_required', message: String(dto.message) }
+            await db?.close()
+            db = undefined
+          }
+          return attachOperationalNotices(
           tool.name,
           a,
           cwd,
@@ -86,7 +185,9 @@ export function createMcpServer(
           false,
           db
         )
-      }
+        })
+        return appendNotificationMarker(captured.result, captured.events)
+      })
     )
   }
   return server
@@ -115,7 +216,9 @@ export async function executeToolResult(
     return err({
       context: name,
       cause: result.error.cause,
-      response: ok(`Error: ${result.error.message}`, true),
+      response: /^(database_busy|restart_required):/.test(result.error.message)
+        ? (() => { const code = result.error.message.split(':', 1)[0]; const dto = { ok: false, operation: name, code, message: result.error.message }; return { content: [{ type: 'text' as const, text: JSON.stringify(dto) }], structuredContent: dto, isError: true } })()
+        : ok(`Error: ${result.error.message}`, true),
     })
   // Some domain failures already have a protocol response. Keep it unchanged.
   return result.value.isError
@@ -453,9 +556,9 @@ async function execute(
       const status = args['status'] as string | undefined
       const includeArchived = args['includeArchived'] as boolean | undefined
       const tasks = status
-        ? await db.getTasks(status as TaskStatus, includeArchived ?? false)
-        : await db.getTasks(undefined, includeArchived ?? false)
-      return ok(JSON.stringify(tasks))
+        ? await db.getTasks(status as TaskStatus, args.archivedOnly === true || (includeArchived ?? false))
+        : await db.getTasks(undefined, args.archivedOnly === true || (includeArchived ?? false))
+      return ok(JSON.stringify(args.archivedOnly === true ? tasks.filter(task => task.archived_at !== null) : tasks))
     }
 
     case 'health.run': {
@@ -494,7 +597,8 @@ async function execute(
     }
 
     case 'tasks.update': {
-      const id = num(args, 'id')
+      const id = typeof args.id === 'string' && /^[a-z][a-z0-9-]*$/.test(args.id) ? (await db.getTaskBySlug(args.id))?.id : num(args, 'id')
+      if (!id) return ok(JSON.stringify({ error: 'Task not found', taskId: args.id }), true)
       const status = str(args, 'status') as TaskStatus
       if (status === 'done') {
         const reserved = await db.beginVerification(id)
@@ -563,7 +667,8 @@ async function execute(
     }
 
     case 'tasks.edit': {
-      const id = num(args, 'id')
+      const id = typeof args.id === 'string' && /^[a-z][a-z0-9-]*$/.test(args.id) ? (await db.getTaskBySlug(args.id))?.id : num(args, 'id')
+      if (!id) return ok(JSON.stringify({ error: 'Task not found', taskId: args.id }), true)
       const title = args['title'] as string | undefined
       const description = args['description'] as string | null | undefined
       const acceptance = args['acceptance'] as string[] | null | undefined
@@ -712,6 +817,7 @@ async function execute(
           outdated: status.skills.filter((s) => s.status === 'outdated').map((s) => s.name),
           ok: status.skills.filter((s) => s.status === 'ok').map((s) => s.name),
         },
+        ...(args.db === true ? { database: await db.databaseDiagnosticNotice() } : {}),
       }
       return ok(JSON.stringify(result))
     }

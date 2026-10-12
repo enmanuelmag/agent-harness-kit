@@ -33,6 +33,8 @@ export interface NotificationRuntimeOptions {
   now?: () => number
 }
 export class NotificationService {
+  private settingsRevision?: string
+  private currentSettings?: NotificationSettings
   get settings(): NotificationSettings {
     const managed = loadManagedConfig(this.cwd)
     const base =
@@ -42,10 +44,13 @@ export class NotificationService {
     const config = managed.ok
       ? mergeManagedConfig({ notifications: base }, managed.value)
       : { notifications: base }
-    return normalizeNotifications(
-      config.notifications,
-      readGlobalNotifications(this.options.homeDir ?? homedir())
-    )
+    const global = readGlobalNotifications(this.options.homeDir ?? homedir())
+    const revision = JSON.stringify([config.notifications, global])
+    if (!this.currentSettings || revision !== this.settingsRevision) {
+      this.currentSettings = normalizeNotifications(config.notifications, global)
+      this.settingsRevision = revision
+    }
+    return this.currentSettings
   }
   readonly projectKey: string
   readonly ledgerPath: string

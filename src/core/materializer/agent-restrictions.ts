@@ -38,7 +38,22 @@
  *    Codex's) — see `grokToolsAllowlist` below.
  */
 
+import { MAINTENANCE_TOOLS } from '../maintenance-tools'
+
 export type AgentName = 'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer'
+
+/** Server-owned maintenance is separate from arbitrary project file edits. */
+export function maintenanceOperationsFor(agentName: AgentName): string[] {
+  return MAINTENANCE_TOOLS.map(tool => tool.name).filter(name =>
+    agentName === 'lead' || agentName === 'builder' ||
+    name.endsWith('.plan') || name.endsWith('.status') ||
+    ['ahk.capabilities', 'ahk.status', 'ahk.serve', 'ahk.health', 'ahk.notify.attention'].includes(name)
+  )
+}
+
+export function claudeMaintenancePermissions(agentName: AgentName): string[] {
+  return maintenanceOperationsFor(agentName).map(name => `mcp__agent-harness-kit__${name.replaceAll('.', '_')}`)
+}
 
 export type AgentRestriction = 'none' | 'no-write'
 
@@ -116,7 +131,7 @@ You MUST NOT create, modify, or delete any file: no \`Write\`, no \`Edit\`, no \
 If you find yourself about to perform a write, STOP. Do not perform it. Report it as a blocker instead. Treat this as a hard rule: breaking it will not fail loudly, it will silently break the harness's audit trail and workflow guarantees.`
 
 export function codexRestrictionNotice(agentName: AgentName): string {
-  return restrictionFor(agentName) === 'no-write' ? CODEX_READ_ONLY_NOTICE : ''
+  return restrictionFor(agentName) === 'no-write' ? CODEX_READ_ONLY_NOTICE + '\n\nServer-owned AHK maintenance is separate from direct project edits. Your permitted maintenance operations are: ' + maintenanceOperationsFor(agentName).join(', ') + '. These permissions do not authorize arbitrary file edits or inventing unsupported migrations; use the server plans and explicit selections.' : ''
 }
 
 // ─── Grok Build ──────────────────────────────────────────────────────────────

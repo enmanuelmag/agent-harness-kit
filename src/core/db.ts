@@ -3,12 +3,14 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
 import { currentDatabaseNoticeSink,DatabaseDiagnostics } from './database-diagnostics'
+import { NotificationService } from './notifications/runtime'
 import { ActionRepository } from './repositories/ActionRepository'
 import { StatsRepository } from './repositories/StatsRepository'
 import { TaskRepository } from './repositories/TaskRepository'
 import { actionDeniedMessage, canStartAction } from './task-execution-policy'
 
 import type { DBDriver } from './drivers/types'
+import type { SQLiteMaintenanceToken } from './sqlite-ownership'
 import type {
   ActionRow,
   ActionSectionRow,
@@ -94,8 +96,10 @@ export class HarnessDB {
   readonly diagnostics: DatabaseDiagnostics
   private sqliteDiagnosticsPath?: string
   private noticeSink = currentDatabaseNoticeSink()
+  private notifications?: NotificationService
 
-  constructor(driver: DBDriver, config: HarnessConfig, _homeDir: string = homedir(), diagnostics = new DatabaseDiagnostics(config.databaseDiagnostics), sqliteDiagnosticsPath?: string) {
+  constructor(driver: DBDriver, config: HarnessConfig, _homeDir: string = homedir(), diagnostics = new DatabaseDiagnostics(config.databaseDiagnostics), sqliteDiagnosticsPath?: string, notifications?: NotificationService) {
+    this.notifications = notifications
     this.diagnosticDriver = driver
     this.diagnostics = diagnostics
     this.sqliteDiagnosticsPath = sqliteDiagnosticsPath
@@ -245,7 +249,13 @@ export class HarnessDB {
       result.executionMode,
       result.runId
     )
-    return changed ? this.getTaskById(taskId) : null
+    const resolved = changed ? await this.getTaskById(taskId) : null
+    try { if (resolved) {
+      if (next === 'blocked' && resolved.execution_mode === 'blocked') this.notifications?.healthBlocked(resolved)
+      else if (passed && next === 'normal' && resolved.execution_mode === 'normal') this.notifications?.recovered(resolved)
+    }
+    } catch { /* notifications cannot change persisted health results */ }
+    return resolved
   }
 
   async beginRepair(
@@ -329,7 +339,7 @@ export class HarnessDB {
   ): Promise<TaskRow | null> {
     if (result.state !== 'passed') return null
     const now = new Date().toISOString()
-    return this.driver.transaction(async (tx) => {
+    const completed = await this.driver.transaction(async (tx) => {
       const tasks = new TaskRepository(tx)
       const task = await tasks.getById(taskId)
       if (
@@ -350,6 +360,8 @@ export class HarnessDB {
       await new ActionRepository(tx).closeOrphaned(taskId, now)
       return tasks.getById(taskId)
     })
+    try { if (completed) this.notifications?.taskCompleted(completed) } catch { /* preserve committed completion */ }
+    return completed
   }
 
   async markAcceptanceMet(criterionId: number): Promise<void> {
@@ -478,16 +490,18 @@ export class HarnessDB {
 
   /** Full relational export of tasks, acceptance criteria, actions, and sections. */
   async exportJson(): Promise<FullExport> {
-    return {
-      tasks: await this.tasks.getAll(undefined, true),
-      taskAcceptance: await this.tasks.getAllAcceptance(),
-      actions: await this.actions.getAll(),
-      sections: await this.actions.getAllSections(),
-      healthRuns: await this.driver.query<TaskHealthRunRow>(
-        'SELECT * FROM task_health_runs ORDER BY started_at, id'
-      ),
-      repairs: await this.driver.query<TaskRepairRow>('SELECT * FROM task_repairs ORDER BY id'),
-    }
+    return this.driver.transaction(async tx => {
+      const tasks = new TaskRepository(tx)
+      const actions = new ActionRepository(tx)
+      return {
+        tasks: await tasks.getAll(undefined, true),
+        taskAcceptance: await tasks.getAllAcceptance(),
+        actions: await actions.getAll(),
+        sections: await actions.getAllSections(),
+        healthRuns: await tx.query<TaskHealthRunRow>('SELECT * FROM task_health_runs ORDER BY started_at, id'),
+        repairs: await tx.query<TaskRepairRow>('SELECT * FROM task_repairs ORDER BY id'),
+      }
+    })
   }
 
   /** Row counts for all four workflow tables against THIS db's driver — used to decide
@@ -800,7 +814,7 @@ export async function openDB(
   config: HarnessConfig,
   cwd: string,
   homeDir: string = homedir(),
-  options: { initializeSchema?: boolean } = {}
+  options: { initializeSchema?: boolean; sqliteMaintenance?: SQLiteMaintenanceToken } = {}
 ): Promise<HarnessDB> {
   const dbConfig = config.database
   let driver: DBDriver
@@ -844,9 +858,14 @@ export async function openDB(
       dbPath = resolve(cwd, config.storage.sqlitePath ?? DEFAULT_SQLITE_PATH)
     }
 
-    driver = new SQLiteDriver(dbPath, options.initializeSchema === false)
+    driver = new SQLiteDriver(dbPath, options.initializeSchema === false, options.sqliteMaintenance)
   }
 
   if (options.initializeSchema !== false) await driver.ensureSchema()
-  return new HarnessDB(driver, config, homeDir, new DatabaseDiagnostics(config.databaseDiagnostics), dbConfig.type === 'sqlite' ? resolveSqlitePath(config, cwd, homeDir) : undefined)
+  let notifications: NotificationService | undefined
+  try {
+    const service = new NotificationService(config, cwd, { homeDir })
+    notifications = service
+  } catch { /* optional notification configuration is fail-open */ }
+  return new HarnessDB(driver, config, homeDir, new DatabaseDiagnostics(config.databaseDiagnostics), dbConfig.type === 'sqlite' ? resolveSqlitePath(config, cwd, homeDir) : undefined, notifications)
 }

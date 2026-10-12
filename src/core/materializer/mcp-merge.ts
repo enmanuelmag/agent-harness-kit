@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
+import { claudeMaintenancePermissions } from './agent-restrictions'
 import { getMcpCommandParts } from './detect-package-manager'
 
 import type { PackageManager } from './detect-package-manager'
@@ -125,6 +126,7 @@ export function mergeClaudeSettingsJson(filePath: string): void {
 
 // Merge MCP tool permissions into .claude/settings.local.json
 export const MCP_CLAUDE_PERMISSIONS_LEAD = [
+  ...claudeMaintenancePermissions('lead'),
   'mcp__agent-harness-kit__health_run',
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
@@ -143,6 +145,7 @@ export const MCP_CLAUDE_PERMISSIONS_LEAD = [
 ]
 
 export const MCP_CLAUDE_PERMISSIONS_EXPLORER = [
+  ...claudeMaintenancePermissions('explorer'),
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
   'mcp__agent-harness-kit__actions_complete',
@@ -161,6 +164,7 @@ export const MCP_CLAUDE_PERMISSIONS_EXPLORER = [
 ]
 
 export const MCP_CLAUDE_PERMISSIONS_BUILDER = [
+  ...claudeMaintenancePermissions('builder'),
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
   'mcp__agent-harness-kit__actions_complete',
@@ -185,6 +189,7 @@ export const MCP_CLAUDE_PERMISSIONS_BUILDER = [
 ]
 
 export const MCP_CLAUDE_PERMISSIONS_REVIEWER = [
+  ...claudeMaintenancePermissions('reviewer'),
   'mcp__agent-harness-kit__health_run',
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
@@ -211,6 +216,7 @@ export const MCP_CLAUDE_PERMISSIONS_REVIEWER = [
 ]
 
 export const MCP_CLAUDE_PERMISSIONS_CONSULTANT = [
+  ...claudeMaintenancePermissions('consultant'),
   'mcp__agent-harness-kit__actions_start',
   'mcp__agent-harness-kit__actions_write',
   'mcp__agent-harness-kit__actions_complete',

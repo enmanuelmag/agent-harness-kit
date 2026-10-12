@@ -24,7 +24,18 @@ notifications: {
 }
 ```
 
-Project settings override an existing user `~/.config/agent-harness-kit/notifications.json` setting per field/category, then defaults apply. AHK does not create or edit that optional global configuration. Only the four packaged WAV names are accepted. Categories default enabled once the overall switch is enabled; set a category false to disable it. Assets are resolved from the installed package, never from project cwd; no conversion or FFmpeg is needed at runtime.
+Precedence is defaults, global `~/.config/agent-harness-kit/notifications.json`, base project configuration, then managed `agent-harness-kit.config.local.json` per field/category. Explicit scoped configuration commands atomically merge JSON and preserve executable base config bytes, unrelated settings and existing private file permissions. Malformed files, symlinks and concurrent writes are reported rather than overwritten. `--unset` restores inheritance; an explicit project disable overrides global enable. Ledger row/age caps remain global. Only the four packaged WAV names are accepted. Categories default enabled once the overall switch is enabled; set a category false to disable it. Assets are resolved from the installed package, never from project cwd; no conversion or FFmpeg is needed at runtime.
+
+`ahk init` asks two independent default-off questions: activate optional sounds, and install managed project hooks. `--notifications`/`--no-notifications` and `--notification-hooks`/`--no-notification-hooks` skip their respective question; `--notification-scope project|global` selects where activation is stored. Existing setups use:
+
+```sh
+ahk notifications enable --scope project
+ahk notifications disable --scope global
+ahk notifications configure --scope project --patch '{"categories":{"provider.completed":false}}'
+ahk notifications configure --scope project --unset enabled
+```
+
+MCP equivalents are `ahk.notifications.status`, `configure`, `enable`, `disable`, `install`, `uninstall`, and `ahk.notify.attention`. Writes require explicit scope. Active notification services refresh bounded settings in the same session. Hook installation remains project-local and independent of global activation.
 
 - `ahk notifications status [--json]`: settings, ledger location and asset paths, without opening the ledger.
 - `ahk notifications install --provider cursor|claude-code|codex-cli|opencode`: explicitly merge owned project hooks or create the owned OpenCode plugin. Re-installation is idempotent; conflicts/edited entries are preserved and reported.
@@ -64,4 +75,4 @@ The separate global ledger lives at `~/.config/agent-harness-kit/notifications.d
 
 New dedicated parent directories use 0700 and the DB 0600 where supported. Existing shared directories are not chmodded. Schema incompatibility disables notifications safely instead of dropping/recreating the registry. SQLite WAL and a 50ms busy timeout coordinate short atomic reservations across processes; there is no growing server connection registry or full-table history cache.
 
-Default retention is **1000 rows total across events, bindings and episodes /24 hours globally**, not per project. Only the optional existing global configuration can reduce `maxRecords` (10–1000) or `maxAgeMs` (1000–86400000); project overrides do not change other projects' global retention policy. Pruning uses bounded victim batches. Retention/eviction can degrade deduplication, but never leave a turn suppressed indefinitely. SQLite reusable free pages/WAL mean row caps are not an exact disk-size promise. No VACUUM or task-data cleanup is performed by this feature.
+Default retention is **1000 rows total across events, bindings and episodes /24 hours globally**, not per project. Only the optional global configuration can reduce `maxRecords` (10–1000) or `maxAgeMs` (1000–86400000); project overrides do not change other projects' global retention policy. Pruning uses bounded victim batches. Retention/eviction can degrade deduplication, but never leave a turn suppressed indefinitely. SQLite reusable free pages/WAL mean row caps are not an exact disk-size promise. No VACUUM or task-data cleanup is performed by this feature.

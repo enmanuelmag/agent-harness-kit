@@ -1,7 +1,9 @@
-import { existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 import { lastInsertId, openSQLite, type SQLiteDB } from '../sqlite-adapter'
+import { assertSQLiteOwner, registerSQLiteOwner, releaseSQLiteOwner, type SQLiteMaintenanceToken } from '../sqlite-ownership'
 import { migrateActionsToIntegerIds } from './migrate-actions'
 import { removeTraceabilityTables } from './remove-traceability'
 
@@ -92,30 +94,29 @@ CREATE INDEX IF NOT EXISTS idx_actions_status    ON actions(status);
 export class SQLiteDriver implements DBDriver {
   private db: SQLiteDB
   private dbPath: string
+  private owner?: ReturnType<typeof registerSQLiteOwner>
+  private transactionDepth = 0
+  private readonly transactionContext = new AsyncLocalStorage<boolean>()
+  private closed = false
 
-  constructor(dbPath: string, private readonly diagnosticsOnly = false) {
+  constructor(dbPath: string, private readonly diagnosticsOnly = false, maintenance?: SQLiteMaintenanceToken) {
     this.dbPath = dbPath
     if (diagnosticsOnly) {
       this.db = openSQLite(dbPath, true)
       return
     }
     mkdirSync(dirname(dbPath), { recursive: true })
-    // Remove stale WAL/SHM files left by a crashed session — they cause SQLITE_IOERR.
-    // A 0-byte WAL alongside a non-empty SHM means the last checkpoint never completed.
-    if (existsSync(dbPath)) {
-      const shm = `${dbPath}-shm`
-      const wal = `${dbPath}-wal`
-      if (existsSync(shm) && existsSync(wal) && statSync(wal).size === 0) {
-        rmSync(shm, { force: true })
-        rmSync(wal, { force: true })
-      }
-    }
+    this.owner = registerSQLiteOwner(dbPath, maintenance)
+    try {
     this.db = openSQLite(dbPath)
     this.db.exec('PRAGMA journal_mode = WAL')
     this.db.exec('PRAGMA foreign_keys = ON')
+    if (maintenance) this.db.exec('PRAGMA busy_timeout = 50')
+    } catch (error) { releaseSQLiteOwner(this.owner); throw error }
   }
 
   async ensureSchema(): Promise<void> {
+    this.assertOwner()
     this.db.exec(SCHEMA)
     // Migration: add archived_at column (safe to run multiple times)
     try {
@@ -169,28 +170,34 @@ export class SQLiteDriver implements DBDriver {
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+    this.assertOwner()
     return this.db.prepare(sql).all(...params) as unknown as T[]
   }
 
   async queryOne<T>(sql: string, params: unknown[] = []): Promise<T | null> {
+    this.assertOwner()
     return (this.db.prepare(sql).get(...params) as unknown as T) ?? null
   }
 
   async insert(sql: string, params: unknown[] = []): Promise<number> {
+    this.assertOwner()
     this.db.prepare(sql).run(...params)
     return lastInsertId(this.db)
   }
 
   async exec(sql: string, params: unknown[] = []): Promise<number> {
+    this.assertOwner()
     const result = this.db.prepare(sql).run(...params)
     return (result as { changes?: number }).changes ?? 0
   }
 
   async execRaw(sql: string): Promise<void> {
+    this.assertOwner()
     this.db.exec(sql)
   }
 
   async reconnect(): Promise<void> {
+    this.assertOwner()
     this.db.close()
     this.db = openSQLite(this.dbPath, this.diagnosticsOnly)
     if (this.diagnosticsOnly) return
@@ -198,19 +205,29 @@ export class SQLiteDriver implements DBDriver {
     this.db.exec('PRAGMA foreign_keys = ON')
   }
 
+  private assertOwner(): void { if (this.closed) throw new Error('restart_required: This SQLite handle is closed. Reopen using current project configuration.'); if (this.owner) assertSQLiteOwner(this.owner) }
+
+  /** Nested callers reuse the existing transaction; export and import remain one snapshot. */
   async transaction<T>(fn: (tx: DBDriver) => Promise<T>): Promise<T> {
-    this.db.exec('BEGIN IMMEDIATE')
+    this.assertOwner()
+    if (this.transactionDepth) {
+      if (this.transactionContext.getStore()) return fn(this)
+      throw new Error('database_busy: Another transaction is active on this SQLite handle. Retry after it finishes.')
+    }
+    this.db.exec(this.diagnosticsOnly ? 'BEGIN' : 'BEGIN IMMEDIATE')
+    this.transactionDepth++
     try {
-      const result = await fn(this)
+      const result = await this.transactionContext.run(true, () => fn(this))
       this.db.exec('COMMIT')
       return result
     } catch (err) {
       this.db.exec('ROLLBACK')
       throw err
-    }
+    } finally { this.transactionDepth-- }
   }
 
   async close(): Promise<void> {
-    this.db.close()
+    if (this.closed) return
+    try { this.db.close() } finally { this.closed = true; if (this.owner) { releaseSQLiteOwner(this.owner); this.owner = undefined } }
   }
 }

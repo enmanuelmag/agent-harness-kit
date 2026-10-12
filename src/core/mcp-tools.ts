@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { MAINTENANCE_TOOLS } from './maintenance-tools'
 import { recover } from './mcp-field-recovery'
 import * as recovery from './mcp-normalizers'
 import { OUTPUT_SCHEMAS } from './mcp-outputs'
@@ -7,6 +8,7 @@ import { RELATIONSHIPS, SPEC_KINDS } from './specs'
 
 // Canonical Zod fields are the only authored input schema source.
 export const TOOLS = [
+  ...MAINTENANCE_TOOLS,
   {
     name: 'specs.list',
     description:
@@ -347,6 +349,7 @@ export const TOOLS = [
         .boolean()
         .optional()
         .describe('If true, include archived tasks in results'),
+      archivedOnly: recover(z.boolean().optional(), (args, key) => z.boolean().optional().parse(args[key]), 3),
     }),
     outputSchema: OUTPUT_SCHEMAS['tasks.get'],
   },
@@ -376,7 +379,7 @@ export const TOOLS = [
     name: 'tasks.update',
     description: 'Change the status of a task.',
     inputSchema: z.object({
-      id: recover(z.number().describe('Task ID'), recovery.num, 0),
+      id: recover(z.union([z.number(), z.string()]).describe('Task ID or slug'), (args, key) => typeof args[key] === 'string' && /^[a-z][a-z0-9-]*$/.test(String(args[key])) ? String(args[key]) : recovery.num(args, key), 0),
       status: recover(z.enum(['pending', 'in_progress', 'done', 'blocked']), recovery.str, 1),
     }),
     outputSchema: OUTPUT_SCHEMAS['tasks.update'],
@@ -444,7 +447,7 @@ export const TOOLS = [
     description:
       'Edit an existing task (title, description, acceptance criteria). Omitted fields keep their current values.',
     inputSchema: z.object({
-      id: recover(z.number().describe('Task ID to edit'), recovery.num, 0),
+      id: recover(z.union([z.number(), z.string()]).describe('Task ID or slug to edit'), (args, key) => typeof args[key] === 'string' && /^[a-z][a-z0-9-]*$/.test(String(args[key])) ? String(args[key]) : recovery.num(args, key), 0),
       title: z.string().optional().describe('New title (optional)'),
       description: z.string().optional().describe('New description (optional, null to clear)'),
       acceptance: z

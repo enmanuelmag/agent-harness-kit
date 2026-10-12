@@ -1,17 +1,20 @@
-import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { createJiti } from 'jiti'
 
 import { getDefaultHealthScriptPath } from '@/core/health-check'
 
 import { normalizeDatabaseDiagnostics } from './database-diagnostics'
+import { loadManagedConfig, mergeManagedConfig } from './maintenance/config'
 
 import type { HarnessConfig } from '@/types'
 
 /** Order is precedence: the first file that exists wins. `.json` is appended
  *  last so adding it cannot change which config an existing project resolves
  *  to — a project that already has a .ts/.mjs/.cjs config keeps loading it. */
+export const BASE_NOTIFICATIONS = Symbol.for('ahk.baseNotifications')
+
 const CONFIG_NAMES = [
   'agent-harness-kit.config.ts',
   'agent-harness-kit.config',
@@ -70,7 +73,17 @@ export async function loadConfig(cwd: string): Promise<HarnessConfig> {
   // normalizeLegacyAgentsKey) for every format — a JSON config carrying a
   // legacy `agents` key or a contradictory global-scope path is normalized
   // and warned about exactly like its .ts/.mjs/.cjs counterpart.
-  return applyDefaults(config as HarnessConfig)
+  const managed = loadManagedConfig(cwd)
+  if (!managed.ok) throw new Error(`${managed.error.path}: ${managed.error.message}`)
+  const loaded = applyDefaults(
+    mergeManagedConfig(
+      config as unknown as Record<string, unknown>,
+      managed.value
+    ) as unknown as HarnessConfig,
+    createHash('sha256').update(realpathSync(cwd)).digest('hex')
+  )
+  Object.defineProperty(loaded, BASE_NOTIFICATIONS, { value: config.notifications })
+  return loaded
 }
 
 export function defineHarness(config: HarnessConfig): HarnessConfig {
@@ -163,7 +176,7 @@ function normalizeLegacyAgentsKey(raw: Record<string, unknown>): Record<string, 
   return normalized
 }
 
-function applyDefaults(config: HarnessConfig): HarnessConfig {
+function applyDefaults(config: HarnessConfig, missingProjectId?: string): HarnessConfig {
   const normalized = normalizeLegacyAgentsKey(
     normalizeLegacyStorageShape(config as unknown as Record<string, unknown>)
   )
@@ -197,7 +210,7 @@ function applyDefaults(config: HarnessConfig): HarnessConfig {
   }
 
   const scope: 'local' | 'global' = c.storage?.scope === 'global' ? 'global' : 'local'
-  const projectId = c.storage?.projectId ?? randomUUID()
+  const projectId = c.storage?.projectId ?? missingProjectId ?? randomUUID()
   const baseStorage = {
     dir: '.harness',
     tasks: { adapter: 'mcp' as const },

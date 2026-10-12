@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 
-const _require = createRequire(import.meta.url)
+const _require = createRequire(typeof __filename === 'string' ? __filename : import.meta.url)
 const isBun = 'bun' in process.versions
 
 // ─── Shared interface ─────────────────────────────────────────────────────────
