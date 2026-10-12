@@ -1,6 +1,6 @@
 {
   "name": "@cardor/agent-harness-kit",
-  "version": "3.0.0-rc.3",
+  "version": "3.0.0-rc.4",
   "description": "CLI scaffolding for multi-agent harness systems",
   "repository": {
     "type": "git",
