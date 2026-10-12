@@ -176,6 +176,14 @@ The default role design favors a stronger planning and implementation model for 
 
 Keep your project configuration, specifications, and health script under normal version control. Treat database exports and provider configuration according to your team's secret and backup policy. The harness can be local-first while optional provider clients and update checks still make network requests.
 
+## Optional local sounds
+
+Sounds are disabled by default. Set `notifications: { enabled: true }` in project configuration, then explicitly install project hooks with `ahk notifications install --provider cursor` (or `claude-code`, `codex-cli`, `opencode`). `ahk notifications status --json` reports settings and packaged asset paths; `uninstall --provider ...` removes only verified owned hooks. Existing custom hooks, edited plugins, TOML trust settings and native sound preferences are preserved.
+
+AHK emits task sounds only after verified completion commits, and blocked sounds for persisted health episodes. General provider completion is suppressed only by successfully played AHK events explicitly correlated to that same project/conversation/turn. Attention remains independent; `ahk notify attention --request-id <stable-id>` supplies an explicit workflow request. Cursor has no universal attention hook. Manually disable native completion sounds when replacing them; keeping both does not guarantee deduplication.
+
+One private per-user ledger at `~/.config/agent-harness-kit/notifications.db` coordinates processes and worktrees, with globally bounded retention. Playback is detached, quiet and best-effort; failures never change task/health results or protocol output. macOS uses `afplay`; Linux uses available `paplay`/`aplay`; Windows currently skips safely. Played means successful process exit, not that the sound was heard. See [sound configuration, provider capabilities and limits](src/core/materializer/skills/ahk-docs/resources/notifications.md).
+
 ## Release lines
 
 `release/v2` maintains the committed v2 baseline with selected fixes and patch releases. Install a specific stable v2 version with `pnpm add @cardor/agent-harness-kit@2.36.2` after that version is published. Backport fixes deliberately; the SDK v2/Zod migration belongs to v3. The local v2.36.2 cut differs from the shared committed baseline only in its package version and retains historical release tooling. Future v2 publications must explicitly use npm `--tag v2`, or selectively backport the release-tooling guards. Do not promote a v2 patch to `latest` after v3 stable is released. Updated tooling also keeps v2 GitHub releases from becoming the latest release.

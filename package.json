@@ -25,7 +25,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "pnpm run build:ui && pnpm run typecheck && tsup && pnpm run copy-assets",
+    "build": "pnpm run build:ui && pnpm run typecheck && tsup && tsup src/index.ts --format cjs --out-dir dist --platform node --target node22 --external better-sqlite3 --dts --sourcemap --no-config && pnpm run copy-assets",
     "build:ui": "pnpm --filter ahk-dashboard install && npx eslint dashboard/src/ && pnpm --filter ahk-dashboard run typecheck && pnpm --filter ahk-dashboard run build",
     "copy-assets": "node scripts/copy-assets.mjs",
     "dev": "tsup --watch",

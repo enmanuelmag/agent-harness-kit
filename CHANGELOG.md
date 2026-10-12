@@ -4,6 +4,18 @@ User-facing v3 changes relative to the Git tag `v2.36.2`, grouped by their repos
 
 ## [Unreleased]
 
+### Added
+
+- Optional local sounds for committed task completion, persisted health blockage, provider turn completion and independent requests for attention. A shared private, bounded SQLite ledger coordinates processes; explicit same-turn event correlation suppresses general completion only after successful specific playback. Health uses two sequential plays of one asset. Notifications are disabled by default and delivery failures preserve business results and protocol output.
+- Explicit project hook installation/uninstallation for Cursor, Claude Code, Codex and OpenCode preserves custom hooks and native preferences. Provider payload/capability limits, manual native completion settings and an explicit attention command are documented; no universal question detection or audible-delivery guarantee is claimed.
+- Four prepared PCM16 WAVs, their original CC0 license and provenance ship with the package. Asset paths resolve independently of the working directory; no runtime conversion or FFmpeg dependency is required.
+
+### Fixed
+
+- Build the advertised CommonJS index entry alongside the ESM CLI/library, so both package entry points can resolve notification assets and the native ledger.
+
+## [3.0.0-rc.3]
+
 ### Runtime requirements
 
 - Upgrade Node to match `>=22.14.0 <23 || >=23.6.0`: Node 22.14.0 or newer on 22.x, or Node 23.6.0 or newer. Earlier 23.x releases are excluded. The SQLite driver is now pinned to `better-sqlite3` 13.0.3, removing the deprecated `prebuild-install` dependency from its installation path. Native installation may require a build toolchain; see [runtime compatibility](README.md#compatibility-and-development) for installation caveats and the limits of platform verification.
@@ -32,7 +44,7 @@ History counts and file size do not establish the cause of latency or promise an
 
 ### Breaking requirements
 
-- The MCP runtime moves from the legacy SDK to `@modelcontextprotocol/server` 2.3.1 and its `McpServer` API, with Zod 4.6.5 tool contracts. This release requires Node `>=22.0.0`; the later Unreleased requirement above is higher.
+- The MCP runtime moves from the legacy SDK to `@modelcontextprotocol/server` 2.3.1 and its `McpServer` API, with Zod 4.6.5 tool contracts. This release requires Node `>=22.0.0`; the later 3.0.0-rc.3 requirement above is higher.
 
 ### Changed
 
@@ -40,6 +52,8 @@ History counts and file size do not establish the cause of latency or promise an
 - Successful structured outputs are schema-validated DTOs alongside the existing text response. Unknown DTO fields are stripped. Root arrays use an `items` envelope and null uses a `value` envelope in `structuredContent`; legacy text, errors and operational notices retain their existing form.
 - Release preparation follows the manifest version with branch, channel and immutable-tag guards. Release candidates use npm's `rc` channel and GitHub prerelease status without becoming latest. The updated tooling keeps v2 maintenance on `v2` and v3 stable on `latest`; dry runs build and pack without authentication or publication. See [release-line guidance](README.md#release-lines) before preparing or backporting a release.
 
-[Unreleased]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.2...release/v3
+[3.0.0-rc.3]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.2...v3.0.0-rc.3
 [3.0.0-rc.2]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.1...v3.0.0-rc.2
 [3.0.0-rc.1]: https://github.com/enmanuelmag/agent-harness-kit/compare/v2.36.2...v3.0.0-rc.1
+
+[Unreleased]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.3...release/v3

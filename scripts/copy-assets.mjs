@@ -54,3 +54,7 @@ if (existsSync(DASHBOARD_SRC)) {
     'warning: src/dashboard-dist not found — run "npm run build:ui" to build the dashboard SPA'
   )
 }
+
+// ─── Sound assets ─────────────────────────────────────────────────────────────
+cpSync('src/assets/sounds', 'dist/assets/sounds', { recursive: true })
+console.log('copied: assets/sounds/')
