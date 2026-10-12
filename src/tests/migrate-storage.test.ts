@@ -421,8 +421,8 @@ describe('runMigrateStorage — CLI command (task #47)', () => {
     const localDbPath = join(projectDir, '.harness', 'harness.db')
     assert.ok(existsSync(localDbPath), 'db should now exist locally')
     assert.ok(
-      !existsSync(join(globalDir, 'harness.db')),
-      'global db file should have been removed after a verified copy'
+      existsSync(join(globalDir, 'harness.db')),
+      'global source remains available after a verified snapshot migration'
     )
 
     const state = readStorageStateFile(projectDir, '.harness')

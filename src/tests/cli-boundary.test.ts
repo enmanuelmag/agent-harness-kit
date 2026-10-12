@@ -44,6 +44,7 @@ before(() => {
     recursive: true,
   })
   cpSync(join(ROOT, 'src/core/materializer/skills'), join(TMP, 'dist/skills'), { recursive: true })
+  cpSync(join(ROOT, 'src/assets/sounds'), join(TMP, 'dist/assets/sounds'), { recursive: true })
 })
 after(() => rmSync(TMP, { recursive: true, force: true }))
 
@@ -229,4 +230,25 @@ test('actual JSON CLI keeps stdout parseable and passive DB notices on stderr', 
   assert.deepEqual(JSON.parse(result.stdout), [])
   assert.match(result.stderr, /Recent database calls were repeatedly slow \(1\/1 calls >=1ms/)
   assert.doesNotMatch(result.stdout, /database|slow/)
+})
+
+
+test('internal notification hooks stay quiet and benign on malformed/oversized/default-off input', () => {
+  const cwd = project('quiet-notifications')
+  for (const [args, input] of [
+    [['notifications', 'hook', '--provider', 'cursor', '--event', 'stop'], '{ invalid'],
+    [['notifications', 'hook', '--provider', 'invalid', '--event', 'Stop'], '{}'],
+    [['notifications', 'hook', '--provider', 'codex-cli', '--event', 'Stop'], 'x'.repeat(262145)],
+    [['notifications', 'hook', '--provider', 'cursor', '--event', 'stop'], '{"status":"completed","conversation_id":"s","generation_id":"t"}'],
+  ] as [string[], string][]) {
+    const result = spawnSync(process.execPath, [CLI, ...args], { cwd, input, encoding: 'utf8', timeout: 5000 })
+    assert.equal(result.error, undefined); assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(JSON.parse(result.stdout), {}); assert.equal(result.stderr, '')
+  }
+  const disabled = cli(['notifications', 'deliver', '--event-id', 'none', '--ledger-path', join(cwd, 'must-not-create/notifications.db'), '--settings', '{"enabled":false}'], cwd)
+  assert.equal(disabled.status, 0); assert.equal(disabled.stdout, ''); assert.equal(disabled.stderr, '')
+  assert.equal(existsSync(join(cwd, 'must-not-create')), false)
+  const status = cli(['notifications', 'status', '--json'], cwd)
+  assert.equal(status.status, 0, status.stderr); assert.equal(JSON.parse(status.stdout).enabled, false)
+  assert.equal(existsSync(join(cwd, '.config')), false)
 })

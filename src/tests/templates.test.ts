@@ -11,6 +11,7 @@ import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { getMaterializer } from '@/core/materializer/index'
 import {
   ensureTomlTopLevelKey,
+  MCP_CLAUDE_PERMISSIONS,
   mergeClaudeMcpJson,
   mergeClaudeSettingsLocalJson,
   mergeCodexConfigToml,
@@ -568,7 +569,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
     assert.ok(parsed.permissions.allow.includes('mcp__agent-harness-kit__actions_start'))
     assert.ok(Array.isArray(parsed.enabledMcpjsonServers))
     assert.ok(parsed.enabledMcpjsonServers.includes('agent-harness-kit'))
-    assert.equal(parsed.permissions.allow.length, 25)
+    assert.deepEqual(new Set(parsed.permissions.allow), new Set(MCP_CLAUDE_PERMISSIONS))
     teardown()
   })
 
@@ -606,7 +607,7 @@ describe('mergeClaudeSettingsLocalJson', () => {
     const parsed = JSON.parse(readFileSync(path, 'utf8'))
     assert.ok(parsed.someOtherKey)
     assert.ok(Array.isArray(parsed.permissions.allow))
-    assert.ok(parsed.permissions.allow.length === 25)
+    assert.deepEqual(new Set(parsed.permissions.allow), new Set(MCP_CLAUDE_PERMISSIONS))
     teardown()
   })
 })

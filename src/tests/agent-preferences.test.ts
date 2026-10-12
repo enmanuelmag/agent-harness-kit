@@ -12,6 +12,8 @@ import {
 } from '@/commands/agent-preferences'
 import { runBuild } from '@/commands/build'
 import { captureModels, runSync } from '@/commands/sync'
+import { loadConfig } from '@/core/config'
+import { MANAGED_CONFIG_NAME } from '@/core/maintenance/config'
 import { pkg } from '@/core/package-data'
 import { __configureUpdateCheckForTests, __resetUpdateCacheForTests } from '@/core/update-check'
 
@@ -75,31 +77,37 @@ test('explicit inherit is complete whereas an absent role is a gap', () => {
   assert.ok(missingPreferenceRoles(config).includes('builder'))
 })
 
-test('JSON persistence atomically merges preferences and preserves raw root keys', async () => {
+test('JSON persistence atomically merges overlay preferences and preserves base bytes', async () => {
   const path = writeConfig()
+  const before = readFileSync(path, 'utf8')
   await persistPreferences(TMP, {
     'codex-cli': { builder: { model: 'gpt-test', reasoningEffort: 'high' } },
   })
   const saved = JSON.parse(readFileSync(path, 'utf8'))
   assert.deepEqual(saved.untouched, { preserve: true })
-  assert.deepEqual(saved.agentPreferences['codex-cli'].builder, {
+  assert.equal(readFileSync(path, 'utf8'), before)
+  const overlay = JSON.parse(readFileSync(join(TMP, MANAGED_CONFIG_NAME), 'utf8'))
+  assert.deepEqual(overlay.agentPreferences['codex-cli'].builder, {
     model: 'gpt-test',
     reasoningEffort: 'high',
   })
 })
 
-test('code config is never rewritten and reports manual update required', async () => {
+test('code config is never rewritten and persists operational overlay preferences', async () => {
   const path = writeConfig('cjs')
   const before = readFileSync(path, 'utf8')
   assert.equal(
     await persistPreferences(TMP, { 'codex-cli': { lead: { model: 'inherit' } } }),
-    'manual-update-required'
+    'saved'
   )
   assert.equal(readFileSync(path, 'utf8'), before)
+  assert.deepEqual((await loadConfig(TMP)).agentPreferences?.['codex-cli']?.lead, {
+    model: 'inherit',
+  })
 })
 
 test('capture imports current-provider canonical TOML metadata and ignores default agent', async () => {
-  const path = writeConfig()
+  writeConfig()
   mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
   for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
     writeFileSync(
@@ -109,14 +117,14 @@ test('capture imports current-provider canonical TOML metadata and ignores defau
   }
   writeFileSync(join(TMP, '.codex/agents/default.toml'), 'model = "ignored"\n')
   await captureModels(TMP)
-  const saved = JSON.parse(readFileSync(path, 'utf8'))
+  const saved = JSON.parse(readFileSync(join(TMP, MANAGED_CONFIG_NAME), 'utf8'))
   assert.equal(saved.agentPreferences['codex-cli'].lead.model, 'gpt-lead')
   assert.equal(saved.agentPreferences['codex-cli'].builder.reasoningEffort, 'medium')
   assert.ok(existsSync(join(TMP, '.codex/agents/default.toml')))
 })
 
 test('capture rejects duplicate authoritative Codex role names', async () => {
-  const path = writeConfig()
+  writeConfig()
   mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
   for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
     const names = role === 'lead' ? 'name = "lead"\nname = "lead"\n' : `name = "${role}"\n`
@@ -125,15 +133,13 @@ test('capture rejects duplicate authoritative Codex role names', async () => {
       `model = "gpt-${role}"\n[agent]\n${names}`
     )
   }
-  await captureModels(TMP)
-  const saved = JSON.parse(readFileSync(path, 'utf8'))
-  assert.equal(saved.agentPreferences['codex-cli'].lead, undefined)
-  assert.equal(saved.agentPreferences['codex-cli'].builder.model, 'gpt-builder')
+  await assert.rejects(() => captureModels(TMP), /needs_input/)
+  assert.equal(existsSync(join(TMP, MANAGED_CONFIG_NAME)), false)
 })
 
 for (const provider of ['claude-code', 'cursor'] as const) {
   test(`capture rejects duplicate authoritative YAML role names for ${provider}`, async () => {
-    const path = writeConfig('json', provider)
+    writeConfig('json', provider)
     const agentDir = provider === 'claude-code' ? '.claude/agents' : '.cursor/agents'
     mkdirSync(join(TMP, agentDir), { recursive: true })
     for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
@@ -143,10 +149,8 @@ for (const provider of ['claude-code', 'cursor'] as const) {
         `---\n${names}\nmodel: ${provider}-${role}\n---\n`
       )
     }
-    await captureModels(TMP)
-    const saved = JSON.parse(readFileSync(path, 'utf8'))
-    assert.equal(saved.agentPreferences[provider].lead, undefined)
-    assert.equal(saved.agentPreferences[provider].builder.model, `${provider}-builder`)
+    await assert.rejects(() => captureModels(TMP), /needs_input/)
+    assert.equal(existsSync(join(TMP, MANAGED_CONFIG_NAME)), false)
   })
 }
 
