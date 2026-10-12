@@ -2,7 +2,11 @@
 
 User-facing v3 changes relative to the Git tag `v2.36.2`, grouped by their repository comparison ranges.
 
-## [Unreleased]
+## [3.0.0]
+
+### Changed
+
+- Tuned the existing local notification sounds: `provider.completed` is 20% louder and `attention.requested` is 25% louder. `health.blocked` now uses a composed double-pulse version of the approved High Minimal notification sound; its first pulse is shortened, its second keeps the full fade-out, and the asset plays once per event.
 
 ## [3.0.0-rc.4]
 

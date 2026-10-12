@@ -1,5 +1,10 @@
 # @cardor/agent-harness-kit
 
+![npm version](https://img.shields.io/npm/v/@cardor/agent-harness-kit)
+![npm downloads](https://img.shields.io/npm/dm/@cardor/agent-harness-kit)
+![license](https://img.shields.io/npm/l/@cardor/agent-harness-kit)
+[![Known Vulnerabilities](https://snyk.io/test/npm/@cardor/agent-harness-kit/badge.svg)](https://snyk.io/test/npm/@cardor/agent-harness-kit)
+
 Agent Harness Kit (AHK) gives AI coding providers a shared workflow for documents, tracked tasks, handoffs, and health evidence. It supports Claude Code, Codex CLI, Cursor, Grok Build, and OpenCode.
 
 AHK supplies structure and records. Your provider supplies the model and its own permissions; prompt instructions, including Codex instructions, are not a security boundary.
@@ -194,7 +199,7 @@ The agent can inspect synchronization drift, plan and apply supported provider/s
 
 ## Release lines
 
-`release/v2` maintains the committed v2 baseline with selected fixes and patch releases. Install a specific stable v2 version with `pnpm add @cardor/agent-harness-kit@2.36.2` after that version is published. Backport fixes deliberately; the SDK v2/Zod migration belongs to v3. The local v2.36.2 cut differs from the shared committed baseline only in its package version and retains historical release tooling. Future v2 publications must explicitly use npm `--tag v2`, or selectively backport the release-tooling guards. Do not promote a v2 patch to `latest` after v3 stable is released. Updated tooling also keeps v2 GitHub releases from becoming the latest release.
+`release/v2` maintains the v2 line for projects that cannot yet meet v3's Node.js requirement. The latest published v2 is currently [2.36.1](https://www.npmjs.com/package/@cardor/agent-harness-kit/v/2.36.1) (checked 2026-10-12); install it with `pnpm add @cardor/agent-harness-kit@2.36.1`. Its SQLite dependency's declared engine range includes Node 20.x, making v2 the compatibility path for projects on that runtime. Although the package manifest declares Node `>=14`, that broader engine field does not establish compatibility with older Node versions because the native SQLite dependency has its own runtime requirements. The local v2.36.2 cut is not yet a published npm version. Backport fixes deliberately; the SDK v2/Zod migration belongs to v3. Future v2 publications must explicitly use npm `--tag v2`, or selectively backport the release-tooling guards. Do not promote a v2 patch to `latest` after v3 stable is released. Updated tooling also keeps v2 GitHub releases from becoming the latest release.
 
 `release/v3` carries v3 development, currently `3.0.0-rc.3`. After an RC is published, use `pnpm add @cardor/agent-harness-kit@rc` or pin the full RC version. The `rc` npm channel and GitHub prerelease flag keep release candidates separate from stable `latest`. Preparing local branches, tags or a tarball does not publish a release.
 
