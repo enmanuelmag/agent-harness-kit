@@ -1,41 +1,14 @@
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import pc from 'picocolors'
+import { MaintenanceService } from '@/core/maintenance/operations'
 
-import { loadConfig } from '@/core/config'
-import { startDashboardServer } from '@/core/dashboard-server'
-import { openDB, resolveSqlitePath } from '@/core/db'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
-interface DashboardOptions {
-  port: number
-  open: boolean
-}
+interface DashboardOptions { port: number; open: boolean }
 
 export async function runDashboard(cwd: string, opts: DashboardOptions): Promise<void> {
-  const config = await loadConfig(cwd)
-  const db = await openDB(config, cwd)
-  const dbPath =
-    config.database.type === 'sqlite' ? resolveSqlitePath(config, cwd, homedir()) : null
-  const staticPath = join(__dirname, 'dashboard-dist')
-
-  const { url } = await startDashboardServer(db, dbPath, staticPath, opts.port)
-
-  console.log(pc.green(`✓`) + ` Dashboard running at ${pc.bold(pc.cyan(url))}`)
-  console.log(pc.dim(`  WebSocket live updates enabled`))
-  console.log(pc.dim(`  Press Ctrl+C to stop`))
-
-  if (opts.open) {
-    const { default: open } = await import('open')
-    await open(url)
-  }
-
-  process.on('SIGINT', () => {
-    process.exit(0)
-  })
-
-  // Keep process alive until SIGINT
-  await new Promise<void>(() => {})
+  const service = new MaintenanceService(cwd)
+  try {
+    const result = await service.execute('dashboard.start', opts as unknown as Record<string, unknown>)
+    if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
+    const job = result.data!.job as { data: { url: string } }
+    console.log(`Dashboard running at ${job.data.url}\nPress Ctrl+C to stop`)
+    await new Promise<void>(resolveStop => process.once('SIGINT', resolveStop))
+  } finally { await service.dispose() }
 }

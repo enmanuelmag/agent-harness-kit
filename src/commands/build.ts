@@ -1,12 +1,11 @@
-import { watch } from 'node:fs'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { terminateCliFailure } from '@/core/cli-boundary'
 import { loadConfig } from '@/core/config'
+import { MaintenanceService } from '@/core/maintenance/operations'
 import { getMaterializer } from '@/core/materializer/index'
 import { collectOperationalNotices } from '@/core/operational-notices'
-import { type BoundaryFailure, capture } from '@/core/result'
 
 import { persistPreferences, toPreferences } from './agent-preferences'
 import { choicesFromPreferences } from './agent-preferences'
@@ -15,6 +14,7 @@ import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
+import type { BuildReport } from '@/core/materializer/index'
 import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
 
 export interface BuildOptions {
@@ -34,33 +34,25 @@ export async function runBuild(cwd: string, opts: BuildOptions): Promise<void> {
   }
 
   if (opts.watch) {
-    let failed = false
-    const watcher = watch(cwd, { recursive: false }, async (_, filename) => {
-      if (failed) return
-      if (filename?.startsWith('agent-harness-kit.config')) {
-        // Deliberately never forced: an automatic rebuild triggered by a file
-        // watcher must not destroy agent-file customizations behind the user's
-        // back. --force is a one-shot, explicitly requested operation.
-        const result = await capture(async () => {
-          p.log.step('Config changed — rebuilding...')
-          await buildOnce(cwd, false)
-        }, 'ahk build --watch rebuild')
-        if (!result.ok) failWatch(result.error)
-      }
-    })
-    const failWatch = (error: BoundaryFailure) => {
-      if (failed) return
-      failed = true
-      watcher.close()
-      terminateCliFailure(error)
-    }
-    watcher.on('error', (cause: Error) => {
-      failWatch({ context: 'ahk build --watch', message: cause.message, cause })
-    })
-    p.log.info(`Watching agent-harness-kit.config.ts for changes...`)
-    // Keep process alive
-    await new Promise(() => {})
+    const service = new MaintenanceService(cwd)
+    try {
+      const result = await service.execute('watch.start')
+      if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
+      p.log.info('Watching agent-harness-kit.config for changes...')
+      await new Promise<void>((resolveStop) => {
+        const onStop = () => { clearInterval(timer); resolveStop() }
+        const timer = setInterval(() => {
+          void service.execute('watch.status').then(async status => {
+            const jobs = status.data?.jobs as { state: string; error?: string }[]
+            const failed = jobs?.find(job => job.state === 'failed')
+            if (failed) { clearInterval(timer); process.off('SIGINT', onStop); await service.dispose(); terminateCliFailure({ context: 'ahk build --watch rebuild', message: failed.error ?? 'Watcher failed', cause: failed.error }) }
+          })
+        }, 250)
+        process.once('SIGINT', onStop)
+      })
+    } finally { await service.dispose() }
   }
+
 }
 
 export async function buildOnce(cwd: string, force?: boolean, keepModels = false): Promise<void> {
@@ -136,13 +128,11 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   spinner.start('Rebuilding files...')
 
   try {
-    const materializer = getMaterializer(config.provider)
-    const report = await materializer.build(config, cwd, {
-      force,
-      claudeAgentModels,
-      codexAgentModels,
-      cursorAgentModels,
-    })
+    const service = new MaintenanceService(cwd)
+    const outcome = await service.execute('build', { force, keepModels: true })
+    await service.dispose()
+    if (!outcome.ok) throw new Error(`${outcome.code}: ${outcome.message ?? ''}`)
+    const report = outcome.data!.report as BuildReport
     spinner.stop(pc.green('Build complete'))
 
     // ── Config-derived files (AGENTS.md, and CLAUDE.md for claude-code) ──

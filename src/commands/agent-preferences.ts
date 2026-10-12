@@ -1,8 +1,5 @@
-import { randomUUID } from 'node:crypto'
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
-
-import { findConfigFile, loadConfig } from '@/core/config'
+import { loadConfig } from '@/core/config'
+import { updateManagedConfig } from '@/core/maintenance/config'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type {
@@ -109,36 +106,19 @@ export function renderPreferenceBlock(preferences: AgentModelPreferences): strin
 
 export type PersistResult = 'saved' | 'already-current' | 'manual-update-required'
 
-/** Persist only JSON config. Code configs are intentionally never rewritten. */
+/** Persist operational preferences in the managed overlay without rewriting code configs. */
 export async function persistPreferences(
   cwd: string,
   incoming: AgentModelPreferences
 ): Promise<PersistResult> {
-  const configPath = findConfigFile(cwd)
-  if (!configPath) throw new Error('No agent-harness-kit.config found. Run: ahk init')
   const current = await loadConfig(cwd)
   const merged = mergePreferences(current.agentPreferences, incoming)
-  if (!configPath.endsWith('.json')) {
-    const same = JSON.stringify(current.agentPreferences ?? {}) === JSON.stringify(merged)
-    if (!same)
-      console.log(
-        `Save this in ${basename(configPath)}, then run: ahk sync --force --keep-models\n\n${renderPreferenceBlock(merged)}`
-      )
-    return same ? 'already-current' : 'manual-update-required'
-  }
-  const raw = readFileSync(configPath, 'utf8')
-  const parsed = JSON.parse(raw) as Record<string, unknown>
-  const next = { ...parsed, agentPreferences: merged }
-  const temp = join(dirname(configPath), `.${basename(configPath)}.${randomUUID()}.tmp`)
-  writeFileSync(temp, JSON.stringify(next, null, 2) + '\n', 'utf8')
-  // Do not overwrite a concurrent edit that happened after the raw read.
-  if (readFileSync(configPath, 'utf8') !== raw)
-    throw new Error('Config changed while saving preferences; no changes were written.')
-  renameSync(temp, configPath)
+  if (JSON.stringify(current.agentPreferences ?? {}) === JSON.stringify(merged))
+    return 'already-current'
+  const saved = await updateManagedConfig(cwd, { agentPreferences: incoming })
+  if (!saved.ok) throw new Error(saved.error.message)
   const verified = await loadConfig(cwd)
   if (JSON.stringify(verified.agentPreferences) !== JSON.stringify(merged))
     throw new Error('Could not verify saved agentPreferences.')
-  return JSON.stringify(current.agentPreferences ?? {}) === JSON.stringify(merged)
-    ? 'already-current'
-    : 'saved'
+  return 'saved'
 }

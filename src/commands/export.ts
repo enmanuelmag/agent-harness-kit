@@ -1,43 +1,19 @@
-import { writeFileSync } from 'node:fs'
-import pc from 'picocolors'
+import { readFileSync } from 'node:fs'
 
-import { loadConfig } from '@/core/config'
-import { openDB } from '@/core/db'
+import { MaintenanceService } from '@/core/maintenance/operations'
 
-interface ExportOptions {
-  sql?: boolean
-  json?: boolean
-  output?: string
-}
+interface ExportOptions { sql?: boolean; json?: boolean; output?: string; force?: boolean }
 
 export async function runExport(cwd: string, opts: ExportOptions): Promise<void> {
-  if (!opts.sql && !opts.json) {
-    console.error(pc.red('Specify --sql or --json'))
-    process.exit(1)
-  }
-
-  const config = await loadConfig(cwd)
-  const db = await openDB(config, cwd)
-
+  if (!opts.sql && !opts.json) throw new Error('Specify --sql or --json')
+  const service = new MaintenanceService(cwd)
   try {
     if (opts.json) {
-      const data = await db.exportJson()
-      const out = JSON.stringify(data, null, 2) + '\n'
-      if (opts.output) {
-        writeFileSync(opts.output, out, 'utf8')
-        console.log(pc.green(`✓ Exported JSON → ${opts.output}`))
-      } else {
-        process.stdout.write(out)
-      }
+      const result = await service.execute('export', { format: 'json', output: opts.output, force: opts.force })
+      if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
+      if (opts.output) console.log(`Exported JSON → ${String(result.data!.path)}`)
+      else process.stdout.write(readFileSync(String(result.data!.path), 'utf8'))
     }
-
-    if (opts.sql) {
-      console.error(
-        pc.dim('SQL dump requires direct SQLite access — use: sqlite3 .harness/harness.db .dump')
-      )
-      process.exit(1)
-    }
-  } finally {
-    await db.close()
-  }
+    if (opts.sql) throw new Error('SQL dump requires direct SQLite access — use: sqlite3 .harness/harness.db .dump')
+  } finally { await service.dispose() }
 }

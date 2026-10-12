@@ -1,8 +1,9 @@
 import Table from 'cli-table3'
 import pc from 'picocolors'
 
-import { loadConfig } from '@/core/config'
-import { openDB } from '@/core/db'
+import { MaintenanceService } from '@/core/maintenance/operations'
+
+import type { ActionRow, TaskAcceptanceRow,TaskRow } from '@/types'
 
 interface StatusOptions {
   json?: boolean
@@ -16,23 +17,14 @@ const STATUS_COLOR: Record<string, (s: string) => string> = {
 }
 
 export async function runStatus(cwd: string, opts: StatusOptions): Promise<void> {
-  const config = await loadConfig(cwd)
-  const db = await openDB(config, cwd)
-
+  const service = new MaintenanceService(cwd)
   try {
-    const tasks = await db.getTasks()
-    const summary = await db.getStatusSummary()
-
+    const result = await service.execute('status', { limit: 100 })
+    if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
+    const tasks = result.data!.tasks as (TaskRow & { actions: ActionRow[]; acceptance: TaskAcceptanceRow[] })[]
+    const summary = result.data!.summary as { status: string; total: number }[]
     if (opts.json) {
-      const actions = await Promise.all(
-        tasks.map(async (t) => ({
-          ...t,
-          actions: await db.getActionsForTask(t.id),
-          acceptance: await db.getTaskAcceptance(t.id),
-        }))
-      )
-      const archivedCount = (await db.getArchivedTasks()).length
-      console.log(JSON.stringify({ tasks: actions, summary, archivedCount }, null, 2))
+      console.log(JSON.stringify(result.data, null, 2))
       return
     }
 
@@ -66,7 +58,7 @@ export async function runStatus(cwd: string, opts: StatusOptions): Promise<void>
       console.log('')
       console.log(pc.bold('Active actions:'))
       for (const t of inProgress) {
-        const actions = await db.getActionsForTask(t.id)
+        const actions = t.actions
         const active = actions.filter((a) => a.status === 'in_progress')
         for (const a of active) {
           console.log(`  ${pc.cyan(a.agent.padEnd(10))} → task #${t.id} ${t.slug}`)
@@ -82,13 +74,9 @@ export async function runStatus(cwd: string, opts: StatusOptions): Promise<void>
     })
     console.log(pc.dim('Tasks — ') + parts.join(pc.dim(' | ')))
 
-    const archivedTasks = await db.getArchivedTasks()
-    if (archivedTasks.length > 0) {
-      console.log(
-        pc.dim(`${archivedTasks.length} archived (use \`ahk task list --archived\` to view)`)
-      )
-    }
+    const archivedCount = result.data!.archivedCount as number
+    if (archivedCount > 0) console.log(`${archivedCount} archived (use ahk task list --archived to view)`)
   } finally {
-    await db.close()
+    await service.dispose()
   }
 }

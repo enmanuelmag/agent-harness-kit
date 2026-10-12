@@ -1,21 +1,19 @@
-import { join } from 'node:path'
 import pc from 'picocolors'
 
 import { findConfigFile, loadConfig } from '@/core/config'
+import { MaintenanceService } from '@/core/maintenance/operations'
 import { claudeAgentFiles } from '@/core/materializer/claude-code'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { cursorAgentFiles } from '@/core/materializer/cursor'
-import { detectPackageManager } from '@/core/materializer/detect-package-manager'
-import { mergeCodexConfigToml } from '@/core/materializer/mcp-merge'
 import { buildCapabilityHints } from '@/core/materializer/provider-research-capabilities'
-import { writeAgentFiles } from '@/core/materializer/scaffold-utils'
 
-import { choicesFromPreferences, persistPreferences, toPreferences } from './agent-preferences'
+import { toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
+import type { WriteAgentFilesResult } from '@/core/materializer/scaffold-utils'
 import type {
   ClaudeAgentModelChoice,
   CodexAgentModelChoice,
@@ -66,24 +64,13 @@ export async function runModels(cwd: string): Promise<void> {
   }
 
   const choices = await promptChoices(ctx.config.provider)
-  const saved = await persistPreferences(cwd, toPreferences(ctx.config.provider, choices))
-  if (saved === 'manual-update-required') return
-
+  const preferences = toPreferences(ctx.config.provider, choices)
+  const service = new MaintenanceService(cwd)
+  const result = await service.execute('models', { choices: preferences[ctx.config.provider] })
+  await service.dispose()
+  if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
   const config = await loadConfig(cwd)
-  const persistedChoices = choicesForCurrentProvider(config)
-  const agents = writeAgentFiles(cwd, filesFor(config, persistedChoices), {
-    force: true,
-    backupRoot: join(cwd, config.storage.dir, 'backups'),
-  })
-  if (config.provider === 'codex-cli') {
-    mergeCodexConfigToml(
-      join(cwd, '.codex/config.toml'),
-      config.tools.mcp.port,
-      cwd,
-      detectPackageManager(cwd),
-      persistedChoices.lead as CodexAgentModelChoice | undefined
-    )
-  }
+  const agents = result.data!.report as WriteAgentFilesResult
   const label =
     config.provider === 'claude-code'
       ? 'Claude Code'
@@ -115,14 +102,6 @@ async function promptChoices(provider: Provider): Promise<ChoiceMap> {
   if (provider === 'claude-code') return promptClaudeAgentModels(provider)
   if (provider === 'codex-cli') return promptCodexAgentModels(provider)
   return promptCursorAgentModels(provider)
-}
-
-function choicesForCurrentProvider(config: HarnessConfig): ChoiceMap {
-  const stored = choicesFromPreferences(config)
-  return (stored.claudeAgentModels ??
-    stored.codexAgentModels ??
-    stored.cursorAgentModels ??
-    {}) as ChoiceMap
 }
 
 /** Exported for focused command tests without mocking interactive prompts. */

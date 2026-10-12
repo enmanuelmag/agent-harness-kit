@@ -1,4 +1,4 @@
-import { loadConfig } from '@/core/config'
+import { findConfigFile, loadConfig } from '@/core/config'
 import { startMcpServer } from '@/core/mcp-server'
 import { checkPermissionsSync } from '@/core/permissions-check'
 
@@ -7,6 +7,11 @@ interface ServeOptions {
 }
 
 export async function runServe(cwd: string, opts: ServeOptions): Promise<void> {
+  if (!findConfigFile(cwd)) {
+    process.stderr.write('[agent-harness-kit] MCP setup mode (stdio): workspace is not initialized.\n')
+    await startMcpServer(undefined, cwd)
+    return
+  }
   const config = await loadConfig(cwd)
 
   if (opts.port) {

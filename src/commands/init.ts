@@ -1,13 +1,9 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { findConfigFile } from '@/core/config'
-import { openDB } from '@/core/db'
 import { getDefaultHealthScriptPath } from '@/core/health-check'
-import { getMaterializer } from '@/core/materializer/index'
-import { configCjs, configJson, configMjs, configTs } from '@/core/materializer/templates'
+import { MaintenanceService } from '@/core/maintenance/operations'
 import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/init'
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
@@ -17,7 +13,6 @@ import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
 import {
-  applyConfigDefaults,
   detectConfigExtension,
   drawBox,
   printWelcomeMessage,
@@ -26,7 +21,10 @@ import {
 
 import type { Provider } from '@/types'
 
-interface InitOptions {
+export interface InitOptions {
+  notifications?: boolean
+  notificationHooks?: boolean
+  notificationScope?: 'project' | 'global'
   name?: string
   provider?: string
   docs?: string
@@ -215,6 +213,14 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   }
   const storageScope = storageScopeResult as StorageScope
 
+  const notifications = flags.notifications ?? await p.confirm({message:'Enable local sound notifications?',initialValue:false})
+  if (p.isCancel(notifications)) {p.cancel('Cancelled.');process.exit(0)}
+  let notificationHooks: boolean | symbol = flags.notificationHooks ?? false
+  if (flags.notificationHooks === undefined && provider !== 'grok-cli') {
+    notificationHooks = await p.confirm({message:'Install managed notification hooks for this provider?',initialValue:false})
+    if (p.isCancel(notificationHooks)) {p.cancel('Cancelled.');process.exit(0)}
+  }
+
   // ─── Optional first task ──────────────────────────────────────────────────
   const addFirstTask = await p.confirm({ message: 'Add your first task now?', initialValue: false })
   if (p.isCancel(addFirstTask)) {
@@ -263,77 +269,17 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   spinner.start('Scaffolding...')
 
   try {
-    const config = applyConfigDefaults({
-      name,
-      description,
-      provider,
-      docsPath,
-      tasksAdapter: 'mcp',
-      scope: storageScope,
-    })
-    config.agentPreferences = agentPreferences
-    const materializer = getMaterializer(provider)
-
-    const installDir = cwd
-
     configExt = detectConfigExtension(cwd)
-    const configFileName = `agent-harness-kit.config.${configExt}`
-    const templateFn =
-      configExt === 'json'
-        ? configJson
-        : configExt === 'ts'
-          ? configTs
-          : configExt === 'mjs'
-            ? configMjs
-            : configCjs
-    const configContent = templateFn({
-      name,
-      description,
-      provider,
-      docsPath,
-      tasksAdapter: 'mcp',
-      port: config.tools.mcp.port,
-      scope: config.storage.scope,
-      projectId: config.storage.projectId,
-      agentPreferences,
-    })
-    writeFileSync(join(installDir, configFileName), configContent, 'utf8')
-
-    // Create .harness dir (always project-local, regardless of storage scope —
-    // this is where health.sh, scripts, and storage-state.json live)
-    mkdirSync(join(installDir, config.storage.dir), { recursive: true })
-
-    // Initialize SQLite DB (scope-aware: local → .harness/harness.db, global → ~/.harness/dbs/<projectId>/harness.db)
-    const db = await openDB(config, installDir)
-
-    // Always write .harness/storage-state.json — reflects the REAL current
-    // storage state (project-local regardless of scope). Consumed by the
-    // future `ahk migrate storage` command.
-    await db.writeStorageState(installDir)
-
-    // Scaffold provider-specific files
-    await materializer.scaffold(config, {
-      cwd: installDir,
-      firstTask,
-      claudeAgentModels,
-      codexAgentModels,
-      cursorAgentModels,
-    })
-
-    if (firstTask) {
-      await db.addTask({
-        slug: firstTask.title
-          .toLowerCase()
-          .trim()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, ''),
-        title: firstTask.title,
-        description: firstTask.description,
-        acceptance: firstTask.acceptance,
+    const service = new MaintenanceService(cwd)
+    try {
+      const outcome = await service.execute('init', {
+        name, description, provider, docs: docsPath, storageScope,
+        choices: agentPreferences[provider], configFormat: configExt,
+        notifications, notificationScope: flags.notificationScope ?? 'project',
+        installHooks: notificationHooks, firstTask,
       })
-    }
-
-    await db.close()
+      if (!outcome.ok) throw new Error(`${outcome.code}: ${outcome.message ?? ''}`)
+    } finally { await service.dispose() }
     spinner.stop('')
   } catch (err) {
     spinner.stop('Failed')

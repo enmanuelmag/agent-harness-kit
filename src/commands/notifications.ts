@@ -6,6 +6,7 @@ import {
   notificationConfigurationStatus,
   type SettingsOutcome,
 } from '../core/maintenance/config'
+import { withMaintenanceLock } from '../core/maintenance/plans'
 import { normalizeNotifications } from '../core/notifications/config'
 import { installNotificationHooks, uninstallNotificationHooks } from '../core/notifications/install'
 import { resolveSoundAsset } from '../core/notifications/player'
@@ -55,12 +56,12 @@ export async function notificationInstall(
   provider: NotificationProvider,
   uninstall = false
 ): Promise<void> {
-  const result = uninstall
+  const result = await withMaintenanceLock(cwd, async () => uninstall
     ? await uninstallNotificationHooks(cwd, provider)
     : await installNotificationHooks(cwd, provider, {
         node: process.execPath,
         cli: notificationCliPath(),
-      })
+      }))
   if (!result.ok) throw result.error.cause
   process.stdout.write(JSON.stringify(result.value, null, 2) + '\n')
 }

@@ -2,9 +2,9 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 
 import { loadConfig } from '@/core/config'
-import { getMaterializer } from '@/core/materializer/index'
+import { MaintenanceService } from '@/core/maintenance/operations'
 
-import { persistPreferences, toPreferences } from './agent-preferences'
+import { toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
@@ -60,31 +60,16 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
     codexAgentModels,
     cursorAgentModels,
   })
-  const preferenceResult = await persistPreferences(cwd, toPreferences(target, choices))
-  if (preferenceResult === 'manual-update-required') return
-  const savedConfig = await loadConfig(cwd)
-
-  const spinner = p.spinner()
-  spinner.start(`Migrating from ${config.provider} to ${target}...`)
-
+  const service = new MaintenanceService(cwd)
   try {
-    // Scaffold the new provider's files
-    const targetMaterializer = getMaterializer(target)
-    await targetMaterializer.build({ ...savedConfig, provider: target }, cwd, {
-      force: true,
-      claudeAgentModels,
-      codexAgentModels,
-      cursorAgentModels,
-    })
+    const preferences = toPreferences(target, choices)
+    const plan = await service.execute('migrate.provider.plan', { to: target, choices: preferences[target], force: true })
+    if (!plan.ok) throw new Error(`${plan.code}: ${plan.message ?? ''}`)
+    const result = await service.execute('migrate.provider.apply', { planId: plan.data!.planId })
+    if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
+    p.log.success(`Migrated to ${target}; stored configuration and generated files updated.`)
+  } finally { await service.dispose() }
 
-    spinner.stop(pc.green(`Migrated to ${target}`))
-    p.log.warn(`Update agent-harness-kit.config.ts: set provider: '${target}'`)
-    p.log.warn(`Then run: ahk build`)
-  } catch (err) {
-    spinner.stop(pc.red('Migration failed'))
-    p.log.error(err instanceof Error ? err.message : String(err))
-    process.exit(1)
-  }
 }
 
 /** Select target-native preferences explicitly: guarded prompts for the other
