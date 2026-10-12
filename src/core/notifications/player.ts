@@ -69,16 +69,10 @@ export async function playNotification(
     const now = options.now ?? Date.now
     const deadline = now() + settings.playerTimeoutMs
     const run = options.run ?? quietRun
-    const count = kind === 'health.blocked' ? 2 : 1
-    for (let index = 0; index < count; index++) {
-      const remaining = deadline - now()
-      if (remaining <= 0) throw new Error('Notification event timed out')
-      await run(command, [path], remaining)
-      if (index + 1 < count) {
-        if (deadline - now() < 150) throw new Error('Notification event timed out')
-        await (options.delay ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))))(150)
-      }
-    }
+    // health-blocked.wav is already composed as a two-pulse sound.
+    const remaining = deadline - now()
+    if (remaining <= 0) throw new Error('Notification event timed out')
+    await run(command, [path], remaining)
     return ok('played')
   } catch (cause) {
     return err({

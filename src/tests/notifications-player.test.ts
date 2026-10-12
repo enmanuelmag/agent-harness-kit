@@ -9,33 +9,24 @@ import { NotificationLedger } from '../core/notifications/ledger.js'
 import { playNotification, resolveSoundAsset } from '../core/notifications/player.js'
 import { deliverEvent } from '../core/notifications/worker.js'
 
-test('blocking sound is one sequential event with a 150 ms gap and a shared deadline', async () => {
+test('blocking sound plays its precomposed double pulse once as one event', async () => {
   const settings = normalizeNotifications({ enabled: true })
-  let now = 0
   const calls: unknown[] = []
   const result = await playNotification('health.blocked', settings, {
     platform: 'darwin',
     command: '/fake/player',
-    now: () => now,
     run: async (command, args, timeout) => {
       calls.push([command, args, timeout])
-      now += 100
-    },
-    delay: async (ms) => {
-      calls.push(ms)
-      now += ms
     },
   })
   assert.deepEqual(result, { ok: true, value: 'played' })
-  assert.equal(calls.length, 3)
-  assert.equal(calls[1], 150)
+  assert.equal(calls.length, 1)
   assert.equal((calls[0] as unknown[])[2], 3000)
-  assert.equal((calls[2] as unknown[])[2], 2750)
   assert.ok(resolveSoundAsset('task-completed.wav').endsWith('assets/sounds/task-completed.wav'))
   assert.throws(() => resolveSoundAsset('../../private.wav'))
 })
 
-test('partial playback failure preserves cause and prevents retries', async () => {
+test('playback failure preserves cause and prevents retries', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'ahk-notification-player-'))
   const path = join(directory, 'notifications.db')
   const settings = normalizeNotifications({ enabled: true })
@@ -52,9 +43,9 @@ test('partial playback failure preserves cause and prevents retries', async () =
   const options = {
     command: '/fake/player',
     run: async () => {
-      if (++calls === 2) throw cause
+      calls++
+      throw cause
     },
-    delay: async () => {},
   }
   try {
     const result = await deliverEvent(event.value.id, settings, path, options)
@@ -62,7 +53,7 @@ test('partial playback failure preserves cause and prevents retries', async () =
     assert.equal(result.error.cause, cause)
     const repeat = await deliverEvent(event.value.id, settings, path, options)
     assert.deepEqual(repeat, { ok: true, value: 'skipped' })
-    assert.equal(calls, 2)
+    assert.equal(calls, 1)
     const check = new NotificationLedger(path, settings)
     try {
       const stored = check.getEvent(event.value.id)
