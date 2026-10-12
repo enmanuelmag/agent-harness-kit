@@ -1,4 +1,5 @@
 import type { DatabaseDiagnosticsConfig } from './core/database-diagnostics'
+import type { NotificationConfig } from './core/notifications/types'
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ export interface HarnessConfig {
   project: ProjectConfig
   provider: Provider
   storage: StorageConfig
+  notifications?: NotificationConfig
   databaseDiagnostics?: DatabaseDiagnosticsConfig
   database: DatabaseConfig
   health: HealthConfig

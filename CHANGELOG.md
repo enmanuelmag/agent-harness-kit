@@ -4,7 +4,14 @@ User-facing v3 changes relative to the Git tag `v2.36.2`, grouped by their repos
 
 ## [Unreleased]
 
+## [3.0.0-rc.4]
+
 ### Added
+
+- Structured MCP equivalents of public CLI maintenance and setup: configless initialization, bounded sync/migration/reset plans, explicit model preservation, exports, status and stateless health, plus managed dashboard/watch lifecycles. Valid configurations with a busy or retired database can start in maintenance-only mode: maintenance tools remain available while business operations are fenced. Agents can detect supported drift, apply registered migrations and report changed paths, backups, conflicts and missing input. Task completion retains its final health gate; cached database timing/history diagnostics remain informative without automatic cleanup.
+- Sound opt-in during initialization and scoped CLI/MCP enable, disable, configure and hook installation. Atomic managed JSON overlays preserve existing executable project configuration; explicit global settings remain shared and project overrides are visible.
+- Existing export files require explicit CLI `--force` or MCP `force: true`; a complete backup is written before replacement. JSON exports use workspace artifacts; SQL export retains explicit unsupported guidance.
+- SQLite maintenance coordinates DB owners across processes and fences retired configurations. Migrations retain their source and verify a consistent snapshot under a native write barrier; reset clears workflow rows with a JSON backup while preserving the file/inode. Other live owners return an actionable busy result. Model setup rejects a requested provider that differs from the current provider without writing preferences.
 
 - Optional local sounds for committed task completion, persisted health blockage, provider turn completion and independent requests for attention. A shared private, bounded SQLite ledger coordinates processes; explicit same-turn event correlation suppresses general completion only after successful specific playback. Health uses two sequential plays of one asset. Notifications are disabled by default and delivery failures preserve business results and protocol output.
 - Explicit project hook installation/uninstallation for Cursor, Claude Code, Codex and OpenCode preserves custom hooks and native preferences. Provider payload/capability limits, manual native completion settings and an explicit attention command are documented; no universal question detection or audible-delivery guarantee is claimed.
@@ -52,8 +59,9 @@ History counts and file size do not establish the cause of latency or promise an
 - Successful structured outputs are schema-validated DTOs alongside the existing text response. Unknown DTO fields are stripped. Root arrays use an `items` envelope and null uses a `value` envelope in `structuredContent`; legacy text, errors and operational notices retain their existing form.
 - Release preparation follows the manifest version with branch, channel and immutable-tag guards. Release candidates use npm's `rc` channel and GitHub prerelease status without becoming latest. The updated tooling keeps v2 maintenance on `v2` and v3 stable on `latest`; dry runs build and pack without authentication or publication. See [release-line guidance](README.md#release-lines) before preparing or backporting a release.
 
+[3.0.0-rc.4]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.3...v3.0.0-rc.4
 [3.0.0-rc.3]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.2...v3.0.0-rc.3
 [3.0.0-rc.2]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.1...v3.0.0-rc.2
 [3.0.0-rc.1]: https://github.com/enmanuelmag/agent-harness-kit/compare/v2.36.2...v3.0.0-rc.1
 
-[Unreleased]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.3...release/v3
+[Unreleased]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.4...release/v3

@@ -22,6 +22,7 @@ import { isExecutableOnPath, printMissingGlobalBinaryWarning } from '@/core/path
 import { capture } from '@/core/result'
 import { checkForUpdate, printUpdateMessage } from '@/core/update-check'
 
+import { notificationAttention, notificationConfigure, notificationEnable, notificationInstall, notificationProvider, notificationStatus, runNotificationInternal } from './commands/notifications'
 import { withDatabaseNoticeSink } from './core/database-diagnostics'
 
 const cwd = process.cwd()
@@ -50,7 +51,8 @@ function parsePort(raw: string): number {
   return port
 }
 
-const updateCheck = capture(() => checkForUpdate(pkg.version), 'update check')
+const internalNotification = process.argv[2] === 'notifications' && ['hook', 'deliver'].includes(process.argv[3])
+const updateCheck = capture(() => internalNotification ? null : checkForUpdate(pkg.version), 'update check')
 let commandContext = 'ahk'
 
 const program = new Command()
@@ -71,6 +73,11 @@ program
   )
   .option('--docs <path>', 'Docs folder path (skip prompt)')
   .option('--storage-scope <scope>', 'Storage scope: local | global (skip prompt)')
+  .option('--notifications', 'Enable optional sounds (skip prompt)')
+  .option('--no-notifications', 'Leave optional sounds disabled (skip prompt)')
+  .option('--notification-hooks', 'Install project-local managed notification hooks (skip prompt)')
+  .option('--no-notification-hooks', 'Skip managed notification hooks (skip prompt)')
+  .option('--notification-scope <scope>', 'Sound settings scope: project | global')
   .action(async (opts) => {
     await runInit(cwd, opts)
   })
@@ -230,6 +237,7 @@ program
   .option('--sql', 'SQL dump')
   .option('--json', 'JSON export of tasks and actions')
   .option('--output <path>', 'Output file path (default: stdout)')
+  .option('--force', 'Overwrite an existing export file only after creating a backup')
   .action(async (opts) => {
     await runExport(cwd, opts)
   })
@@ -255,6 +263,23 @@ program
   .action(async (opts: { db?: boolean }) => {
     await runDoctor(cwd, opts)
   })
+
+// ─── notifications ───────────────────────────────────────────────────────────
+const notifications = program.command('notifications').description('Optional local sound notifications and provider hooks')
+for (const verb of ['enable', 'disable']) notifications.command(verb).requiredOption('--scope <scope>', 'Explicit project or global scope').action(async (opts: { scope: 'project' | 'global' }) => {
+  const result = await notificationEnable(cwd, opts.scope, verb === 'enable')
+  process.stdout.write(JSON.stringify(result) + '\n')
+  if (!result.ok) process.exitCode = 1
+})
+notifications.command('configure').requiredOption('--scope <scope>', 'Explicit project or global scope').option('--patch <json>', 'Settings JSON object').option('--unset <fields>', 'Comma-separated keys to restore inheritance').action(async (opts: { scope: 'project' | 'global'; patch?: string; unset?: string }) => {
+  const result = await notificationConfigure(cwd, opts.scope, opts.patch ? JSON.parse(opts.patch) : undefined, opts.unset?.split(',').filter(Boolean))
+  process.stdout.write(JSON.stringify(result) + '\n')
+  if (!result.ok) process.exitCode = 1
+})
+notifications.command('status').option('--json', 'Print status JSON').action(async (opts: { json?: boolean }) => { await notificationStatus(cwd, opts.json) })
+notifications.command('install').requiredOption('--provider <provider>', 'Provider', notificationProvider).action(async (opts: { provider: ReturnType<typeof notificationProvider> }) => { await notificationInstall(cwd, opts.provider) })
+notifications.command('uninstall').requiredOption('--provider <provider>', 'Provider', notificationProvider).action(async (opts: { provider: ReturnType<typeof notificationProvider> }) => { await notificationInstall(cwd, opts.provider, true) })
+program.command('notify').description('Emit an explicit workflow notification').command('attention').requiredOption('--request-id <id>', 'Stable identity for this request').action(async (opts: { requestId: string }) => { await notificationAttention(cwd, opts.requestId) })
 
 // ─── models ───────────────────────────────────────────────────────────────────
 program
@@ -307,7 +332,8 @@ function rewriteLegacyMigrateArgv(argv: string[]): string[] {
   return rewritten
 }
 
-await runCliBoundary(
+if (internalNotification) await runNotificationInternal(cwd, process.argv.slice(3))
+else await runCliBoundary(
   () => withDatabaseNoticeSink(notice => {
     if (commandContext !== 'ahk serve') process.stderr.write(`[agent-harness-kit] ${notice.message}\n`)
   }, () => program.parseAsync(rewriteLegacyMigrateArgv(process.argv))),
