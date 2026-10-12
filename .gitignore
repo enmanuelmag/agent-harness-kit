@@ -53,3 +53,5 @@ graphify-out/
 .claude/skills/
 .opencode/skills/
 .tmp-templates/
+# Local social media source and renders
+content/
