@@ -92,7 +92,7 @@ export default defineHarness({
     docsPath: './docs',
   },
   
-  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'opencode-v2' | 'codex-cli' | 'grok-cli' | 'cursor'
   
   // No `agents` key — role instructions live in the generated agent file,
   // while optional per-role model choices are also retained as agentPreferences
@@ -288,7 +288,7 @@ This directory contains all runtime data:
 - `harness.db` - SQLite database with tasks, actions, and logs  
 
 #### Provider Configuration
-The system supports five providers:
+The system supports six providers (OpenCode V2 is independent from v1):
 
 1. **Claude Code** (`/.claude/`)
 2. **OpenCode** (`/.opencode/`)
@@ -309,7 +309,7 @@ The main configuration file with all customizable settings. It includes:
    - Name and description
    - Documentation path
 2. **Provider Settings** 
-   - AI provider selection (claude-code, opencode, codex-cli, grok-cli, cursor)
+   - AI provider selection (claude-code, opencode, opencode-v2, codex-cli, grok-cli, cursor)
 3. **Agent Definitions**
    - Permissions for each agent type
    - Allowed paths for each role
@@ -563,3 +563,5 @@ The project follows [Semantic Versioning](https://semver.org/) principles:
 4. **Documentation**: Update docs for new features or breaking changes
 
 This implementation guide provides everything needed to get started with the agent-harness-kit, enabling developers to quickly understand, set up, and customize the system for their projects.
+
+OpenCode V2 (`opencode-v2`) uses the shared `.opencode` paths with native v2 configuration and a separate materializer. See the bundled `ahk-docs/resources/opencode-v2.md` guide for migration and recovery.

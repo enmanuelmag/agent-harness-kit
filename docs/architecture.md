@@ -204,7 +204,7 @@ export default defineHarness({
     description: 'What this project does',
     docsPath: './docs',
   },
-  provider: 'claude-code', // 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
+  provider: 'claude-code', // 'claude-code' | 'opencode' | 'opencode-v2' | 'codex-cli' | 'grok-cli' | 'cursor'
   // No `agents` key — role instructions live in the generated agent file;
   // optional model choices are retained as agentPreferences metadata.
   // `database` never carries a file path — physical location is a `storage`
@@ -306,3 +306,5 @@ This architecture ensures that the system is:
 - **Auditable** with comprehensive logging of all activities
 - **Scalable** by allowing additional agents or configurations
 - **Maintainable** with clear separation between configuration, logic, and data
+
+OpenCode V2 (`opencode-v2`) uses the shared `.opencode` paths with native v2 configuration and a separate materializer. See the bundled `ahk-docs/resources/opencode-v2.md` guide for migration and recovery.
