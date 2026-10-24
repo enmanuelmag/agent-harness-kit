@@ -1,9 +1,11 @@
+import type { OpenCodeV2AgentModelChoice } from './schema/opencode-v2'
+export type { OpenCodeV2AgentModelChoice } from './schema/opencode-v2'
 import type { DatabaseDiagnosticsConfig } from './core/database-diagnostics'
 import type { NotificationConfig } from './core/notifications/types'
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-export type Provider = 'claude-code' | 'opencode' | 'codex-cli' | 'grok-cli' | 'cursor'
+export type Provider = 'claude-code' | 'opencode' | 'opencode-v2' | 'codex-cli' | 'grok-cli' | 'cursor'
 
 // ─── Config types ─────────────────────────────────────────────────────────────
 
@@ -276,6 +278,7 @@ export interface CursorAgentModelChoice {
 }
 
 export interface ScaffoldOptions {
+  opencodeV2AgentModels?: Partial<Record<'lead' | 'explorer' | 'consultant' | 'builder' | 'reviewer', OpenCodeV2AgentModelChoice>>
   cwd: string
   firstTask?: {
     title: string

@@ -11,8 +11,11 @@ import { capture } from '@/core/result'
 const ROOT = join(import.meta.dirname, '../..')
 const TMP = mkdtempSync(join(ROOT, '.tmp-cli-boundary-'))
 const CLI = join(TMP, 'dist/cli.js')
+const FIXTURE_HOME = join(TMP, 'home')
+const FIXTURE_ENV = { ...process.env, HOME: FIXTURE_HOME, USERPROFILE: FIXTURE_HOME }
 
 before(() => {
+  mkdirSync(FIXTURE_HOME)
   writeFileSync(join(TMP, 'package.json'), readFileSync(join(ROOT, 'package.json')))
   const require = createRequire(import.meta.url)
   const manifest = require.resolve('tsup/package.json')
@@ -37,7 +40,7 @@ before(() => {
       '--no-config',
       '--silent',
     ],
-    { cwd: ROOT, encoding: 'utf8' }
+    { cwd: ROOT, encoding: 'utf8', env: FIXTURE_ENV }
   )
   assert.equal(built.status, 0, built.stderr || built.stdout)
   cpSync(join(ROOT, 'src/core/materializer/agent-templates'), join(TMP, 'dist/agent-templates'), {
@@ -57,6 +60,7 @@ function project(name: string) {
 function cli(args: string[], cwd: string) {
   return spawnSync(process.execPath, [CLI, ...args], {
     cwd,
+    env: FIXTURE_ENV,
     encoding: 'utf8',
     timeout: 8000,
     killSignal: 'SIGKILL',
@@ -168,6 +172,7 @@ test('watch async reload failure is consumed once, closes and terminates without
   writeFileSync(custom, '# User-owned builder\nPreserve this content.\n')
   const child = spawn(process.execPath, [CLI, 'build', '--watch'], {
     cwd,
+    env: FIXTURE_ENV,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let stdout = '',
@@ -241,7 +246,7 @@ test('internal notification hooks stay quiet and benign on malformed/oversized/d
     [['notifications', 'hook', '--provider', 'codex-cli', '--event', 'Stop'], 'x'.repeat(262145)],
     [['notifications', 'hook', '--provider', 'cursor', '--event', 'stop'], '{"status":"completed","conversation_id":"s","generation_id":"t"}'],
   ] as [string[], string][]) {
-    const result = spawnSync(process.execPath, [CLI, ...args], { cwd, input, encoding: 'utf8', timeout: 5000 })
+    const result = spawnSync(process.execPath, [CLI, ...args], { cwd, input, encoding: 'utf8', timeout: 5000, env: FIXTURE_ENV })
     assert.equal(result.error, undefined); assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(JSON.parse(result.stdout), {}); assert.equal(result.stderr, '')
   }
