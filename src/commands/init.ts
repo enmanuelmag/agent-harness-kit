@@ -8,7 +8,7 @@ import { initDescriptionSchema, initDocsSchema, initNameSchema } from '@/schema/
 import { taskDescriptionSchema, taskTitleSchema } from '@/schema/task'
 import { cliFormWithRetry } from '@/utils/form'
 
-import { mergePreferences, toPreferences } from './agent-preferences'
+import { defaultOpenCodeV2AgentModels, mergePreferences, toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
@@ -18,7 +18,6 @@ import {
   printWelcomeMessage,
   readProjectNameFromPackageJson,
 } from './init-helpers'
-import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { Provider } from '@/types'
 
@@ -178,7 +177,8 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // cancel-handling.
   const codexAgentModels = await promptCodexAgentModels(provider)
   const cursorAgentModels = await promptCursorAgentModels(provider)
-  const opencodeV2AgentModels = await promptOpenCodeV2AgentModels(provider)
+  // OpenCode V2 starts with inheritance; only `ahk models` asks for overrides.
+  const opencodeV2AgentModels = defaultOpenCodeV2AgentModels(provider)
   const agentPreferences = mergePreferences(toPreferences(provider, opencodeV2AgentModels), mergePreferences(
     {},
     mergePreferences(

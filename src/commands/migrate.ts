@@ -4,11 +4,10 @@ import pc from 'picocolors'
 import { loadConfig } from '@/core/config'
 import { MaintenanceService } from '@/core/maintenance/operations'
 
-import { toPreferences } from './agent-preferences'
+import { defaultOpenCodeV2AgentModels, toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
-import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { Provider } from '@/types'
@@ -48,16 +47,12 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
     return
   }
 
-  // Re-run the same per-role model prompt `ahk init` and `ahk build --force`
-  // use, scoped to whichever provider we're migrating to. Both helpers
-  // self-guard on the provider argument, so calling both unconditionally is
-  // safe — only the target's own questions actually appear. Must happen
-  // BEFORE the spinner below starts: an interactive p.select cannot render
-  // while a p.spinner is active.
+  // Other interactive providers collect their native choices before generation.
+  // OpenCode V2 starts with inheritance; only `ahk models` asks for overrides.
   const claudeAgentModels = await promptClaudeAgentModels(target)
   const codexAgentModels = await promptCodexAgentModels(target)
   const cursorAgentModels = await promptCursorAgentModels(target)
-  const opencodeV2AgentModels = await promptOpenCodeV2AgentModels(target)
+  const opencodeV2AgentModels = defaultOpenCodeV2AgentModels(target)
   const choices = choicesForMigrationTarget(target, {
     claudeAgentModels,
     codexAgentModels,

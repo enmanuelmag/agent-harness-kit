@@ -284,7 +284,7 @@ program.command('notify').description('Emit an explicit workflow notification').
 // ─── models ───────────────────────────────────────────────────────────────────
 program
   .command('models')
-  .description('Re-prompt per-role native model settings for Claude Code, Codex CLI, or Cursor')
+  .description('Re-prompt per-role native model settings for Claude Code, Codex CLI, Cursor, or OpenCode V2')
   .action(async () => {
     await runModels(cwd)
   })

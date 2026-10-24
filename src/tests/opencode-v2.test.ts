@@ -6,6 +6,7 @@ import { afterEach, test } from 'node:test'
 import { choicesFromPreferences, toPreferences } from '@/commands/agent-preferences'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { filesFor, resolveModelsContext } from '@/commands/models'
+import { promptOpenCodeV2AgentModels } from '@/commands/opencode-v2-model-prompt'
 import { loadConfig } from '@/core/config'
 import { captureNativeChoices } from '@/core/maintenance/native-model-capture'
 import { MaintenanceService } from '@/core/maintenance/operations'
@@ -26,6 +27,19 @@ function fixture(provider: 'opencode' | 'opencode-v2' = 'opencode-v2') {
   writeFileSync(join(cwd, 'agent-harness-kit.config.json'), JSON.stringify(config))
   return { cwd, config }
 }
+
+test('explicit V2 model prompt accepts undefined, blank and inherit while retaining native variants', async () => {
+  const responses = [undefined, '', '   ', ' inherit ', 'team/model#high']
+  const choices = await promptOpenCodeV2AgentModels('opencode-v2', undefined, async options => {
+    assert.equal(options.validate?.(''), undefined)
+    assert.equal(options.validate?.('inherit'), undefined)
+    assert.equal(options.validate?.('team/model#high'), undefined)
+    assert.equal(typeof options.validate?.('bad model'), 'string')
+    return responses.shift()
+  })
+  assert.deepEqual(choices, { lead: {}, explorer: {}, consultant: {}, builder: {}, reviewer: { model: 'team/model#high' } })
+  assert.deepEqual(await promptOpenCodeV2AgentModels('opencode', undefined, async () => { throw new Error('Unexpected prompt') }), {})
+})
 
 test('native JSONC preserves comments, foreign servers and user decisions; repeating merge is byte-identical', () => {
   const { cwd, config } = fixture()

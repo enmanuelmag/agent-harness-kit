@@ -15,6 +15,11 @@ import type {
 export const ROLES: AgentName[] = ['lead', 'explorer', 'consultant', 'builder', 'reviewer']
 type PreferenceMap = Partial<Record<AgentName, { model: string; reasoningEffort?: string }>>
 
+/** Setup inherits OpenCode's current model; explicit overrides belong to `ahk models`. */
+export function defaultOpenCodeV2AgentModels(provider: Provider): Partial<Record<AgentName, OpenCodeV2AgentModelChoice>> {
+  return provider === 'opencode-v2' ? Object.fromEntries(ROLES.map(role => [role, {}])) : {}
+}
+
 export function toPreferences(
   provider: Provider,
   choices?: Partial<

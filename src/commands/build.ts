@@ -7,12 +7,11 @@ import { MaintenanceService } from '@/core/maintenance/operations'
 import { getMaterializer } from '@/core/materializer/index'
 import { collectOperationalNotices } from '@/core/operational-notices'
 
-import { persistPreferences, toPreferences } from './agent-preferences'
+import { defaultOpenCodeV2AgentModels, persistPreferences, toPreferences } from './agent-preferences'
 import { choicesFromPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
-import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { BuildReport } from '@/core/materializer/index'
@@ -65,6 +64,17 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   // that used to say "Loading config...".
   let config = await loadConfig(cwd)
 
+  // OpenCode V2 only asks for overrides in `ahk models`, including on forced
+  // rebuilds. Fill older/partial preferences without replacing saved choices.
+  if (config.provider === 'opencode-v2') {
+    const models = {
+      ...defaultOpenCodeV2AgentModels(config.provider),
+      ...choicesFromPreferences(config).opencodeV2AgentModels,
+    }
+    await persistPreferences(cwd, toPreferences(config.provider, models))
+    config = await loadConfig(cwd)
+  }
+
   // Claude Code only, and only when --force is set: re-run the same per-role
   // model prompt `ahk init` and `ahk models` use, before regenerating agent
   // files. Must happen BEFORE the spinner below starts.
@@ -91,11 +101,10 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   if (force && config.provider === 'codex-cli' && !keepModels) {
     codexAgentModels = await promptCodexAgentModels(config.provider)
   }
-  if (force && config.provider === 'opencode-v2' && !keepModels) opencodeV2AgentModels = await promptOpenCodeV2AgentModels(config.provider)
   if (force && config.provider === 'cursor' && !keepModels) {
     cursorAgentModels = await promptCursorAgentModels(config.provider)
   }
-  if (force && keepModels) {
+  if (force && keepModels && config.provider !== 'opencode-v2') {
     const { choicesFromPreferences, missingPreferenceRoles } = await import('./agent-preferences')
     const missing = missingPreferenceRoles(config)
     if (missing.length) {
@@ -103,7 +112,6 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
         claudeAgentModels = await promptClaudeAgentModels(config.provider, missing)
       if (config.provider === 'codex-cli')
         codexAgentModels = await promptCodexAgentModels(config.provider, missing)
-      if (config.provider === 'opencode-v2') opencodeV2AgentModels = await promptOpenCodeV2AgentModels(config.provider, missing)
       if (config.provider === 'cursor')
         cursorAgentModels = await promptCursorAgentModels(config.provider, missing)
       const result = await persistPreferences(
@@ -122,7 +130,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
     codexAgentModels = stored.codexAgentModels
     cursorAgentModels = stored.cursorAgentModels
     opencodeV2AgentModels = stored.opencodeV2AgentModels
-  } else if (force) {
+  } else if (force && config.provider !== 'opencode-v2') {
     const choices = (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels ?? opencodeV2AgentModels) as never
     const result = await persistPreferences(cwd, toPreferences(config.provider, choices))
     if (result === 'manual-update-required')
