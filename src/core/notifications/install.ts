@@ -222,10 +222,18 @@ export function uninstallNotificationHooks(
 export async function inspectOpenCodeNotificationPlugin(cwd: string, provider: 'opencode' | 'opencode-v2') {
   const { target, manifest } = paths(resolve(cwd), provider)
   safeOpenCodePath(cwd, target); safeOpenCodePath(cwd, manifest)
+  // Inspect both paths even when the plugin is absent: an incompatible stale manifest
+  // would otherwise fail only after another provider's files had already changed.
   const text = await optional(target)
-  if (text === undefined) return { present: false, owned: false }
   const saved = await optional(manifest)
-  if (!saved) return { present: true, owned: false }
-  try { const owned = JSON.parse(saved) as Ownership; return { present: true, owned: owned.version === 1 && owned.path === target && owned.hash === digest(text) } }
-  catch { return { present: true, owned: false } }
+  let manifestValid = false
+  let owned = false
+  if (saved !== undefined) {
+    try {
+      const record = JSON.parse(saved) as Ownership
+      manifestValid = record.version === 1 && record.path === target && typeof record.hash === 'string' && /^[a-f0-9]{64}$/.test(record.hash)
+      owned = manifestValid && text !== undefined && record.hash === digest(text)
+    } catch { /* malformed ownership is a preflight conflict */ }
+  }
+  return { present: text !== undefined, owned, manifestPresent: saved !== undefined, manifestValid }
 }

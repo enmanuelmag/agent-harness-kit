@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { openCodeV2ChoiceSchema } from '@/schema/opencode-v2'
 
@@ -9,6 +10,7 @@ import { opencodeAgentFiles } from './opencode'
 import { prepareOpenCodeV2Config, safeOpenCodePath, writeOpenCodeV2Config } from './opencode-v2-config'
 import { buildCapabilityHints } from './provider-research-capabilities'
 import { appendGitignore, ensureNativeHealthScaffold, reconcileGeneratedFiles, writeAgentFiles, writeSkills } from './scaffold-utils'
+import { CANONICAL_SKILLS } from './skill-migrations'
 import { agentBuilder, agentConsultant, agentExplorer, agentLead, agentReviewer, agentsMd } from './templates'
 
 import type { AgentName } from './agent-restrictions'
@@ -40,8 +42,28 @@ export function opencodeV2AgentFiles(config: HarnessConfig, choices: ScaffoldOpt
     return { relPath: `.opencode/agents/${role}.md`, content: `---\n${description}\nmode: ${role === 'lead' ? 'primary' : 'subagent'}\n${choice.model ? `model: ${JSON.stringify(choice.model)}\n` : ''}permissions: ${JSON.stringify(openCodeV2Permissions(role))}\n---\n${match[2]}` }
   })
 }
+/** Check every generated shared destination before config/agent/plugin mutation. */
+function preflightDestinations(cwd: string) {
+  const check = (relativePath: string, directory: boolean) => {
+    const path = safeOpenCodePath(cwd, relativePath)
+    if (!existsSync(path)) return
+    const stat = lstatSync(path)
+    if (directory ? !stat.isDirectory() : !stat.isFile()) throw new Error(`Incompatible OpenCode destination: ${relativePath}`)
+  }
+  for (const path of ['.opencode', '.opencode/agents', '.opencode/skills', '.harness', '.harness/backups']) check(path, true)
+  for (const path of ['AGENTS.md', '.harness/skills-state.json', 'agent-harness-kit.config.local.json']) check(path, false)
+  const source = join(dirname(fileURLToPath(import.meta.url)), 'skills')
+  const visit = (src: string, relativePath: string) => {
+    const directory = lstatSync(src).isDirectory()
+    check(relativePath, directory)
+    if (directory) for (const entry of readdirSync(src)) visit(join(src, entry), join(relativePath, entry))
+  }
+  for (const name of CANONICAL_SKILLS) visit(join(source, name), join('.opencode/skills', name))
+}
+
 /** Shared roots require proof of unmodified canonical v1 content before conversion. */
 export function preflightOpenCodeV2(config: HarnessConfig, cwd: string, migrateV1 = false) {
+  preflightDestinations(cwd)
   if (!migrateV1 && existsSync(safeOpenCodePath(cwd, '.opencode/plugins/ahk-notifications.js'))) throw new Error('Incompatible v1 notification plugin on shared OpenCode path; migrate or uninstall the owned v1 hook first.')
   const prepared = prepareOpenCodeV2Config(cwd, config, migrateV1)
   const legacy = opencodeAgentFiles({ ...config, provider: 'opencode' }, buildCapabilityHints('opencode'))

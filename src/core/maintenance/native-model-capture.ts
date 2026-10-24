@@ -6,6 +6,31 @@ import { openCodeV2ChoiceSchema } from '@/schema/opencode-v2'
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice, HarnessConfig } from '@/types'
 
+
+/** Decode supported one-line YAML scalars without treating an adjacent #variant as a comment. */
+function openCodeModelScalar(raw: string): string {
+  const value = raw.trim()
+  if (!value) throw new Error('Empty model scalar')
+  if (value.startsWith('"')) {
+    const token = value.match(/^"(?:[^"\\]|\\.)*"/)
+    if (!token || !/^(?:[ \t]*|[ \t]+#.*)$/.test(value.slice(token[0].length))) throw new Error('Malformed double-quoted model scalar')
+    const decoded: unknown = JSON.parse(token[0])
+    if (typeof decoded !== 'string') throw new Error('Invalid model scalar')
+    return decoded
+  }
+  if (value.startsWith("'")) {
+    let decoded = ''
+    for (let index = 1; index < value.length; index++) {
+      if (value[index] !== "'") { decoded += value[index]; continue }
+      if (value[index + 1] === "'") { decoded += "'"; index++; continue }
+      if (!/^(?:[ \t]*|[ \t]+#.*)$/.test(value.slice(index + 1))) throw new Error('Malformed single-quoted model scalar')
+      return decoded
+    }
+    throw new Error('Unterminated model scalar')
+  }
+  return value.replace(/[ \t]+#.*$/, '').trim()
+}
+
 /** Parse only canonical role metadata. Ambiguous or malformed headers are never guessed. */
 export function captureNativeChoices(cwd: string, config: HarnessConfig) {
   const choices: Partial<
@@ -33,8 +58,7 @@ export function captureNativeChoices(cwd: string, config: HarnessConfig) {
       if (!header || models.length > 1 || !/^mode: (primary|subagent)\s*$/m.test(header) || !/^permissions:/m.test(header)) { missing.push(role); continue }
       try {
         const raw = models[0]?.replace(/^model:\s*/, '').trim()
-        const model = raw?.startsWith('\"') ? JSON.parse(raw) : raw
-        const parsed = openCodeV2ChoiceSchema.safeParse(model ? { model } : {})
+        const parsed = openCodeV2ChoiceSchema.safeParse(raw === undefined ? {} : { model: openCodeModelScalar(raw) })
         if (!parsed.success) missing.push(role); else choices[role] = parsed.data
       } catch { missing.push(role) }
     } else if (config.provider === 'codex-cli') {

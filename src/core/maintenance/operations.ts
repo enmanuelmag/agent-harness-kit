@@ -251,21 +251,31 @@ export class MaintenanceService {
       if (missing.length) return failure('migrate.provider.apply', 'needs_input', 'Target requires explicit native choices.', missing.map(role => `choices.${role}`))
     }
     if (config.provider === 'opencode-v2' && target === 'opencode') return failure('migrate.provider.apply', 'recovery_required', 'V1 shares V2 paths. Restore the verified pre-migration backup as documented before selecting OpenCode V1; native V2 settings are not converted automatically.')
-    const oldPlugin = target === 'opencode-v2' ? await inspectOpenCodeNotificationPlugin(this.cwd, 'opencode') : { present: false, owned: false }
-    if (oldPlugin.present && !oldPlugin.owned) return failure('migrate.provider.apply', 'custom_plugin_conflict', 'Customized v1 notification plugin preserved. Resolve it before switching shared OpenCode paths.')
+    const oldPlugin = target === 'opencode-v2' ? await inspectOpenCodeNotificationPlugin(this.cwd, 'opencode') : undefined
+    const targetPlugin = target === 'opencode-v2' ? await inspectOpenCodeNotificationPlugin(this.cwd, 'opencode-v2') : undefined
+    for (const [version, plugin] of [['v1', oldPlugin], ['v2', targetPlugin]] as const) {
+      if (plugin && ((plugin.present && !plugin.owned) || (plugin.manifestPresent && !plugin.manifestValid))) return failure('migrate.provider.apply', 'custom_plugin_conflict', `Customized or incompatible ${version} notification plugin/ownership preserved. Resolve it before switching shared OpenCode paths.`)
+    }
     const shared = target === 'opencode-v2' ? preflightOpenCodeV2(next, this.cwd, config.provider === 'opencode') : undefined
     const backupDir = this.backup([...this.generatedFiles(config), ...this.generatedFiles(next)])
-    if (oldPlugin.present) { const removed = await uninstallNotificationHooks(this.cwd, 'opencode'); if (!removed.ok || removed.value.preserved.length) return failure('migrate.provider.apply', 'hook_conflict', 'Could not retire the owned v1 notification plugin.') }
-    if (shared) {
-      writeOpenCodeV2Config(shared.prepared)
-      if (shared.converted.length) writeAgentFiles(this.cwd, opencodeV2AgentFiles(next, choicesFromPreferences(next).opencodeV2AgentModels).filter(entry => shared.converted.includes(entry.relPath)), { force: true, backupRoot: join(this.cwd, config.storage.dir, 'backups') })
+    const recovery = 'Review later edits and restore only affected AHK files and the previous provider overlay from this backup; do not reverse-convert unrelated OpenCode settings. Multi-file generation is not atomic.'
+    const failedAfterBackup = (code: string, message: string): MaintenanceOutcome => ({ ...failure('migrate.provider.apply', code, message), data: { backupDir, recovery, previousProvider: config.provider, targetProvider: target }, notices: [recovery] })
+    try {
+      if (oldPlugin?.present) { const removed = await uninstallNotificationHooks(this.cwd, 'opencode'); if (!removed.ok || removed.value.preserved.length) return failedAfterBackup('hook_conflict', 'Could not retire the owned v1 notification plugin.') }
+      if (shared) {
+        writeOpenCodeV2Config(shared.prepared)
+        if (shared.converted.length) writeAgentFiles(this.cwd, opencodeV2AgentFiles(next, choicesFromPreferences(next).opencodeV2AgentModels).filter(entry => shared.converted.includes(entry.relPath)), { force: true, backupRoot: join(this.cwd, config.storage.dir, 'backups') })
+      }
+      const report = await getMaterializer(target).build(next, this.cwd, { force: plan.args.force === true && !shared, ...choicesFromPreferences(next) })
+      if (oldPlugin?.present) { const installed = await installNotificationHooks(this.cwd, 'opencode-v2', { node: process.execPath, cli: notificationCliPath() }); if (!installed.ok || installed.value.preserved.length) return failedAfterBackup('hook_install_failed', 'Could not install v2 notifications; recover the prior setup from the maintenance backup before retrying.') }
+      const saved = await updateManagedConfig(this.cwd, { provider: target, ...(pref.data?.preferences ? { agentPreferences: pref.data.preferences } : {}) })
+      if (!saved.ok) return failedAfterBackup(saved.error.code, saved.error.message)
+      return success('migrate.provider.apply', { provider: target, report, backupDir }, backupDir ? [recovery] : undefined)
+    } catch (error) {
+      return failedAfterBackup('operation_failed', error instanceof Error ? error.message : String(error))
     }
-    const report = await getMaterializer(target).build(next, this.cwd, { force: plan.args.force === true && !shared, ...choicesFromPreferences(next) })
-    if (oldPlugin.present) { const installed = await installNotificationHooks(this.cwd, 'opencode-v2', { node: process.execPath, cli: notificationCliPath() }); if (!installed.ok || installed.value.preserved.length) return failure('migrate.provider.apply', 'hook_install_failed', 'Could not install v2 notifications; recover the prior setup from the reported maintenance backup before retrying.') }
-    const saved = await updateManagedConfig(this.cwd, { provider: target, ...(pref.data?.preferences ? { agentPreferences: pref.data.preferences } : {}) })
-    if (!saved.ok) return failure('migrate.provider.apply', saved.error.code, saved.error.message)
-    return success('migrate.provider.apply', { provider: target, report, backupDir }, backupDir ? ['Recovery: restore only verified unchanged AHK files from the backup and the previous provider overlay; do not reverse-convert unrelated OpenCode settings.'] : undefined)
   }
+
   private specChanges(config: HarnessConfig) {
     return fileTree(this.cwd, resolve(this.cwd, config.project.docsPath, 'specs')).filter(path => path.endsWith('.md')).flatMap(path => {
       const before = readFileSync(path, 'utf8')
@@ -285,10 +295,16 @@ export class MaintenanceService {
     }
     const provider = (args.provider ?? config.provider) as Provider
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid reset provider.')
+    const sharedOpenCode = provider === 'opencode' || provider === 'opencode-v2'
+    if (sharedOpenCode && (config.provider === 'opencode' || config.provider === 'opencode-v2') && provider !== config.provider) throw new Error(`Shared OpenCode provider mismatch: workspace is ${config.provider}; refusing reset as ${provider}.`)
     for (const role of (args.targets as string[] | undefined) ?? (args.provider ? ROLES : [])) {
       if (!ROLES.includes(role as typeof ROLES[number])) throw new Error(`Unknown reset role: ${role}`)
       const path = safePath(this.cwd, join(this.cwd, providerRoot(provider), 'agents', `${role}${provider === 'codex-cli' ? '.toml' : '.md'}`))
-      if (provider === 'opencode-v2' && existsSync(path)) { const expected = opencodeV2AgentFiles(config).find(entry => entry.relPath.endsWith(`/${role}.md`)); if (readFileSync(path, 'utf8') !== expected?.content) throw new Error(`Preserving customized shared OpenCode agent: ${role}`) }
+      if (sharedOpenCode && existsSync(path) && provider === 'opencode') {
+        const header = readFileSync(path, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? ''
+        if (/^permissions:/m.test(header)) throw new Error(`Shared OpenCode agent ${role} is V2 content; refusing reset as V1.`)
+      }
+      if (sharedOpenCode && (provider === 'opencode-v2' || config.provider === 'opencode-v2') && existsSync(path)) { const expected = opencodeV2AgentFiles(config).find(entry => entry.relPath.endsWith(`/${role}.md`)); if (readFileSync(path, 'utf8') !== expected?.content) throw new Error(`Preserving customized shared OpenCode agent: ${role}`) }
       files.push(path)
     }
     return files.filter(existsSync)
