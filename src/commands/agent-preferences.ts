@@ -8,6 +8,7 @@ import type {
   CodexAgentModelChoice,
   CursorAgentModelChoice,
   HarnessConfig,
+  OpenCodeV2AgentModelChoice,
   Provider,
 } from '@/types'
 
@@ -19,7 +20,7 @@ export function toPreferences(
   choices?: Partial<
     Record<
       AgentName,
-      string | ClaudeAgentModelChoice | CodexAgentModelChoice | CursorAgentModelChoice
+      string | ClaudeAgentModelChoice | CodexAgentModelChoice | CursorAgentModelChoice | OpenCodeV2AgentModelChoice
     >
   >
 ): AgentModelPreferences {
@@ -55,6 +56,7 @@ export function mergePreferences(
 export function choicesFromPreferences(config: HarnessConfig): {
   claudeAgentModels?: Partial<Record<AgentName, ClaudeAgentModelChoice>>
   codexAgentModels?: Partial<Record<AgentName, CodexAgentModelChoice>>
+  opencodeV2AgentModels?: Partial<Record<AgentName, OpenCodeV2AgentModelChoice>>
   cursorAgentModels?: Partial<Record<AgentName, CursorAgentModelChoice>>
 } {
   const saved = config.agentPreferences?.[config.provider] as PreferenceMap | undefined
@@ -84,6 +86,9 @@ export function choicesFromPreferences(config: HarnessConfig): {
         ])
       ),
     }
+  }
+  if (config.provider === 'opencode-v2') {
+    return { opencodeV2AgentModels: Object.fromEntries(Object.entries(saved).map(([r,v]) => [r, v.model === 'inherit' ? {} : { model: v.model }])) }
   }
   if (config.provider === 'cursor') {
     return {

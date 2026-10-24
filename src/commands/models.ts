@@ -5,12 +5,14 @@ import { MaintenanceService } from '@/core/maintenance/operations'
 import { claudeAgentFiles } from '@/core/materializer/claude-code'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { cursorAgentFiles } from '@/core/materializer/cursor'
+import { opencodeV2AgentFiles } from '@/core/materializer/opencode-v2'
 import { buildCapabilityHints } from '@/core/materializer/provider-research-capabilities'
 
 import { toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
+import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { WriteAgentFilesResult } from '@/core/materializer/scaffold-utils'
@@ -20,9 +22,10 @@ import type {
   CursorAgentModelChoice,
   HarnessConfig,
   Provider,
+  ScaffoldOptions,
 } from '@/types'
 
-const SUPPORTED_PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor']
+const SUPPORTED_PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor', 'opencode-v2']
 const ROLE_FILES = new Set(['lead', 'explorer', 'consultant', 'builder', 'reviewer'])
 
 export type ModelsContext =
@@ -57,7 +60,7 @@ export async function runModels(cwd: string): Promise<void> {
     }
     console.log(
       pc.dim(
-        `ahk models supports Claude Code, Codex CLI, and Cursor. '${ctx.provider}' has no native per-role model prompt — nothing to do.`
+        `ahk models supports Claude Code, Codex CLI, Cursor, and OpenCode V2. '${ctx.provider}' has no native per-role model prompt — nothing to do.`
       )
     )
     return
@@ -76,7 +79,7 @@ export async function runModels(cwd: string): Promise<void> {
       ? 'Claude Code'
       : config.provider === 'codex-cli'
         ? 'Codex CLI'
-        : 'Cursor'
+        : config.provider === 'opencode-v2' ? 'OpenCode V2' : 'Cursor'
   console.log('')
   if (agents.overwritten.length) {
     console.log(
@@ -99,6 +102,7 @@ type ChoiceMap = Partial<Record<AgentName, Choice>>
 type ChoiceMapFor<T> = Partial<Record<AgentName, T>>
 
 async function promptChoices(provider: Provider): Promise<ChoiceMap> {
+  if (provider === 'opencode-v2') return promptOpenCodeV2AgentModels(provider)
   if (provider === 'claude-code') return promptClaudeAgentModels(provider)
   if (provider === 'codex-cli') return promptCodexAgentModels(provider)
   return promptCursorAgentModels(provider)
@@ -106,6 +110,7 @@ async function promptChoices(provider: Provider): Promise<ChoiceMap> {
 
 /** Exported for focused command tests without mocking interactive prompts. */
 export function filesFor(config: HarnessConfig, choices: ChoiceMap) {
+  if (config.provider === 'opencode-v2') return opencodeV2AgentFiles(config, choices as ScaffoldOptions['opencodeV2AgentModels'])
   const files =
     config.provider === 'claude-code'
       ? claudeAgentFiles(

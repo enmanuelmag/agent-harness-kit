@@ -12,10 +12,11 @@ import { choicesFromPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
+import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { BuildReport } from '@/core/materializer/index'
-import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
+import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice,ScaffoldOptions } from '@/types'
 
 export interface BuildOptions {
   watch?: boolean
@@ -69,6 +70,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   // files. Must happen BEFORE the spinner below starts.
   let claudeAgentModels: Partial<Record<AgentName, ClaudeAgentModelChoice>> | undefined
   let codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>> | undefined
+  let opencodeV2AgentModels: ScaffoldOptions['opencodeV2AgentModels']
   let cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>> | undefined
   // A safe rebuild never prompts, but a deleted role agent should be recreated
   // with the recorded choice rather than silently losing its model override.
@@ -77,6 +79,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
     claudeAgentModels = stored.claudeAgentModels
     codexAgentModels = stored.codexAgentModels
     cursorAgentModels = stored.cursorAgentModels
+    opencodeV2AgentModels = stored.opencodeV2AgentModels
   }
   if (force && config.provider === 'claude-code' && !keepModels) {
     claudeAgentModels = await promptClaudeAgentModels(config.provider)
@@ -88,6 +91,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
   if (force && config.provider === 'codex-cli' && !keepModels) {
     codexAgentModels = await promptCodexAgentModels(config.provider)
   }
+  if (force && config.provider === 'opencode-v2' && !keepModels) opencodeV2AgentModels = await promptOpenCodeV2AgentModels(config.provider)
   if (force && config.provider === 'cursor' && !keepModels) {
     cursorAgentModels = await promptCursorAgentModels(config.provider)
   }
@@ -99,13 +103,14 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
         claudeAgentModels = await promptClaudeAgentModels(config.provider, missing)
       if (config.provider === 'codex-cli')
         codexAgentModels = await promptCodexAgentModels(config.provider, missing)
+      if (config.provider === 'opencode-v2') opencodeV2AgentModels = await promptOpenCodeV2AgentModels(config.provider, missing)
       if (config.provider === 'cursor')
         cursorAgentModels = await promptCursorAgentModels(config.provider, missing)
       const result = await persistPreferences(
         cwd,
         toPreferences(
           config.provider,
-          (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never
+          (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels ?? opencodeV2AgentModels) as never
         )
       )
       if (result === 'manual-update-required')
@@ -116,8 +121,9 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
     claudeAgentModels = stored.claudeAgentModels
     codexAgentModels = stored.codexAgentModels
     cursorAgentModels = stored.cursorAgentModels
+    opencodeV2AgentModels = stored.opencodeV2AgentModels
   } else if (force) {
-    const choices = (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels) as never
+    const choices = (claudeAgentModels ?? codexAgentModels ?? cursorAgentModels ?? opencodeV2AgentModels) as never
     const result = await persistPreferences(cwd, toPreferences(config.provider, choices))
     if (result === 'manual-update-required')
       throw new Error('Preferences need to be saved before regenerating agent files.')

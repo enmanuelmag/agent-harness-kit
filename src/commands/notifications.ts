@@ -15,10 +15,10 @@ import { notificationCliPath, NotificationService } from '../core/notifications/
 import { deliverEvent } from '../core/notifications/worker'
 import { capture } from '../core/result'
 
-const providers = ['cursor', 'claude-code', 'codex-cli', 'opencode'] as const
+const providers = ['cursor', 'claude-code', 'codex-cli', 'opencode', 'opencode-v2'] as const
 export function notificationProvider(value: string): NotificationProvider {
   if (!providers.includes(value as NotificationProvider))
-    throw new Error('Provider must be cursor, claude-code, codex-cli or opencode')
+    throw new Error('Provider must be cursor, claude-code, codex-cli opencode or opencode-v2')
   return value as NotificationProvider
 }
 async function service(cwd: string): Promise<NotificationService> {

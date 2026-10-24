@@ -8,10 +8,11 @@ import { toPreferences } from './agent-preferences'
 import { promptClaudeAgentModels } from './claude-model-prompt'
 import { promptCodexAgentModels } from './codex-model-prompt'
 import { promptCursorAgentModels } from './cursor-model-prompt'
+import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { Provider } from '@/types'
-import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice } from '@/types'
+import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice,OpenCodeV2AgentModelChoice } from '@/types'
 
 interface MigrateOptions {
   to?: string
@@ -21,7 +22,7 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   const config = await loadConfig(cwd)
 
   let target: Provider
-  if (opts.to && ['claude-code', 'opencode', 'codex-cli', 'grok-cli', 'cursor'].includes(opts.to)) {
+  if (opts.to && ['claude-code', 'opencode', 'opencode-v2', 'codex-cli', 'grok-cli', 'cursor'].includes(opts.to)) {
     target = opts.to as Provider
   } else {
     const val = await p.select({
@@ -29,6 +30,7 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
       options: [
         { value: 'claude-code', label: 'Claude Code' },
         { value: 'opencode', label: 'OpenCode' },
+        { value: 'opencode-v2', label: 'OpenCode V2' },
         { value: 'codex-cli', label: 'Codex CLI' },
         { value: 'grok-cli', label: 'Grok CLI' },
         { value: 'cursor', label: 'Cursor' },
@@ -55,10 +57,12 @@ export async function runMigrate(cwd: string, opts: MigrateOptions): Promise<voi
   const claudeAgentModels = await promptClaudeAgentModels(target)
   const codexAgentModels = await promptCodexAgentModels(target)
   const cursorAgentModels = await promptCursorAgentModels(target)
+  const opencodeV2AgentModels = await promptOpenCodeV2AgentModels(target)
   const choices = choicesForMigrationTarget(target, {
     claudeAgentModels,
     codexAgentModels,
     cursorAgentModels,
+    opencodeV2AgentModels,
   })
   const service = new MaintenanceService(cwd)
   try {
@@ -79,11 +83,13 @@ export function choicesForMigrationTarget(
   choices: {
     claudeAgentModels: Partial<Record<AgentName, ClaudeAgentModelChoice>>
     codexAgentModels: Partial<Record<AgentName, CodexAgentModelChoice>>
+    opencodeV2AgentModels?: Partial<Record<AgentName, OpenCodeV2AgentModelChoice>>
     cursorAgentModels: Partial<Record<AgentName, CursorAgentModelChoice>>
   }
 ) {
   if (target === 'claude-code') return choices.claudeAgentModels
   if (target === 'codex-cli') return choices.codexAgentModels
+  if (target === 'opencode-v2') return choices.opencodeV2AgentModels ?? {}
   if (target === 'cursor') return choices.cursorAgentModels
   return {}
 }

@@ -18,6 +18,7 @@ import {
   printWelcomeMessage,
   readProjectNameFromPackageJson,
 } from './init-helpers'
+import { promptOpenCodeV2AgentModels } from './opencode-v2-model-prompt'
 
 import type { Provider } from '@/types'
 
@@ -131,7 +132,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   let provider: Provider
   if (
     flags.provider &&
-    ['claude-code', 'opencode', 'codex-cli', 'grok-cli', 'cursor'].includes(flags.provider)
+    ['claude-code', 'opencode', 'opencode-v2', 'codex-cli', 'grok-cli', 'cursor'].includes(flags.provider)
   ) {
     provider = flags.provider as Provider
   } else {
@@ -139,6 +140,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
       message: 'AI provider',
       options: [
         { value: 'opencode', label: 'OpenCode' },
+        { value: 'opencode-v2', label: 'OpenCode V2' },
         { value: 'claude-code', label: 'Claude Code' },
         { value: 'codex-cli', label: 'Codex CLI' },
         { value: 'grok-cli', label: 'Grok CLI' },
@@ -176,7 +178,8 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // cancel-handling.
   const codexAgentModels = await promptCodexAgentModels(provider)
   const cursorAgentModels = await promptCursorAgentModels(provider)
-  const agentPreferences = mergePreferences(
+  const opencodeV2AgentModels = await promptOpenCodeV2AgentModels(provider)
+  const agentPreferences = mergePreferences(toPreferences(provider, opencodeV2AgentModels), mergePreferences(
     {},
     mergePreferences(
       toPreferences(provider, claudeAgentModels),
@@ -185,7 +188,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
         toPreferences(provider, cursorAgentModels)
       )
     )
-  )
+  ))
 
   // ─── Docs path ────────────────────────────────────────────────────────────
   let docsPath: string
@@ -291,6 +294,7 @@ export async function runInit(cwd: string, flags: InitOptions): Promise<void> {
   // ─── Summary ─────────────────────────────────────────────────────────────-
   const PROVIDER_SUMMARY_INFO: Record<Provider, { agentsDir: string; mcpFile: string }> = {
     'claude-code': { agentsDir: '.claude/agents/', mcpFile: '.mcp.json' },
+    'opencode-v2': { agentsDir: '.opencode/agents/', mcpFile: './opencode.json(c)' },
     opencode: { agentsDir: '.opencode/agents/', mcpFile: './opencode.json' },
     'codex-cli': { agentsDir: '.codex/agents/', mcpFile: '.codex/config.toml' },
     'grok-cli': { agentsDir: '.grok/agents/', mcpFile: '.grok/config.toml' },

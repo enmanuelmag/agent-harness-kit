@@ -131,6 +131,10 @@ export async function runDoctor(cwd: string, opts: { db?: boolean } = {}): Promi
 
   console.log('')
   printSkillsSection(status.skills)
+  if (status.opencodeV2) {
+    neutral('OpenCode V2', `config: ${status.opencodeV2.configPath ?? 'unresolved'}; runtime: ${status.opencodeV2.runtimeVersion ?? 'unavailable'}; live integration not verified by doctor`)
+    for (const issue of status.opencodeV2.issues) warn('OpenCode V2', issue)
+  }
 
   if (config) {
     try {
