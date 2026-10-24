@@ -1,14 +1,17 @@
+import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { loadConfig } from '@/core/config'
 import { renderDelegationGuidance } from '@/core/materializer/delegation-guidance'
+import { inspectOpenCodeConfig } from '@/core/materializer/opencode-v2-config'
 import { CANONICAL_SKILLS } from '@/core/materializer/skill-migrations'
 import { injectDelegationGuidance } from '@/core/materializer/templates'
 import { pkg } from '@/core/package-data'
 import { __resetUpdateCacheForTests, isNewer, lookupUpdate } from '@/core/update-check'
 
+import type { OpenCodeV2Diagnostic } from '@/schema/opencode-v2'
 import type { Provider } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +43,7 @@ export interface DoctorStatus {
   lib: LibStatus
   agents: AgentStatus[]
   skills: SkillStatus[]
+  opencodeV2?: OpenCodeV2Diagnostic
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -81,6 +85,7 @@ function getProviderAgentInfo(provider: string): {
   switch (provider) {
     case 'claude-code':
       return { agentsDir: '.claude/agents', ext: '.md' }
+    case 'opencode-v2':
     case 'opencode':
       return { agentsDir: '.opencode/agents', ext: '.md' }
     case 'codex-cli':
@@ -118,6 +123,7 @@ function getProviderSkillsDir(provider: string): string {
   switch (provider) {
     case 'claude-code':
       return '.claude/skills'
+    case 'opencode-v2':
     case 'opencode':
       return '.opencode/skills'
     case 'codex-cli':
@@ -209,5 +215,27 @@ export async function getDoctorStatus(cwd: string): Promise<DoctorStatus> {
   const agents = checkAgentFiles(cwd, provider)
   const skills = checkSkills(cwd, provider)
 
-  return { lib, agents, skills }
+  return { lib, agents, skills, ...(provider === 'opencode-v2' ? { opencodeV2: inspectOpenCodeV2(cwd) } : {}) }
+}
+
+export function inspectOpenCodeV2(cwd: string): OpenCodeV2Diagnostic {
+  const result: OpenCodeV2Diagnostic = { issues: [], runtimeVerified: false }
+  try {
+    const config = inspectOpenCodeConfig(cwd)
+    result.configPath = config.path
+    if (!config.native) result.issues.push('Native mcp.servers.agent-harness-kit entry is missing or still uses v1 syntax.')
+    if (existsSync(join(cwd, '.opencode/plugins/ahk-notifications.js'))) result.issues.push('A v1 notification plugin is present on the shared plugin path.')
+    for (const name of AGENT_NAMES) {
+      const path = join(cwd, '.opencode/agents', `${name}.md`)
+      if (!existsSync(path)) continue
+      const header = readFileSync(path, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? ''
+      if (!/^permissions:/m.test(header) || !new RegExp(`^mode: ${name === 'lead' ? 'primary' : 'subagent'}$`, 'm').test(header)) result.issues.push(`${name}: expected native V2 permissions and mode.`)
+    }
+  } catch (error) { result.issues.push(error instanceof Error ? error.message : String(error)) }
+  const binary = spawnSync('opencode', ['--version'], { encoding: 'utf8', timeout: 1000, windowsHide: true })
+  if (binary.status === 0) {
+    result.runtimeVersion = binary.stdout.trim().slice(0, 100)
+    if (!/(?:^|v|\s)2\./.test(result.runtimeVersion)) result.issues.push('The opencode executable on PATH is not V2; selecting a provider does not install it.')
+  } else result.issues.push('OpenCode runtime version unavailable; install and verify V2 separately.')
+  return result
 }

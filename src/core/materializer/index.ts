@@ -3,6 +3,7 @@ import { CodexCliMaterializer } from './codex-cli'
 import { CursorMaterializer } from './cursor'
 import { GrokMaterializer } from './grok'
 import { OpenCodeMaterializer } from './opencode'
+import { OpenCodeV2Materializer } from './opencode-v2'
 
 import type { ReconcileResult, WriteAgentFilesResult } from './scaffold-utils'
 import type { WriteSkillsResult } from './scaffold-utils'
@@ -31,6 +32,7 @@ export interface BuildMaterializerOptions {
    *  read this field — this cuts both ways, since `codex-cli.ts` likewise
    *  never reads `claudeAgentModels`. */
   codexAgentModels?: ScaffoldOptions['codexAgentModels']
+  opencodeV2AgentModels?: ScaffoldOptions['opencodeV2AgentModels']
   cursorAgentModels?: ScaffoldOptions['cursorAgentModels']
 }
 
@@ -56,6 +58,8 @@ export function getMaterializer(provider: Provider): Materializer {
   switch (provider) {
     case 'claude-code':
       return new ClaudeCodeMaterializer()
+    case 'opencode-v2':
+      return new OpenCodeV2Materializer()
     case 'opencode':
       return new OpenCodeMaterializer()
     case 'codex-cli':

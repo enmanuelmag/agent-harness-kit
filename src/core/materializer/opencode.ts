@@ -28,7 +28,7 @@ import type { AgentFileEntry } from './scaffold-utils'
 import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 
 /** Agent files this provider owns. Shared by `scaffold()` and `build()`. */
-function opencodeAgentFiles(config: HarnessConfig, capabilityHints = ''): AgentFileEntry[] {
+export function opencodeAgentFiles(config: HarnessConfig, capabilityHints = ''): AgentFileEntry[] {
   const projectName = config.project.name
   return [
     {

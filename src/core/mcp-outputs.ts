@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { openCodeV2DiagnosticSchema } from '@/schema/opencode-v2'
+
 const string = z.string()
 const number = z.number()
 const nullableString = string.nullable()
@@ -203,6 +205,7 @@ export const OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
     }),
   ]),
   'ahk.doctor': z.object({
+    opencodeV2: openCodeV2DiagnosticSchema.optional(),
     lib: version,
     agents: names,
     skills: names.extend({ outdated: strings }),

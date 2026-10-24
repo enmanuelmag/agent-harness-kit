@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { openCodeV2ChoiceSchema } from '@/schema/opencode-v2'
+
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type { ClaudeAgentModelChoice, CodexAgentModelChoice, CursorAgentModelChoice, HarnessConfig } from '@/types'
 
@@ -17,15 +19,25 @@ export function captureNativeChoices(cwd: string, config: HarnessConfig) {
         ? join(cwd, `.claude/agents/${role}.md`)
         : config.provider === 'codex-cli'
           ? join(cwd, `.codex/agents/${role}.toml`)
-          : config.provider === 'cursor'
-            ? join(cwd, `.cursor/agents/${role}.md`)
+          : (config.provider === 'cursor' || config.provider === 'opencode-v2')
+            ? join(cwd, `${config.provider === 'cursor' ? '.cursor' : '.opencode'}/agents/${role}.md`)
             : ''
     if (!path || !existsSync(path)) {
       missing.push(role)
       continue
     }
     const content = readFileSync(path, 'utf8')
-    if (config.provider === 'codex-cli') {
+    if (config.provider === 'opencode-v2') {
+      const header = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]
+      const models = header?.match(/^model:.*$/gm) ?? []
+      if (!header || models.length > 1 || !/^mode: (primary|subagent)\s*$/m.test(header) || !/^permissions:/m.test(header)) { missing.push(role); continue }
+      try {
+        const raw = models[0]?.replace(/^model:\s*/, '').trim()
+        const model = raw?.startsWith('\"') ? JSON.parse(raw) : raw
+        const parsed = openCodeV2ChoiceSchema.safeParse(model ? { model } : {})
+        if (!parsed.success) missing.push(role); else choices[role] = parsed.data
+      } catch { missing.push(role) }
+    } else if (config.provider === 'codex-cli') {
       const header = content.split(/^\s*\[/m, 1)[0]
       const model = header.match(/^\s*model\s*=\s*["']([^"']+)["']\s*(?:#.*)?$/m)
       const agentStart = content.search(/^\s*\[agent\]\s*$/m)

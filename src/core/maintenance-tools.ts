@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 import { recover } from './mcp-field-recovery'
 
-const provider = z.enum(['claude-code', 'codex-cli', 'cursor', 'opencode', 'grok-cli'])
-const hookProvider = z.enum(['claude-code', 'codex-cli', 'cursor', 'opencode'])
+const provider = z.enum(['claude-code', 'codex-cli', 'cursor', 'opencode', 'opencode-v2', 'grok-cli'])
+const hookProvider = z.enum(['claude-code', 'codex-cli', 'cursor', 'opencode', 'opencode-v2'])
 const text = z.string().trim().min(1).max(4096)
 const roleChoice = z.object({ model: text, reasoningEffort: text.optional() })
 const choices = z.object({ lead: roleChoice.optional(), explorer: roleChoice.optional(), consultant: roleChoice.optional(), builder: roleChoice.optional(), reviewer: roleChoice.optional() })

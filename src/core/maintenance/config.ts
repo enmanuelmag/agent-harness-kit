@@ -14,6 +14,8 @@ import {
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import { openCodeV2PreferenceSchema } from '@/schema/opencode-v2'
+
 import { err, ok, type Result } from '../result'
 
 export const MANAGED_CONFIG_NAME = 'agent-harness-kit.config.local.json'
@@ -199,7 +201,7 @@ function validateManagedPatch(
     return err({ code: 'invalid_settings', message: 'Unsupported managed configuration field.' })
   if (
     patch.provider !== undefined &&
-    !['claude-code', 'codex-cli', 'cursor', 'opencode', 'grok-cli'].includes(String(patch.provider))
+    !['claude-code', 'codex-cli', 'cursor', 'opencode', 'opencode-v2', 'grok-cli'].includes(String(patch.provider))
   )
     return err({ code: 'invalid_settings', message: 'Unsupported provider.' })
   for (const key of ['storage', 'database', 'project', 'tools', 'health'])
@@ -215,7 +217,7 @@ function validateManagedPatch(
       return err({ code: 'invalid_settings', message: 'agentPreferences must be an object.' })
     for (const [provider, roles] of Object.entries(patch.agentPreferences)) {
       if (
-        !['claude-code', 'codex-cli', 'cursor', 'opencode', 'grok-cli'].includes(provider) ||
+        !['claude-code', 'codex-cli', 'cursor', 'opencode', 'opencode-v2', 'grok-cli'].includes(provider) ||
         !object(roles)
       )
         return err({ code: 'invalid_settings', message: 'Invalid preference provider.' })
@@ -226,6 +228,7 @@ function validateManagedPatch(
           typeof preference.model !== 'string' ||
           !preference.model.trim() ||
           preference.model.length > 256 ||
+          (provider === 'opencode-v2' && !openCodeV2PreferenceSchema.safeParse(preference).success) ||
           (preference.reasoningEffort !== undefined &&
             typeof preference.reasoningEffort !== 'string')
         )

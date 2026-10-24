@@ -14,13 +14,16 @@ import { HarnessDB, openDB, readStorageStateFile, resolveSqlitePath, resolveSqli
 import { SQLiteDriver } from '@/core/drivers/sqlite'
 import { inspectHealthCheck } from '@/core/health-check'
 import { getMaterializer } from '@/core/materializer/index'
+import { opencodeV2AgentFiles, preflightOpenCodeV2 } from '@/core/materializer/opencode-v2'
+import { inspectOpenCodeConfig, writeOpenCodeV2Config } from '@/core/materializer/opencode-v2-config'
 import { slugify } from '@/core/materializer/scaffold-utils'
 import { writeAgentFiles } from '@/core/materializer/scaffold-utils'
 import { configCjs, configJson, configMjs, configTs } from '@/core/materializer/templates'
-import { installNotificationHooks } from '@/core/notifications/install'
+import { inspectOpenCodeNotificationPlugin, installNotificationHooks,uninstallNotificationHooks } from '@/core/notifications/install'
 import { notificationCliPath } from '@/core/notifications/runtime'
 import { capture } from '@/core/result'
 import { changeSQLiteEpoch, inspectSQLiteEpoch, withSQLiteMaintenance } from '@/core/sqlite-ownership'
+import { openCodeV2PreferenceSchema } from '@/schema/opencode-v2'
 
 import { configureNotifications, updateManagedConfig } from './config'
 import { JobStore } from './jobs'
@@ -38,8 +41,8 @@ export interface MaintenanceOptions {
   afterStorageChange?: () => Promise<void>
   homeDir?: string
 }
-const PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor', 'opencode', 'grok-cli']
-const providerRoot = (p: Provider) => ({ 'claude-code': '.claude', 'codex-cli': '.codex', cursor: '.cursor', opencode: '.opencode', 'grok-cli': '.grok' })[p]
+const PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor', 'opencode', 'opencode-v2', 'grok-cli']
+const providerRoot = (p: Provider) => ({ 'claude-code': '.claude', 'codex-cli': '.codex', cursor: '.cursor', opencode: '.opencode', 'opencode-v2': '.opencode', 'grok-cli': '.grok' })[p]
 const success = (operation: string, data: Record<string, unknown> = {}, notices?: string[]): MaintenanceOutcome => ({ ok: true, operation, code: 'ok', data, ...(notices?.length ? { notices } : {}) })
 const failure = (operation: string, code: string, message: string, required?: string[]): MaintenanceOutcome => ({ ok: false, operation, code, message, ...(required ? { required } : {}) })
 
@@ -88,7 +91,7 @@ export class MaintenanceService {
     const prefs = this.preferences(args, config.provider)
     if (!prefs.ok) return { ...prefs, operation: 'init' }
     if (prefs.data?.preferences) config.agentPreferences = prefs.data.preferences as AgentModelPreferences
-    if (['claude-code', 'codex-cli', 'cursor'].includes(config.provider)) {
+    if (['claude-code', 'codex-cli', 'cursor', 'opencode-v2'].includes(config.provider)) {
       const missing = missingPreferenceRoles(config)
       if (missing.length) return failure('init', 'needs_input', 'Provide explicit native model choices; inherit is a valid choice.', missing.map(role => `choices.${role}`))
     }
@@ -99,6 +102,7 @@ export class MaintenanceService {
     if (!(ext in templates)) return failure('init', 'invalid_input', 'configFormat must be json, ts, mjs or cjs.')
     const path = safePath(this.cwd, join(this.cwd, `agent-harness-kit.config.${ext}`))
     const content = templates[ext as keyof typeof templates]({ name: config.project.name, description: config.project.description, provider: config.provider, docsPath, tasksAdapter: 'mcp', scope: config.storage.scope, projectId: config.storage.projectId, port: config.tools.mcp.port, agentPreferences: config.agentPreferences })
+    if (config.provider === 'opencode-v2') preflightOpenCodeV2(config, this.cwd)
     writeFileSync(path, content, { flag: 'wx', mode: 0o600 })
     const choices = choicesFromPreferences(config)
     await getMaterializer(config.provider).scaffold(config, { cwd: this.cwd, ...choices })
@@ -119,6 +123,7 @@ export class MaintenanceService {
     for (const [role, value] of Object.entries(roles)) {
       if (!ROLES.includes(role as typeof ROLES[number]) || !value || typeof value.model !== 'string' || !value.model.trim() || (value.reasoningEffort !== undefined && typeof value.reasoningEffort !== 'string')) return failure('models', 'invalid_input', `Invalid native choice for ${role}.`)
     }
+    if (provider === 'opencode-v2') for (const value of Object.values(roles)) { const checked = openCodeV2PreferenceSchema.safeParse(value); if (!checked.success) return failure('models', 'invalid_input', checked.error.message) }
     return success('models', { preferences: { [provider]: roles } })
   }
   private async generate(operation: string, args: Record<string, unknown>): Promise<MaintenanceOutcome> {
@@ -126,13 +131,14 @@ export class MaintenanceService {
     if (operation === 'models' && args.provider !== undefined && args.provider !== config.provider) return { ...failure(operation, 'provider_mismatch', `Current provider is ${config.provider}; requested ${String(args.provider)}. Models configure only the current provider. Use a provider migration plan to change providers.`), data: { currentProvider: config.provider, requestedProvider: args.provider } }
     const pref = this.preferences(args, config.provider)
     if (!pref.ok) return { ...pref, operation }
-    if (operation === 'models' && !['claude-code', 'codex-cli', 'cursor'].includes(config.provider)) return failure(operation, 'unsupported_provider', `${config.provider} has no supported native model choices.`)
-    if ((operation === 'models' || (args.force === true && args.keepModels !== true)) && ['claude-code', 'codex-cli', 'cursor'].includes(config.provider) && !pref.data?.preferences) return failure(operation, 'needs_input', 'Provide native choices for all roles or force with keepModels.', ROLES.map(role => `choices.${role}`))
+    if (operation === 'models' && !['claude-code', 'codex-cli', 'cursor', 'opencode-v2'].includes(config.provider)) return failure(operation, 'unsupported_provider', `${config.provider} has no supported native model choices.`)
+    if ((operation === 'models' || (args.force === true && args.keepModels !== true)) && ['claude-code', 'codex-cli', 'cursor', 'opencode-v2'].includes(config.provider) && !pref.data?.preferences) return failure(operation, 'needs_input', 'Provide native choices for all roles or force with keepModels.', ROLES.map(role => `choices.${role}`))
     const combined = pref.data?.preferences ? { ...config, agentPreferences: { ...config.agentPreferences, [config.provider]: { ...config.agentPreferences?.[config.provider], ...(pref.data.preferences as AgentModelPreferences)[config.provider] } } } : config
-    if ((args.force === true || operation === 'models') && ['claude-code', 'codex-cli', 'cursor'].includes(config.provider)) {
+    if ((args.force === true || operation === 'models') && ['claude-code', 'codex-cli', 'cursor', 'opencode-v2'].includes(config.provider)) {
       const missing = missingPreferenceRoles(combined)
       if (missing.length) return failure(operation, 'needs_input', 'Missing native model preferences; no files changed.', missing.map(role => `choices.${role}`))
     }
+    if (config.provider === 'opencode-v2') preflightOpenCodeV2(combined, this.cwd)
     const files = this.generatedFiles(config)
     const backupDir = args.force === true || operation === 'models' ? this.backup(files) : undefined
     if (pref.data?.preferences) {
@@ -142,7 +148,7 @@ export class MaintenanceService {
     }
     const choices = choicesFromPreferences(config)
     if (operation === 'models') {
-      const native = choices.claudeAgentModels ?? choices.codexAgentModels ?? choices.cursorAgentModels ?? {}
+      const native = choices.claudeAgentModels ?? choices.codexAgentModels ?? choices.cursorAgentModels ?? choices.opencodeV2AgentModels ?? {}
       const report = writeAgentFiles(this.cwd, filesFor(config, native), { force: true, backupRoot: join(this.cwd, config.storage.dir, 'backups') })
       // Codex project default and permissions are reconciled by the same materializer.
       if (config.provider === 'codex-cli') await getMaterializer(config.provider).build(config, this.cwd, choices)
@@ -152,7 +158,7 @@ export class MaintenanceService {
     return success(operation, { report, backupDir, permissionsSynced: args.sync === true }, args.sync === true ? ['Native permissions are maintained by generation; provider syncPermissions is a documented no-op.'] : undefined)
   }
   private generatedFiles(config: HarnessConfig): string[] {
-    return [...fileTree(this.cwd, join(this.cwd, providerRoot(config.provider))), ...['AGENTS.md', 'CLAUDE.md', '.mcp.json', 'opencode.json', 'agent-harness-kit.config.local.json'].map(p => safePath(this.cwd, join(this.cwd, p)))]
+    return [...fileTree(this.cwd, join(this.cwd, providerRoot(config.provider))), ...['AGENTS.md', 'CLAUDE.md', '.mcp.json', 'opencode.json', 'opencode.jsonc', '.opencode/opencode.json', '.opencode/opencode.jsonc', 'agent-harness-kit.config.local.json', '.harness/skills-state.json', '.harness/notifications-hooks-opencode.json', '.harness/notifications-hooks-opencode-v2.json'].map(p => safePath(this.cwd, join(this.cwd, p)))]
   }
   private backup(files: string[]): string | undefined {
     const existing = [...new Set(files)].filter(existsSync)
@@ -240,15 +246,25 @@ export class MaintenanceService {
     const pref = this.preferences(plan.args, target)
     if (!pref.ok) return { ...pref, operation: 'migrate.provider.apply' }
     const next = { ...config, provider: target, agentPreferences: { ...config.agentPreferences, [target]: { ...config.agentPreferences?.[target], ...(pref.data?.preferences as AgentModelPreferences | undefined)?.[target] } } }
-    if (['claude-code', 'codex-cli', 'cursor'].includes(target)) {
+    if (['claude-code', 'codex-cli', 'cursor', 'opencode-v2'].includes(target)) {
       const missing = missingPreferenceRoles(next)
       if (missing.length) return failure('migrate.provider.apply', 'needs_input', 'Target requires explicit native choices.', missing.map(role => `choices.${role}`))
     }
+    if (config.provider === 'opencode-v2' && target === 'opencode') return failure('migrate.provider.apply', 'recovery_required', 'V1 shares V2 paths. Restore the verified pre-migration backup as documented before selecting OpenCode V1; native V2 settings are not converted automatically.')
+    const oldPlugin = target === 'opencode-v2' ? await inspectOpenCodeNotificationPlugin(this.cwd, 'opencode') : { present: false, owned: false }
+    if (oldPlugin.present && !oldPlugin.owned) return failure('migrate.provider.apply', 'custom_plugin_conflict', 'Customized v1 notification plugin preserved. Resolve it before switching shared OpenCode paths.')
+    const shared = target === 'opencode-v2' ? preflightOpenCodeV2(next, this.cwd, config.provider === 'opencode') : undefined
     const backupDir = this.backup([...this.generatedFiles(config), ...this.generatedFiles(next)])
+    if (oldPlugin.present) { const removed = await uninstallNotificationHooks(this.cwd, 'opencode'); if (!removed.ok || removed.value.preserved.length) return failure('migrate.provider.apply', 'hook_conflict', 'Could not retire the owned v1 notification plugin.') }
+    if (shared) {
+      writeOpenCodeV2Config(shared.prepared)
+      if (shared.converted.length) writeAgentFiles(this.cwd, opencodeV2AgentFiles(next, choicesFromPreferences(next).opencodeV2AgentModels).filter(entry => shared.converted.includes(entry.relPath)), { force: true, backupRoot: join(this.cwd, config.storage.dir, 'backups') })
+    }
+    const report = await getMaterializer(target).build(next, this.cwd, { force: plan.args.force === true && !shared, ...choicesFromPreferences(next) })
+    if (oldPlugin.present) { const installed = await installNotificationHooks(this.cwd, 'opencode-v2', { node: process.execPath, cli: notificationCliPath() }); if (!installed.ok || installed.value.preserved.length) return failure('migrate.provider.apply', 'hook_install_failed', 'Could not install v2 notifications; recover the prior setup from the reported maintenance backup before retrying.') }
     const saved = await updateManagedConfig(this.cwd, { provider: target, ...(pref.data?.preferences ? { agentPreferences: pref.data.preferences } : {}) })
     if (!saved.ok) return failure('migrate.provider.apply', saved.error.code, saved.error.message)
-    const report = await getMaterializer(target).build(next, this.cwd, { force: plan.args.force === true, ...choicesFromPreferences(next) })
-    return success('migrate.provider.apply', { provider: target, report, backupDir })
+    return success('migrate.provider.apply', { provider: target, report, backupDir }, backupDir ? ['Recovery: restore only verified unchanged AHK files from the backup and the previous provider overlay; do not reverse-convert unrelated OpenCode settings.'] : undefined)
   }
   private specChanges(config: HarnessConfig) {
     return fileTree(this.cwd, resolve(this.cwd, config.project.docsPath, 'specs')).filter(path => path.endsWith('.md')).flatMap(path => {
@@ -271,7 +287,9 @@ export class MaintenanceService {
     if (!PROVIDERS.includes(provider)) throw new Error('Invalid reset provider.')
     for (const role of (args.targets as string[] | undefined) ?? (args.provider ? ROLES : [])) {
       if (!ROLES.includes(role as typeof ROLES[number])) throw new Error(`Unknown reset role: ${role}`)
-      files.push(safePath(this.cwd, join(this.cwd, providerRoot(provider), 'agents', `${role}${provider === 'codex-cli' ? '.toml' : '.md'}`)))
+      const path = safePath(this.cwd, join(this.cwd, providerRoot(provider), 'agents', `${role}${provider === 'codex-cli' ? '.toml' : '.md'}`))
+      if (provider === 'opencode-v2' && existsSync(path)) { const expected = opencodeV2AgentFiles(config).find(entry => entry.relPath.endsWith(`/${role}.md`)); if (readFileSync(path, 'utf8') !== expected?.content) throw new Error(`Preserving customized shared OpenCode agent: ${role}`) }
+      files.push(path)
     }
     return files.filter(existsSync)
   }
@@ -449,7 +467,7 @@ export class MaintenanceService {
     const checks = ROLES.map(role => ({ path: join(root, 'agents', `${role}${extension}`), ok: existsSync(join(this.cwd, root, 'agents', `${role}${extension}`)) }))
     const dbPath = config.database.type === 'sqlite' ? resolveSqlitePath(config, this.cwd, this.home) : null
     if (dbPath) checks.push({ path: dbPath, ok: existsSync(dbPath) })
-    const mcp = ({ 'claude-code': '.mcp.json', opencode: 'opencode.json', 'codex-cli': '.codex/config.toml', 'grok-cli': '.grok/config.toml', cursor: '.cursor/mcp.json' })[config.provider]
+    const mcp = config.provider === 'opencode-v2' ? relative(this.cwd, inspectOpenCodeConfig(this.cwd).path) : ({ 'claude-code': '.mcp.json', opencode: 'opencode.json', 'opencode-v2': 'opencode.json', 'codex-cli': '.codex/config.toml', 'grok-cli': '.grok/config.toml', cursor: '.cursor/mcp.json' })[config.provider]
     if (config.tools.mcp.enabled) checks.push({ path: mcp, ok: existsSync(join(this.cwd, mcp)) })
     const inspection = inspectHealthCheck(this.cwd, config.health.scriptPath)
     if (checks.some(c => !c.ok) || inspection.state !== 'ready') return { ...failure('health', 'health_failed', `Workspace health prerequisites failed (${inspection.state}).`), data: { checks, inspection } }
@@ -502,7 +520,7 @@ export class MaintenanceService {
     } catch (error) { await db.close(); throw error }
   }
   private async captureModels(config: HarnessConfig): Promise<MaintenanceOutcome> {
-    if (!['claude-code', 'codex-cli', 'cursor'].includes(config.provider)) return failure('sync', 'unsupported_provider', 'Native model capture is unavailable for this provider.')
+    if (!['claude-code', 'codex-cli', 'cursor', 'opencode-v2'].includes(config.provider)) return failure('sync', 'unsupported_provider', 'Native model capture is unavailable for this provider.')
     const { choices, missing } = captureNativeChoices(this.cwd, config)
     if (missing.length) return failure('sync', 'needs_input', 'Some native model metadata is missing or invalid; no preferences changed.', missing.map(role => `choices.${role}`))
     const saved = await updateManagedConfig(this.cwd, { agentPreferences: toPreferences(config.provider, choices) })

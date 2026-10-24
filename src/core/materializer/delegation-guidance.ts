@@ -22,6 +22,13 @@ export const PROVIDER_DELEGATION_GUIDANCE: Readonly<Record<Provider, ProviderDel
         'Pass a self-contained objective, scope, known context, restrictions, and output contract with each @mention.',
       waitForCompletion: 'Wait for each @mention to complete before proceeding to the next step.',
     },
+    'opencode-v2': {
+      invoke: ['subagent'],
+      sequential: 'Use the subagent tool with the named role; start a dependent role only after receiving the prior result.',
+      parallel: 'Launch independent roles in background child sessions with distinct deliverables and consolidate every required result.',
+      contextTransfer: 'Child sessions have fresh context. Supply objective, scope, known context, restrictions and output contract.',
+      waitForCompletion: 'Wait for all required child results before implementation, review or final synthesis.',
+    },
     opencode: {
       invoke: ['@mention'],
       sequential:

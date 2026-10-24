@@ -817,6 +817,7 @@ async function execute(
           outdated: status.skills.filter((s) => s.status === 'outdated').map((s) => s.name),
           ok: status.skills.filter((s) => s.status === 'ok').map((s) => s.name),
         },
+        ...(status.opencodeV2 ? { opencodeV2: status.opencodeV2 } : {}),
         ...(args.db === true ? { database: await db.databaseDiagnosticNotice() } : {}),
       }
       return ok(JSON.stringify(result))

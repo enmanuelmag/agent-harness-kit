@@ -15,7 +15,7 @@ Yarn Modern (Berry) removed `yarn global`; use the pnpm, npm, or Bun global comm
 
 ## Providers
 
-The materializers support Claude Code, Codex CLI, Cursor, Grok Build, and OpenCode. Every provider receives project-root `AGENTS.md`, its role-agent files, its skills, and a merged MCP configuration:
+The materializers support Claude Code, Codex CLI, Cursor, Grok Build, OpenCode, and OpenCode V2. Every provider receives project-root `AGENTS.md`, its role-agent files, its skills, and a merged MCP configuration:
 
 | Provider | Role agents | Skills | MCP/configuration |
 | --- | --- | --- | --- |
@@ -23,7 +23,8 @@ The materializers support Claude Code, Codex CLI, Cursor, Grok Build, and OpenCo
 | Codex CLI | `.codex/agents/*.toml` | `.agents/skills/` | `.codex/config.toml` |
 | Cursor | `.cursor/agents/*.md` | `.cursor/skills/` | `.cursor/mcp.json`; also `.cursor/permissions.json` |
 | Grok Build | `.grok/agents/*.md` | `.grok/skills/` | `.grok/config.toml` |
-| OpenCode | `.opencode/agents/*.md` | `.opencode/skills/` | `opencode.json` |
+| OpenCode (v1) | `.opencode/agents/*.md` | `.opencode/skills/` | `opencode.json` |
+| OpenCode V2 | `.opencode/agents/*.md` | `.opencode/skills/` | `opencode.json(c)` in root or `.opencode/`; native `mcp.servers` |
 
 Run `ahk build` after changing AHK configuration and restart or reopen the provider when it needs to reload MCP configuration.
 
@@ -53,3 +54,7 @@ MCP input guidance and compiled tolerant admission are derived from one authored
 Release scripts use the checked-in manifest version. The updated release tooling maps v2 to the `v2` maintenance channel and stable v3 to `latest`; v3 RCs publish to `rc` and create GitHub prereleases that are not marked latest. Prepared tags may be reused only at the same HEAD; version tags must never be moved. After review and commit, fast-forward local `main` to the exact `release/v3` commit as an explicit release step.
 
 Keep generated-skill downgrade protection intact; generating v2 over a v3 tree is refused. The update checker follows stable npm `latest`, so check `rc` explicitly for RC-to-RC updates. Do not regenerate provider files merely to prepare a release.
+
+## OpenCode V2 compatibility
+
+Use provider `opencode-v2` for native v2 configuration. Read [the V2 guide](opencode-v2.md) before switching an existing `.opencode` project. V1 and V2 share paths and executable names; AHK never installs or changes global OpenCode settings.

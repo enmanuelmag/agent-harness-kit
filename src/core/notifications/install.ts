@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
+import { safeOpenCodePath } from '../materializer/opencode-v2-config'
 import { type BoundaryFailure, capture, type Result } from '../result'
+import { renderOpenCodeV2Plugin } from './opencode-v2'
 import { type NotificationProvider, OpenCodeTurnTracker } from './providers'
 
 export interface InstallationInfo {
@@ -77,7 +79,7 @@ function paths(cwd: string, provider: NotificationProvider): { target: string; m
         ? '.claude/settings.json'
         : provider === 'codex-cli'
           ? '.codex/hooks.json'
-          : '.opencode/plugins/ahk-notifications.js'
+          : provider === 'opencode-v2' ? '.opencode/plugins/ahk-notifications-v2/index.js' : '.opencode/plugins/ahk-notifications.js'
   return {
     target: join(cwd, relative),
     manifest: join(cwd, '.harness', `notifications-hooks-${provider}.json`),
@@ -117,8 +119,11 @@ export function installNotificationHooks(
     }
     let nextOwnership: Ownership
     let next: string
-    if (provider === 'opencode') {
-      next = plugin(runtime, cwd)
+    if (provider === 'opencode' || provider === 'opencode-v2') {
+      safeOpenCodePath(cwd, target); safeOpenCodePath(cwd, manifest)
+      const other = paths(cwd, provider === 'opencode' ? 'opencode-v2' : 'opencode')
+      if (await optional(other.target) !== undefined) throw new Error('Conflicting OpenCode notification plugin: uninstall the other version using its ownership manifest before installing this provider.')
+      next = provider === 'opencode-v2' ? renderOpenCodeV2Plugin(runtime, cwd) : plugin(runtime, cwd)
       if (existing !== undefined && (!owned?.hash || digest(existing) !== owned.hash)) {
         info.preserved.push(target)
         return info
@@ -165,7 +170,9 @@ export function uninstallNotificationHooks(
   provider: NotificationProvider
 ): Promise<Result<InstallationInfo, BoundaryFailure>> {
   return capture(async () => {
-    const { target, manifest } = paths(resolve(cwd), provider)
+    cwd = resolve(cwd)
+    const { target, manifest } = paths(cwd, provider)
+    if (provider === 'opencode' || provider === 'opencode-v2') { safeOpenCodePath(cwd, target); safeOpenCodePath(cwd, manifest) }
     const info: InstallationInfo = {
       provider,
       files: [],
@@ -178,7 +185,7 @@ export function uninstallNotificationHooks(
     if (owned.version !== 1 || owned.path !== target)
       throw new Error('Incompatible notification hook ownership record')
     const existing = await optional(target)
-    if (existing !== undefined && provider === 'opencode') {
+    if (existing !== undefined && (provider === 'opencode' || provider === 'opencode-v2')) {
       if (owned.hash && digest(existing) === owned.hash) {
         await unlink(target)
         info.files.push(target)
@@ -209,4 +216,16 @@ export function uninstallNotificationHooks(
     }
     return info
   }, 'uninstall notification hooks')
+}
+
+/** Read-only preflight for switching providers sharing auto-discovered plugin paths. */
+export async function inspectOpenCodeNotificationPlugin(cwd: string, provider: 'opencode' | 'opencode-v2') {
+  const { target, manifest } = paths(resolve(cwd), provider)
+  safeOpenCodePath(cwd, target); safeOpenCodePath(cwd, manifest)
+  const text = await optional(target)
+  if (text === undefined) return { present: false, owned: false }
+  const saved = await optional(manifest)
+  if (!saved) return { present: true, owned: false }
+  try { const owned = JSON.parse(saved) as Ownership; return { present: true, owned: owned.version === 1 && owned.path === target && owned.hash === digest(text) } }
+  catch { return { present: true, owned: false } }
 }

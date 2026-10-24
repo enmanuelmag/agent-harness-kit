@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-export type NotificationProvider = 'cursor' | 'claude-code' | 'codex-cli' | 'opencode'
+export type NotificationProvider = 'cursor' | 'claude-code' | 'codex-cli' | 'opencode' | 'opencode-v2'
 export type HookAction =
   | {
       type: 'bind'
@@ -49,7 +49,7 @@ export function normalizeProviderHook(
   )
   const causeId = id(p.request_id) ?? id(p.tool_use_id) ?? id(p.call_id)
   const requestId = causeId ?? (session && turn ? `${session}:${turn}:${event}` : randomUUID())
-  if (provider === 'opencode') {
+  if (provider === 'opencode' || provider === 'opencode-v2') {
     if (event === 'bind' && session && turn)
       return [{ type: 'bind', provider, session, turn, response: p.response }]
     if (event === 'complete' && secondary) return []

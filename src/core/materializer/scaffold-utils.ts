@@ -366,11 +366,12 @@ export interface WriteSkillsResult {
 export function writeSkills(
   cwd: string,
   skillsDir: string,
-  delegationGuidance?: string
+  delegationGuidance?: string,
+  explicitProvider?: string
 ): WriteSkillsResult {
   // Migrations are project-local and ordered by the executable package version.
   // Exact canonical and retired AHK skill names are reserved for the generator.
-  const provider = skillsDir.startsWith('.claude')
+  const provider = explicitProvider ?? (skillsDir.startsWith('.claude')
     ? 'claude-code'
     : skillsDir.startsWith('.agents')
       ? 'codex-cli'
@@ -380,7 +381,7 @@ export function writeSkills(
           ? 'grok-cli'
           : skillsDir.startsWith('.opencode')
             ? 'opencode'
-            : undefined
+            : undefined)
   // Each completed migration persists its own checkpoint before a later
   // migration or canonical refresh can fail; retries resume safely.
   const migration = migrateSkills(cwd, skillsDir, provider)

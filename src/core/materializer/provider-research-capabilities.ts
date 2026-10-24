@@ -8,6 +8,7 @@ export interface ResearchCapabilities {
 
 const capabilities: Record<Provider, ResearchCapabilities> = {
   'claude-code': { context7: true, mintlifyIndex: false, webSearch: true },
+  'opencode-v2': { context7: true, mintlifyIndex: true, webSearch: true },
   opencode: { context7: true, mintlifyIndex: true, webSearch: true },
   'codex-cli': { context7: true, mintlifyIndex: false, webSearch: true },
   'grok-cli': { context7: true, mintlifyIndex: false, webSearch: true },

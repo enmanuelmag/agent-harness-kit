@@ -7,7 +7,7 @@ Run commands from the project that contains `agent-harness-kit.config.*`.
 | `ahk init` | Interactively scaffold the current directory. Flags include `--name`, `--provider`, `--docs`, and `--storage-scope local|global`. |
 | `ahk build` | Reconcile generated files from configuration. `--force` overwrites existing agent files only after a backup. `--watch` rebuilds on config changes. |
 | `ahk sync` | Safely synchronize generated files. `--force` backs up agent files; `--keep-models` reuses saved choices; `--capture-models` imports current-provider metadata. |
-| `ahk models` | Re-prompt compatible per-role model settings for Claude Code, Codex CLI, or Cursor. |
+| `ahk models` | Re-prompt compatible per-role model settings for Claude Code, Codex CLI, Cursor, or OpenCode V2. |
 | `ahk health` | Run the configured native health script manually and statelessly. |
 | `ahk status` | Show tasks and active actions; `--json` is available. |
 | `ahk dashboard` | Serve the local dashboard; `--port` accepts 1–65535 and `--no-open` avoids opening a browser. |
@@ -24,7 +24,7 @@ Run commands from the project that contains `agent-harness-kit.config.*`.
 
 `task add`, `task list`, `task edit`, and `task done <id|slug>` are interactive or direct CLI helpers. `ahk export --json` writes JSON to stdout unless `--output` is provided. SQL export currently reports the direct-SQLite alternative instead of generating a dump. `ahk reset` clears SQLite workflow data transactionally after confirmation or with `--force`, preserves the DB file/inode/schema and writes a consistent JSON backup; `--provider <provider>` additionally offers removal of that provider's five role files. It does not reset remote databases. Storage maintenance refuses other live AHK owners, fences stale configurations/handles, and retains the original SQLite source after migration. Stop unmanaged native writers first; this is a snapshot migration, not ongoing replication.
 
-`ahk models` prompts current native choices for Claude Code, Codex CLI, or Cursor. `ahk sync --capture-models` reads those current provider role files into saved preferences; it cannot be combined with force or keep-models. `ahk sync --force --keep-models` reuses saved preferences and prompts only for missing roles before regenerating agent files with backups.
+`ahk models` prompts current native choices for Claude Code, Codex CLI, Cursor, or OpenCode V2. `ahk sync --capture-models` reads those current provider role files into saved preferences; it cannot be combined with force or keep-models. `ahk sync --force --keep-models` reuses saved preferences and prompts only for missing roles before regenerating agent files with backups.
 
 ## Configuration and generated files
 
