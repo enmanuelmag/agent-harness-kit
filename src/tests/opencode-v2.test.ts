@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 
@@ -231,5 +231,146 @@ test('provider migration switches only an owned v1 plugin and preserves its back
     assert.equal(existsSync(oldPath), false)
     assert.equal(existsSync(join(cwd, '.opencode/plugins/ahk-notifications-v2/index.js')), true)
     assert.equal(readFileSync(join(String(result.data!.backupDir), '.opencode/plugins/ahk-notifications.js'), 'utf8'), old)
+  } finally { await service.dispose() }
+})
+
+function snapshot(root: string, prefix = ''): Record<string, string> {
+  return Object.fromEntries(readdirSync(join(root, prefix), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => {
+    const path = join(prefix, entry.name)
+    return entry.isDirectory() ? Object.entries(snapshot(root, path)) : [[path, readFileSync(join(root, path)).toString('base64')]]
+  }))
+}
+const inheritedChoices = () => Object.fromEntries(['lead', 'explorer', 'consultant', 'builder', 'reviewer'].map(role => [role, { model: 'inherit' }]))
+
+test('capture decodes supported YAML model scalars and rejects malformed metadata without saving preferences', async () => {
+  const { cwd, config } = fixture()
+  await new OpenCodeV2Materializer().scaffold(config, { cwd })
+  const path = join(cwd, '.opencode/agents/builder.md')
+  const original = readFileSync(path, 'utf8')
+  const service = new MaintenanceService(cwd)
+  try {
+    for (const scalar of ['team/model#high', "'team/model#high'", '"team/model#high"', 'team/model#high # team choice', "'team/model#high' # team choice", '"team/model#high" # team choice']) {
+      writeFileSync(path, original.replace(/^mode: subagent$/m, `mode: subagent\nmodel: ${scalar}`))
+      const plan = await service.execute('sync.plan', { captureModels: true })
+      assert.equal(plan.ok, true, plan.message)
+      const result = await service.execute('sync.apply', { planId: plan.data!.planId })
+      assert.equal(result.ok, true, result.message)
+      assert.equal((await loadConfig(cwd)).agentPreferences?.['opencode-v2']?.builder?.model, 'team/model#high')
+    }
+    const prefsPath = join(cwd, 'agent-harness-kit.config.local.json')
+    const before = readFileSync(prefsPath, 'utf8')
+    for (const scalar of ["'team/model#high", '"team/model#high', "'team/model#high' trailing", '"team/model#high" trailing', '', 'team/model#high trailing', "team/mod'el#high"]) {
+      writeFileSync(path, original.replace(/^mode: subagent$/m, `mode: subagent\nmodel: ${scalar}`))
+      const plan = await service.execute('sync.plan', { captureModels: true })
+      const result = await service.execute('sync.apply', { planId: plan.data!.planId })
+      assert.equal(result.ok, false, `must reject ${JSON.stringify(scalar)}`)
+      assert.equal(result.code, 'needs_input')
+      assert.equal(readFileSync(prefsPath, 'utf8'), before)
+    }
+    for (const model of ["'team/model#high'", '"team/model#high"']) assert.equal(openCodeV2PreferenceSchema.safeParse({ model }).success, false)
+  } finally { await service.dispose() }
+})
+
+test('owned v1 plus custom destination v2 plugin conflicts before any project bytes change', async () => {
+  const { cwd, config } = fixture('opencode')
+  await new OpenCodeMaterializer().scaffold(config, { cwd })
+  assert.equal((await installNotificationHooks(cwd, 'opencode', { node: process.execPath, cli: join(process.cwd(), 'dist/cli.js') })).ok, true)
+  const directory = join(cwd, '.opencode/plugins/ahk-notifications-v2')
+  mkdirSync(directory)
+  writeFileSync(join(directory, 'index.js'), '// my own v2 plugin\n')
+  const before = snapshot(cwd)
+  const service = new MaintenanceService(cwd)
+  try {
+    const plan = await service.execute('migrate.provider.plan', { to: 'opencode-v2', choices: inheritedChoices() })
+    const result = await service.execute('migrate.provider.apply', { planId: plan.data!.planId })
+    assert.equal(result.code, 'custom_plugin_conflict')
+    assert.deepEqual(snapshot(cwd), before)
+    assert.equal((await loadConfig(cwd)).provider, 'opencode')
+  } finally { await service.dispose() }
+})
+
+test('incompatible absent-target destination manifest and shared resource collision fail before mutation', async () => {
+  for (const conflict of ['manifest', 'resource'] as const) {
+    const { cwd, config } = fixture('opencode')
+    await new OpenCodeMaterializer().scaffold(config, { cwd })
+    if (conflict === 'manifest') writeFileSync(join(cwd, '.harness/notifications-hooks-opencode-v2.json'), '{"version":999,"path":"wrong"}')
+    else {
+      const path = join(cwd, '.opencode/skills/ahk-docs/resources/opencode-v2.md')
+      rmSync(path); mkdirSync(path)
+    }
+    const before = snapshot(cwd)
+    const service = new MaintenanceService(cwd)
+    try {
+      const plan = await service.execute('migrate.provider.plan', { to: 'opencode-v2', choices: inheritedChoices() })
+      const result = await service.execute('migrate.provider.apply', { planId: plan.data!.planId })
+      assert.equal(result.ok, false)
+      assert.deepEqual(snapshot(cwd), before)
+    } finally { await service.dispose() }
+  }
+})
+
+test('late provider-save failure exposes verified backup and recovery metadata rather than claiming atomicity', async () => {
+  const { cwd, config } = fixture('opencode')
+  await new OpenCodeMaterializer().scaffold(config, { cwd })
+  const original = readFileSync(join(cwd, '.opencode/agents/lead.md'), 'utf8')
+  // A real concurrent overlay writer can prevent the final save after generation.
+  writeFileSync(join(cwd, 'agent-harness-kit.config.local.json.lock'), '')
+  const service = new MaintenanceService(cwd)
+  try {
+    const plan = await service.execute('migrate.provider.plan', { to: 'opencode-v2', choices: inheritedChoices() })
+    const result = await service.execute('migrate.provider.apply', { planId: plan.data!.planId })
+    assert.equal(result.ok, false)
+    assert.equal(result.code, 'concurrent_edit')
+    assert.equal(typeof result.data?.backupDir, 'string')
+    assert.equal(readFileSync(join(String(result.data!.backupDir), '.opencode/agents/lead.md'), 'utf8'), original)
+    assert.match(String(result.data?.recovery), /not atomic/)
+    assert.equal(result.data?.previousProvider, 'opencode')
+    assert.equal((await loadConfig(cwd)).provider, 'opencode')
+    assert.match(readFileSync(join(cwd, '.opencode/agents/lead.md'), 'utf8'), /mode: primary/)
+  } finally { await service.dispose() }
+})
+
+test('shared reset flags cannot bypass actual provider identity or native-content preservation', async () => {
+  for (const provider of ['opencode', 'opencode-v2'] as const) {
+    const { cwd, config } = fixture(provider)
+    await (provider === 'opencode' ? new OpenCodeMaterializer() : new OpenCodeV2Materializer()).scaffold(config, { cwd })
+    const path = join(cwd, '.opencode/agents/builder.md')
+    writeFileSync(path, readFileSync(path, 'utf8') + '\ncustom behavior\n')
+    const before = snapshot(cwd)
+    const service = new MaintenanceService(cwd)
+    try {
+      const result = await service.execute('reset.plan', { provider: provider === 'opencode' ? 'opencode-v2' : 'opencode', targets: ['builder'], force: true })
+      assert.equal(result.ok, false)
+      assert.match(result.message!, /provider mismatch/)
+      assert.deepEqual(snapshot(cwd), before)
+    } finally { await service.dispose() }
+  }
+  const { cwd, config } = fixture('opencode')
+  await new OpenCodeMaterializer().scaffold(config, { cwd })
+  writeFileSync(join(cwd, '.opencode/agents/builder.md'), opencodeV2AgentFiles(config).find(entry => entry.relPath.endsWith('/builder.md'))!.content)
+  const before = snapshot(cwd)
+  const service = new MaintenanceService(cwd)
+  try {
+    const result = await service.execute('reset.plan', { provider: 'opencode', targets: ['builder'], force: true })
+    assert.equal(result.ok, false)
+    assert.match(result.message!, /V2 content/)
+    assert.deepEqual(snapshot(cwd), before)
+  } finally { await service.dispose() }
+})
+
+test('config-only project still returns a real backup on late migration failure', async () => {
+  const { cwd } = fixture('opencode')
+  const configPath = join(cwd, 'agent-harness-kit.config.json')
+  const original = readFileSync(configPath, 'utf8')
+  writeFileSync(join(cwd, 'agent-harness-kit.config.local.json.lock'), '')
+  const service = new MaintenanceService(cwd)
+  try {
+    const plan = await service.execute('migrate.provider.plan', { to: 'opencode-v2', choices: inheritedChoices() })
+    const result = await service.execute('migrate.provider.apply', { planId: plan.data!.planId })
+    assert.equal(result.code, 'concurrent_edit')
+    assert.equal(typeof result.data?.backupDir, 'string')
+    assert.equal(readFileSync(join(String(result.data!.backupDir), 'agent-harness-kit.config.json'), 'utf8'), original)
+    assert.equal((await loadConfig(cwd)).provider, 'opencode')
+    assert.match(String(result.data?.recovery), /not atomic/)
   } finally { await service.dispose() }
 })

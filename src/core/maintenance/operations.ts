@@ -257,7 +257,8 @@ export class MaintenanceService {
       if (plugin && ((plugin.present && !plugin.owned) || (plugin.manifestPresent && !plugin.manifestValid))) return failure('migrate.provider.apply', 'custom_plugin_conflict', `Customized or incompatible ${version} notification plugin/ownership preserved. Resolve it before switching shared OpenCode paths.`)
     }
     const shared = target === 'opencode-v2' ? preflightOpenCodeV2(next, this.cwd, config.provider === 'opencode') : undefined
-    const backupDir = this.backup([...this.generatedFiles(config), ...this.generatedFiles(next)])
+    const configPath = findConfigFile(this.cwd)
+    const backupDir = this.backup([...this.generatedFiles(config), ...this.generatedFiles(next), ...(configPath ? [configPath] : [])])
     const recovery = 'Review later edits and restore only affected AHK files and the previous provider overlay from this backup; do not reverse-convert unrelated OpenCode settings. Multi-file generation is not atomic.'
     const failedAfterBackup = (code: string, message: string): MaintenanceOutcome => ({ ...failure('migrate.provider.apply', code, message), data: { backupDir, recovery, previousProvider: config.provider, targetProvider: target }, notices: [recovery] })
     try {
