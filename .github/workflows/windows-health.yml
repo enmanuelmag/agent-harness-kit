@@ -1,0 +1,53 @@
+name: Windows native health
+
+on:
+  push:
+    branches: [release/v3]
+    paths:
+      - '.github/workflows/windows-health.yml'
+      - 'src/core/**'
+      - 'src/commands/init-helpers.ts'
+      - 'src/tests/native-health-execution.test.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
+  pull_request:
+    branches: [main, release/v3]
+    paths:
+      - '.github/workflows/windows-health.yml'
+      - 'src/core/**'
+      - 'src/commands/init-helpers.ts'
+      - 'src/tests/native-health-execution.test.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.json'
+
+permissions:
+  contents: read
+
+jobs:
+  native-health:
+    name: Native health (Windows, Node ${{ matrix.node }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.14.0', '24']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Exercise native health runners
+        run: node --test --import tsx/esm src/tests/native-health-execution.test.ts

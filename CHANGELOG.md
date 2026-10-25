@@ -2,6 +2,20 @@
 
 User-facing v3 changes relative to the Git tag `v2.36.2`, grouped by their repository comparison ranges.
 
+## [3.2.0] — prepared, unpublished
+
+### Fixed
+
+- Windows native health execution now shares one command construction path for manual `ahk health`, MCP maintenance health, and task health gates. The batch pathname is passed through a child-only environment variable with verbatim arguments to `cmd.exe`, avoiding incompatible automatic argument escaping and a second `CALL` expansion. Paths with spaces, shell punctuation, and literal percent expressions are covered by focused native execution tests.
+
+### Upgrade
+
+- After publication, update the global or project AHK installation to 3.2.0 and restart the provider or reconnect its MCP server before rerunning health. Existing health scripts and configuration need no migration, regeneration, or Claude repair prompt. Updates remain advisory and are not automatically installed.
+
+### Verification
+
+- Added a focused Windows workflow on Node 22.14.0 and 24.x for both native health runners, successful and failed exits, retained output, and unchanged project files. Local Bash execution does not establish Windows execution; check the Windows workflow result for the commit being released.
+
 ## [3.0.0]
 
 ### Changed
@@ -68,4 +82,5 @@ History counts and file size do not establish the cause of latency or promise an
 [3.0.0-rc.2]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.1...v3.0.0-rc.2
 [3.0.0-rc.1]: https://github.com/enmanuelmag/agent-harness-kit/compare/v2.36.2...v3.0.0-rc.1
 
-[Unreleased]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.0.0-rc.4...release/v3
+[3.2.0]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.1.4...release/v3
+[Unreleased]: https://github.com/enmanuelmag/agent-harness-kit/compare/v3.1.4...release/v3

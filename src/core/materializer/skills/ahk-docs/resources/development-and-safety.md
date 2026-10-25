@@ -27,6 +27,8 @@ Do not put secrets in specification text, handoffs, screenshots, or exports. Rev
 
 Static checks prove syntax, types, and exercised behavior. They do not prove deployment, browser visuals, real-device behavior, provider account permissions, external integrations, or production data safety unless those environments were explicitly tested.
 
+Native health command construction is shared by manual/MCP maintenance health and task health gates. The focused regression suite runs real native scripts through both runners, preserving stdout, stderr, exit status, and existing script/configuration contents. Run `node --test --import tsx/esm src/tests/native-health-execution.test.ts` on Windows to exercise batch execution, including project paths with spaces, `&`, parentheses, `!`, and literal percent expressions. The dedicated Windows workflow covers Node 22.14.0 and 24.x; running this test on macOS or Linux exercises Bash and does not prove Windows execution.
+
 
 ## Command failures
 

@@ -211,7 +211,7 @@ The agent can inspect synchronization drift, plan and apply supported provider/s
 
 `release/v2` maintains the v2 line for projects that cannot yet meet v3's Node.js requirement. The latest published v2 is currently [2.36.1](https://www.npmjs.com/package/@cardor/agent-harness-kit/v/2.36.1) (checked 2026-10-12); install it with `pnpm add @cardor/agent-harness-kit@2.36.1`. Its SQLite dependency's declared engine range includes Node 20.x, making v2 the compatibility path for projects on that runtime. Although the package manifest declares Node `>=14`, that broader engine field does not establish compatibility with older Node versions because the native SQLite dependency has its own runtime requirements. The local v2.36.2 cut is not yet a published npm version. Backport fixes deliberately; the SDK v2/Zod migration belongs to v3. Future v2 publications must explicitly use npm `--tag v2`, or selectively backport the release-tooling guards. Do not promote a v2 patch to `latest` after v3 stable is released. Updated tooling also keeps v2 GitHub releases from becoming the latest release.
 
-`release/v3` carries v3 development, currently prepared at `3.1.0` in this repository. This version has not been published. After an RC is published, use `pnpm add @cardor/agent-harness-kit@rc` or pin the full RC version. The `rc` npm channel and GitHub prerelease flag keep release candidates separate from stable `latest`. Preparing local branches, tags or a tarball does not publish a release.
+`release/v3` carries v3 development, currently prepared at `3.2.0` in this repository. This version has not been published. After stable publication, install `@cardor/agent-harness-kit@3.2.0` or use the stable `latest` channel. For release candidates, use `@cardor/agent-harness-kit@rc` or pin the full RC version. The `rc` npm channel and GitHub prerelease flag keep release candidates separate from stable `latest`. Preparing local branches, tags or a tarball does not publish a release.
 
 After reviewed v3 changes are committed, align local `main` by fast-forwarding it to the same `release/v3` commit. This is an explicit release step; it does not create automatic ongoing synchronization. Existing version tags are immutable. Release preparations accept an existing tag only when its peeled commit is the current HEAD.
 
@@ -223,7 +223,7 @@ Generated skills retain downgrade protection: do not regenerate a v2 provider tr
 
 AHK requires Node 22.14.0 or newer on 22.x, or Node 23.6.0 or newer. Earlier 23.x releases are excluded. The pinned `better-sqlite3` 13.0.3 driver uses Node-API 10; the repository build targets Node 22.
 
-Native installation can still require a working build toolchain. [Upstream issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516) records installation failures on Windows with npm and on Linux with pnpm; those reports do not establish an AHK failure on every platform. CI is configured to test exact Node 22.14.0 and the current 22.x release. Local compatibility evidence applies to the tested OS, architecture and package manager.
+Native installation can still require a working build toolchain. [Upstream issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516) records installation failures on Windows with npm and on Linux with pnpm; those reports do not establish an AHK failure on every platform. General CI tests exact Node 22.14.0 and the current 22.x release on Ubuntu. A focused Windows job exercises native health execution on Node 22.14.0 and 24.x. Local compatibility evidence applies to the tested OS, architecture and package manager.
 
 ```bash
 pnpm test
@@ -232,6 +232,12 @@ pnpm lint:check
 ```
 
 Run the smallest relevant test while iterating, then the full suite before releasing a change that affects shared materialization. A passing static check does not prove generated files load in every provider, so validate the provider configuration you actually use.
+
+### Windows health correction in 3.2.0
+
+The Windows health runners now invoke `health.bat` without the argument re-escaping that could make `cmd.exe` report that the script was not recognized. The same correction covers manual `ahk health`, MCP maintenance health, and task health gates, including project paths with spaces or shell punctuation.
+
+After 3.2.0 is published, update the AHK installation used by the project: `pnpm add -g @cardor/agent-harness-kit@3.2.0` for a global CLI, or `pnpm add -D @cardor/agent-harness-kit@3.2.0` for a project dependency. Restart the provider or reconnect its MCP server to replace any running older process, then rerun `ahk health`. This correction requires no changes to an existing `health.bat` or `health.scriptPath`, no project regeneration, and no repair prompt in Claude. Update notices are advisory; AHK does not install its updates automatically. `ahk doctor` checks setup artifacts and does not replace actual health-script execution.
 
 ### Keeping documentation accurate
 

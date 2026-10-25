@@ -42,18 +42,24 @@ The CLI location and storage scope are independent. Agent and skill files materi
 
 AHK requires Node 22.14.0 or newer on 22.x, or Node 23.6.0 or newer. Earlier 23.x releases are excluded. The pinned `better-sqlite3` 13.0.3 driver uses Node-API 10; the repository build targets Node 22.
 
-Native installation can still require a working build toolchain. [Upstream issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516) records installation failures on Windows with npm and on Linux with pnpm; those reports do not establish an AHK failure on every platform. CI is configured to test exact Node 22.14.0 and the current 22.x release. Local compatibility evidence applies to the tested OS, architecture and package manager.
+Native installation can still require a working build toolchain. [Upstream issue #1516](https://github.com/WiseLibs/better-sqlite3/issues/1516) records installation failures on Windows with npm and on Linux with pnpm; those reports do not establish an AHK failure on every platform. General CI tests exact Node 22.14.0 and the current 22.x release on Ubuntu. A focused Windows job exercises native health execution on Node 22.14.0 and 24.x. Local compatibility evidence applies to the tested OS, architecture and package manager.
 
 
 ## Stable and release-candidate versions
 
-The v2 maintenance line is `release/v2`; select and backport fixes there without the v3 MCP migration. After publication, pin a stable v2 version such as `@cardor/agent-harness-kit@2.36.2`. The v3 line is `release/v3`, currently prepared at `3.1.0` in this repository; this version has not been published. After publication, install `@cardor/agent-harness-kit@rc` or pin its full prerelease version. The isolated v2.36.2 cut changes only the package version from its shared committed baseline, retaining historical release tooling. Future v2 publication must specify `--tag v2` explicitly or selectively backport release guards, so a v2 patch cannot replace v3 stable at `latest`. Local release preparation and tags do not publish packages.
+The v2 maintenance line is `release/v2`; select and backport fixes there without the v3 MCP migration. After publication, pin a stable v2 version such as `@cardor/agent-harness-kit@2.36.2`. The v3 line is `release/v3`, currently prepared at `3.2.0` in this repository; this version has not been published. After stable publication, install `@cardor/agent-harness-kit@3.2.0` or use `latest`. For release candidates, use `@cardor/agent-harness-kit@rc` or pin the full prerelease version. The isolated v2.36.2 cut changes only the package version from its shared committed baseline, retaining historical release tooling. Future v2 publication must specify `--tag v2` explicitly or selectively backport release guards, so a v2 patch cannot replace v3 stable at `latest`. Local release preparation and tags do not publish packages.
 
 MCP input guidance and compiled tolerant admission are derived from one authored Zod registry. Compatibility recovery stays private and preserves existing numeric/string/JSON-array inputs, omitted keys and explicit null values. Successful responses keep their legacy text and add validated structured DTOs.
 
 Release scripts use the checked-in manifest version. The updated release tooling maps v2 to the `v2` maintenance channel and stable v3 to `latest`; v3 RCs publish to `rc` and create GitHub prereleases that are not marked latest. Prepared tags may be reused only at the same HEAD; version tags must never be moved. After review and commit, fast-forward local `main` to the exact `release/v3` commit as an explicit release step.
 
 Keep generated-skill downgrade protection intact; generating v2 over a v3 tree is refused. The update checker follows stable npm `latest`, so check `rc` explicitly for RC-to-RC updates. Do not regenerate provider files merely to prepare a release.
+
+## Windows health correction in 3.2.0
+
+After publication, update the AHK installation your project uses: `pnpm add -g @cardor/agent-harness-kit@3.2.0` for the global CLI, or `pnpm add -D @cardor/agent-harness-kit@3.2.0` for a project dependency. Restart the provider or reconnect its MCP server, then run `ahk health` again. Existing scripts and `health.scriptPath` stay unchanged; no `ahk init`, regeneration, or Claude repair prompt is needed for this fix. The corrected runner is used by manual/MCP health and task health gates automatically once the updated process is running. AHK only reports available updates; it does not install them automatically.
+
+The correction fixes Windows command quoting for `health.bat`, including paths with spaces and shell punctuation. A green `ahk doctor` validates setup artifacts but does not establish that the native health script passes.
 
 ## OpenCode V2 compatibility
 

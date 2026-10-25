@@ -11,6 +11,8 @@ import {
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 
+import type { SpawnOptions } from 'node:child_process'
+
 export type HealthCheckState = 'ready' | 'missing' | 'placeholder' | 'incompatible'
 
 export function getDefaultHealthScriptPath(
@@ -92,6 +94,21 @@ export interface HealthExecutionResult {
   tail: string
 }
 
+/** Keep the batch pathname out of cmd's command text. CALL would expand percent
+ * expressions a second time, and Node's default argument escaping uses rules
+ * that cmd.exe does not understand. The outer quotes are stripped by /s /c. */
+export function healthCommand(scriptPath: string, platform = process.platform) {
+  const options: Pick<SpawnOptions, 'env' | 'windowsVerbatimArguments'> = {}
+  if (platform !== 'win32') return { command: 'bash', args: [scriptPath], options }
+  options.windowsVerbatimArguments = true
+  options.env = { ...process.env, AHK_INTERNAL_HEALTH_SCRIPT_PATH: scriptPath }
+  return {
+    command: process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/v:off', '/s', '/c', '""%AHK_INTERNAL_HEALTH_SCRIPT_PATH%""'],
+    options,
+  }
+}
+
 export function tailFile(path: string, lines: number): string {
   const size = statSync(path).size
   if (size === 0) return ''
@@ -125,14 +142,10 @@ export function executeHealthCheck(
   const logDir = mkdtempSync(join(tmpdir(), 'ahk-health-'))
   const logPath = join(logDir, `${basename(scriptPath)}.log`)
   const fd = openSync(logPath, 'w')
-  const command = platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'bash'
-  const args =
-    platform === 'win32'
-      ? ['/d', '/v:off', '/s', '/c', `call "${scriptPath.replace(/"/g, '""')}"`]
-      : [scriptPath]
+  const { command, args, options } = healthCommand(scriptPath, platform)
   let result: ReturnType<typeof spawnSync>
   try {
-    result = spawnSync(command, args, { cwd, stdio: ['ignore', fd, fd] })
+    result = spawnSync(command, args, { ...options, cwd, stdio: ['ignore', fd, fd] })
   } finally {
     closeSync(fd)
   }

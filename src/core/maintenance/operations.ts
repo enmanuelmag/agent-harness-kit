@@ -12,7 +12,7 @@ import { findConfigFile, loadConfig } from '@/core/config'
 import { startDashboardServer } from '@/core/dashboard-server'
 import { HarnessDB, openDB, readStorageStateFile, resolveSqlitePath, resolveSqlitePathForScope } from '@/core/db'
 import { SQLiteDriver } from '@/core/drivers/sqlite'
-import { inspectHealthCheck } from '@/core/health-check'
+import { healthCommand, inspectHealthCheck } from '@/core/health-check'
 import { getMaterializer } from '@/core/materializer/index'
 import { opencodeV2AgentFiles, preflightOpenCodeV2 } from '@/core/materializer/opencode-v2'
 import { inspectOpenCodeConfig, writeOpenCodeV2Config } from '@/core/materializer/opencode-v2-config'
@@ -495,7 +495,8 @@ export class MaintenanceService {
     const logPath = safePath(this.cwd, join(this.cwd, '.harness', 'health-logs', `${randomUUID()}.log`))
     mkdirSync(dirname(logPath), { recursive: true })
     return new Promise((resolveRun, reject) => {
-      const child = spawn(process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'bash', process.platform === 'win32' ? ['/d', '/s', '/c', `call "${path}"`] : [path], { cwd: this.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+      const { command, args, options } = healthCommand(path)
+      const child = spawn(command, args, { ...options, cwd: this.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
       let tail = ''
       writeFileSync(logPath, '', { mode: 0o600 })
       const collect = (chunk: Buffer) => { appendFileSync(logPath, chunk); tail = (tail + chunk.toString()).slice(-12000); /* output stays bounded in memory */ }
