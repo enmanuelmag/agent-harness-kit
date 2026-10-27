@@ -26,7 +26,6 @@ import type {
 } from '@/types'
 
 const SUPPORTED_PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor', 'opencode-v2']
-const ROLE_FILES = new Set(['lead', 'explorer', 'consultant', 'builder', 'reviewer'])
 
 export type ModelsContext =
   | { ok: true; config: HarnessConfig }
@@ -125,5 +124,5 @@ export function filesFor(config: HarnessConfig, choices: ChoiceMap) {
             choices as ChoiceMapFor<CursorAgentModelChoice>,
             buildCapabilityHints('cursor')
           )
-  return files.filter((file) => ROLE_FILES.has(file.relPath.match(/agents\/([^./]+)/)?.[1] ?? ''))
+  return files
 }

@@ -1041,7 +1041,7 @@ describe('agent*Toml — no opts → still no model line', () => {
     ['consultant', () => agentConsultantToml({ projectName: 'demo' })],
     ['builder', () => agentBuilderToml({ projectName: 'demo' })],
     ['reviewer', () => agentReviewerToml({ projectName: 'demo' })],
-    ['default (lead shim)', () => agentLeadAsDefaultToml({ projectName: 'demo' })],
+    ['default (native lead)', () => agentLeadAsDefaultToml({ projectName: 'demo' })],
   ]
 
   for (const [role, generate] of generators) {
@@ -1133,7 +1133,7 @@ describe('agent*Toml — per-role model + effort injection', () => {
     )
   })
 
-  test('default.toml (lead shim) also accepts opts, mirroring agentLeadToml', () => {
+  test('default.toml (native lead) also accepts opts, mirroring agentLeadToml', () => {
     const result = agentLeadAsDefaultToml(
       { projectName: 'demo' },
       { model: 'gpt-5.5', effort: 'minimal' }

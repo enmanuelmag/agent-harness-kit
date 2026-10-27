@@ -106,7 +106,7 @@ test('code config is never rewritten and persists operational overlay preference
   })
 })
 
-test('capture imports current-provider canonical TOML metadata and ignores default agent', async () => {
+test('capture imports legacy TOML metadata when default is absent', async () => {
   writeConfig()
   mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
   for (const role of ['lead', 'explorer', 'consultant', 'builder', 'reviewer']) {
@@ -115,12 +115,10 @@ test('capture imports current-provider canonical TOML metadata and ignores defau
       `model = "gpt-${role}"\nmodel_reasoning_effort = "medium"\n[agent]\nname = "${role}"\n`
     )
   }
-  writeFileSync(join(TMP, '.codex/agents/default.toml'), 'model = "ignored"\n')
   await captureModels(TMP)
   const saved = JSON.parse(readFileSync(join(TMP, MANAGED_CONFIG_NAME), 'utf8'))
   assert.equal(saved.agentPreferences['codex-cli'].lead.model, 'gpt-lead')
   assert.equal(saved.agentPreferences['codex-cli'].builder.reasoningEffort, 'medium')
-  assert.ok(existsSync(join(TMP, '.codex/agents/default.toml')))
 })
 
 test('capture rejects duplicate authoritative Codex role names', async () => {
@@ -168,7 +166,7 @@ test('safe sync creates missing agents from saved choices without prompting', as
   raw.agentPreferences = { 'codex-cli': { lead: { model: 'gpt-safe', reasoningEffort: 'medium' } } }
   writeFileSync(path, JSON.stringify(raw, null, 2))
   await runSync(TMP, {})
-  assert.match(readFileSync(join(TMP, '.codex/agents/lead.toml'), 'utf8'), /model = "gpt-safe"/)
+  assert.match(readFileSync(join(TMP, '.codex/agents/default.toml'), 'utf8'), /model = "gpt-safe"/)
 })
 
 test('complete keep-models force sync regenerates using saved model and effort', async () => {

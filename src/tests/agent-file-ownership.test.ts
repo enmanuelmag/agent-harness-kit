@@ -53,7 +53,7 @@ function configFor(provider: Provider) {
 }
 
 /** Every provider, with the agent files it owns. `default.toml` is included for
- *  codex-cli deliberately: it is a generated shim for Codex's built-in agent,
+ *  codex-cli deliberately: it is the native lead projection for Codex's fallback subagent,
  *  but it is still an agent file the user may edit, so it follows the same
  *  ownership rule as the five roles. */
 const PROVIDERS: { provider: Provider; dir: string; files: string[] }[] = [
@@ -71,7 +71,6 @@ const PROVIDERS: { provider: Provider; dir: string; files: string[] }[] = [
     provider: 'codex-cli',
     dir: '.codex/agents',
     files: [
-      'lead.toml',
       'explorer.toml',
       'consultant.toml',
       'builder.toml',

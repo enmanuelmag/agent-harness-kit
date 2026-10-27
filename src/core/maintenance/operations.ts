@@ -14,6 +14,7 @@ import { HarnessDB, openDB, readStorageStateFile, resolveSqlitePath, resolveSqli
 import { SQLiteDriver } from '@/core/drivers/sqlite'
 import { healthCommand, inspectHealthCheck } from '@/core/health-check'
 import { getMaterializer } from '@/core/materializer/index'
+import { LEGACY_CODEX_LEAD, nativeAgentFilename } from '@/core/materializer/native-agent-path'
 import { opencodeV2AgentFiles, preflightOpenCodeV2 } from '@/core/materializer/opencode-v2'
 import { inspectOpenCodeConfig, writeOpenCodeV2Config } from '@/core/materializer/opencode-v2-config'
 import { slugify } from '@/core/materializer/scaffold-utils'
@@ -189,6 +190,11 @@ export class MaintenanceService {
     if (base === 'sync' && ((args.captureModels && (args.force || args.keepModels)) || (args.keepModels && !args.force))) return failure(operation, 'invalid_input', 'captureModels cannot combine with force/keepModels; keepModels requires force.')
     if (base === 'migrate.provider' && !PROVIDERS.includes(args.to as Provider)) return failure(operation, 'needs_input', 'Select a migration provider.', ['to'])
     const preview: Record<string, unknown> = base === 'migrate.storage' ? await this.storagePreview(config) : base === 'migrate.specs' ? { files: this.specChanges(config).map(c => relative(this.cwd, c.path)) } : base === 'reset' ? { targets: this.resetTargets(config, args) } : { provider: args.to ?? config.provider, force: args.force === true, keepModels: args.keepModels === true, captureModels: args.captureModels === true, files: this.generatedFiles({ ...config, provider: (args.to ?? config.provider) as Provider }).map(p => relative(this.cwd, p)) }
+    if (base === 'sync' && config.provider === 'codex-cli') {
+      const legacy = existsSync(join(this.cwd, LEGACY_CODEX_LEAD)) ? [LEGACY_CODEX_LEAD] : []
+      preview.retired = args.force === true ? legacy : []
+      preview.preservedLegacy = args.force === true ? [] : legacy
+    }
     const plan = this.plans.create(base, args, await this.fingerprint(base, args, config), preview)
     return success(operation, { planId: plan.id, expiresAt: new Date(plan.expiresAt).toISOString(), digest: plan.digest, ...preview })
   }
@@ -300,7 +306,7 @@ export class MaintenanceService {
     if (sharedOpenCode && (config.provider === 'opencode' || config.provider === 'opencode-v2') && provider !== config.provider) throw new Error(`Shared OpenCode provider mismatch: workspace is ${config.provider}; refusing reset as ${provider}.`)
     for (const role of (args.targets as string[] | undefined) ?? (args.provider ? ROLES : [])) {
       if (!ROLES.includes(role as typeof ROLES[number])) throw new Error(`Unknown reset role: ${role}`)
-      const path = safePath(this.cwd, join(this.cwd, providerRoot(provider), 'agents', `${role}${provider === 'codex-cli' ? '.toml' : '.md'}`))
+      const path = safePath(this.cwd, join(this.cwd, providerRoot(provider), 'agents', nativeAgentFilename(provider, role)))
       if (sharedOpenCode && existsSync(path) && provider === 'opencode') {
         const header = readFileSync(path, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? ''
         if (/^permissions:/m.test(header)) throw new Error(`Shared OpenCode agent ${role} is V2 content; refusing reset as V1.`)
@@ -480,8 +486,7 @@ export class MaintenanceService {
   private async health(): Promise<MaintenanceOutcome> {
     const config = await this.config()
     const root = providerRoot(config.provider)
-    const extension = config.provider === 'codex-cli' ? '.toml' : '.md'
-    const checks = ROLES.map(role => ({ path: join(root, 'agents', `${role}${extension}`), ok: existsSync(join(this.cwd, root, 'agents', `${role}${extension}`)) }))
+    const checks = ROLES.map(role => ({ path: join(root, 'agents', nativeAgentFilename(config.provider, role)), ok: existsSync(join(this.cwd, root, 'agents', nativeAgentFilename(config.provider, role))) }))
     const dbPath = config.database.type === 'sqlite' ? resolveSqlitePath(config, this.cwd, this.home) : null
     if (dbPath) checks.push({ path: dbPath, ok: existsSync(dbPath) })
     const mcp = config.provider === 'opencode-v2' ? relative(this.cwd, inspectOpenCodeConfig(this.cwd).path) : ({ 'claude-code': '.mcp.json', opencode: 'opencode.json', 'opencode-v2': 'opencode.json', 'codex-cli': '.codex/config.toml', 'grok-cli': '.grok/config.toml', cursor: '.cursor/mcp.json' })[config.provider]

@@ -32,7 +32,7 @@ describe('runHealth', () => {
     const result = await captureRunHealth(() => runHealth(TMP))
 
     assert.equal(result.exitCode, 1)
-    assert.match(result.output, /lead\.toml present/)
+    assert.match(result.output, /default\.toml present/)
     assert.match(result.output, /\.codex\/config\.toml valid/)
     assert.doesNotMatch(result.output, /opencode\.json/)
     assert.match(result.output, /Harness checks failed/)
@@ -110,7 +110,7 @@ export default {
   writeFileSync(join(TMP, '.harness/harness.db'), '', 'utf8')
 
   mkdirSync(join(TMP, '.codex/agents'), { recursive: true })
-  for (const agent of ['lead', 'explorer', 'builder', 'reviewer']) {
+  for (const agent of ['default', 'explorer', 'builder', 'reviewer']) {
     writeFileSync(join(TMP, `.codex/agents/${agent}.toml`), `name = "${agent}"\n`, 'utf8')
   }
   // Leave .codex/config.toml absent so runHealth exits after scaffold validation.

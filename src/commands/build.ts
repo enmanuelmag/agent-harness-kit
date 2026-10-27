@@ -191,7 +191,7 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
     p.log.success(`Agent definitions (${config.provider})`)
     p.log.success('MCP config')
 
-    const { created, overwritten, preserved, backupDir } = report.agents
+    const { created, overwritten, preserved, backupDir, retired } = report.agents
 
     if (created.length > 0) {
       p.log.info(`Created ${created.length} missing agent file(s):\n  ${created.join('\n  ')}`)
@@ -209,6 +209,10 @@ export async function buildOnce(cwd: string, force?: boolean, keepModels = false
       if (backupDir) {
         p.log.info(pc.yellow(`  Previous content backed up → ${backupDir}`))
       }
+    }
+
+    if (retired?.length) {
+      p.log.info(`Retired legacy agent file(s): ${retired.join(', ')}. Previous content backed up → ${backupDir}`)
     }
 
     if (preserved.length > 0) {

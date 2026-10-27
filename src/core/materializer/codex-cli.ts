@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { renderDelegationGuidance } from './delegation-guidance'
 import { detectPackageManager } from './detect-package-manager'
 import { mergeCodexConfigToml } from './mcp-merge'
+import { LEGACY_CODEX_LEAD, nativeAgentFilename } from './native-agent-path'
 import {
   appendGitignore,
   reconcileGeneratedFiles,
@@ -17,7 +18,6 @@ import {
   agentConsultantToml,
   agentExplorerToml,
   agentLeadAsDefaultToml,
-  agentLeadToml,
   agentReviewerToml,
   agentsMd,
 } from './templates'
@@ -28,11 +28,9 @@ import type { HarnessConfig, Provider, ScaffoldOptions } from '@/types'
 
 /** Agent files this provider owns. Shared by `scaffold()` and `build()`.
  *
- *  `default.toml` is included deliberately. It is a shim that overrides Codex's
- *  built-in `default` agent so `lead` runs when no agent is selected, but it is
- *  still an agent file the user may edit, so it follows the same user-owned
- *  policy as the five roles: created when missing, regenerated only with
- *  --force.
+ *  `default.toml` is the sole native projection of the logical lead role.
+ *  It overrides the fallback subagent, not the primary interactive session.
+ *  Agent files remain user-owned and regenerate only with --force.
  *
  *  `modelsByRole` is optional, collected via `promptCodexAgentModels` (Codex
  *  CLI only). It is populated by `scaffold()` (from `ahk init`'s per-role
@@ -51,8 +49,8 @@ export function codexAgentFiles(
   const projectName = config.project.name
   return [
     {
-      relPath: '.codex/agents/lead.toml',
-      content: agentLeadToml(
+      relPath: `.codex/agents/${nativeAgentFilename('codex-cli', 'lead')}`,
+      content: agentLeadAsDefaultToml(
         { projectName },
         modelsByRole?.lead,
         renderDelegationGuidance('codex-cli', 'lead')
@@ -74,14 +72,7 @@ export function codexAgentFiles(
       relPath: '.codex/agents/reviewer.toml',
       content: agentReviewerToml({ projectName }, modelsByRole?.reviewer),
     },
-    {
-      relPath: '.codex/agents/default.toml',
-      content: agentLeadAsDefaultToml(
-        { projectName },
-        modelsByRole?.lead,
-        renderDelegationGuidance('codex-cli', 'lead')
-      ),
-    },
+
   ]
 }
 
@@ -137,6 +128,7 @@ export class CodexCliMaterializer implements Materializer {
     const agents = writeAgentFiles(cwd, codexAgentFiles(config, opts.codexAgentModels), {
       force: opts.force,
       backupRoot: join(cwd, config.storage.dir, 'backups'),
+      retire: [LEGACY_CODEX_LEAD],
     })
 
     // Re-detecting on every build self-corrects the command if the user

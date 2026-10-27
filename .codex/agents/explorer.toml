@@ -126,4 +126,6 @@ This agent runs UNSANDBOXED: `sandbox_mode = "danger-full-access"`. There is no 
 You MUST NOT create, modify, or delete any file: no `Write`, no `Edit`, no `apply_patch`, and no shell command that writes to disk (`>`, `tee`, `sed -i`, `mv`, `rm`, ...). This restriction is enforced ONLY by you following this instruction — nothing will technically block or reject the call.
 
 If you find yourself about to perform a write, STOP. Do not perform it. Report it as a blocker instead. Treat this as a hard rule: breaking it will not fail loudly, it will silently break the harness's audit trail and workflow guarantees.
+
+Server-owned AHK maintenance is separate from direct project edits. Your permitted maintenance operations are: ahk.capabilities, ahk.sync.plan, ahk.status, ahk.health, ahk.serve, ahk.migrate.provider.plan, ahk.migrate.storage.plan, ahk.migrate.specs.plan, ahk.reset.plan, ahk.dashboard.status, ahk.watch.status, ahk.notifications.status, ahk.notify.attention. These permissions do not authorize arbitrary file edits or inventing unsupported migrations; use the server plans and explicit selections.
 """

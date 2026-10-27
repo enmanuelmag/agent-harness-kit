@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import { loadConfig } from '@/core/config'
 import { renderDelegationGuidance } from '@/core/materializer/delegation-guidance'
+import { nativeAgentName } from '@/core/materializer/native-agent-path'
 import { inspectOpenCodeConfig } from '@/core/materializer/opencode-v2-config'
 import { CANONICAL_SKILLS } from '@/core/materializer/skill-migrations'
 import { injectDelegationGuidance } from '@/core/materializer/templates'
@@ -105,16 +106,16 @@ function getProviderAgentInfo(provider: string): {
 //
 // Existence is the ONLY signal. The file's contents are never read, so any
 // hand-editing of an agent definition is invisible here by design.
-function checkAgentFilesAtRoot(agentsRoot: string, ext: string): AgentStatus[] {
+function checkAgentFilesAtRoot(agentsRoot: string, ext: string, provider: string): AgentStatus[] {
   return AGENT_NAMES.map((name) => {
-    const filePath = join(agentsRoot, `${name}${ext}`)
+    const filePath = join(agentsRoot, `${nativeAgentName(provider, name)}${ext}`)
     return { name, status: existsSync(filePath) ? ('ok' as const) : ('missing' as const) }
   })
 }
 
 function checkAgentFiles(cwd: string, provider: string): AgentStatus[] {
   const { agentsDir, ext } = getProviderAgentInfo(provider)
-  return checkAgentFilesAtRoot(join(cwd, agentsDir), ext)
+  return checkAgentFilesAtRoot(join(cwd, agentsDir), ext, provider)
 }
 
 // ─── Skill check ─────────────────────────────────────────────────────────────

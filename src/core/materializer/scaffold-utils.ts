@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -47,6 +47,8 @@ export interface WriteAgentFilesOptions {
   /** Absolute directory under which the pre-overwrite backup is written.
    *  Required when `force` is set and any file would actually be overwritten. */
   backupRoot?: string
+  /** Obsolete agent paths: preserved normally, backed up and removed with force. */
+  retire?: string[]
 }
 
 export interface WriteAgentFilesResult {
@@ -58,6 +60,7 @@ export interface WriteAgentFilesResult {
   preserved: string[]
   /** Absolute path of the backup directory, when one was written. */
   backupDir?: string
+  retired?: string[]
 }
 
 /**
@@ -88,7 +91,9 @@ export function writeAgentFiles(
 ): WriteAgentFilesResult {
   const result: WriteAgentFilesResult = { created: [], overwritten: [], preserved: [] }
 
-  const existing = entries.filter((e) => existsSync(join(cwd, e.relPath)))
+  const retirement = (opts.retire ?? []).filter((path) => existsSync(join(cwd, path)))
+  const existing = [...new Set([...entries.map(e => e.relPath), ...retirement])]
+    .filter((path) => existsSync(join(cwd, path)))
 
   // Back up BEFORE any write. If this throws, nothing has been touched yet.
   if (opts.force && existing.length > 0) {
@@ -101,10 +106,10 @@ export function writeAgentFiles(
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const backupDir = join(opts.backupRoot, `agents-${stamp}`)
     try {
-      for (const entry of existing) {
-        const dest = join(backupDir, entry.relPath)
+      for (const path of existing) {
+        const dest = join(backupDir, path)
         mkdirSync(resolve(dest, '..'), { recursive: true })
-        writeFileSync(dest, readFileSync(join(cwd, entry.relPath), 'utf8'), 'utf8')
+        writeFileSync(dest, readFileSync(join(cwd, path)))
       }
     } catch (err) {
       throw new Error(
@@ -131,6 +136,11 @@ export function writeAgentFiles(
     else result.created.push(entry.relPath)
   }
 
+  // Replacement writes have succeeded; only now retire obsolete definitions.
+  if (opts.force) {
+    for (const path of retirement) unlinkSync(join(cwd, path))
+    if (retirement.length) result.retired = retirement
+  } else result.preserved.push(...retirement)
   return result
 }
 
@@ -293,7 +303,7 @@ export function reconcileGeneratedFiles(
       for (const entry of toBackup) {
         const dest = join(backupDir, entry.relPath)
         mkdirSync(resolve(dest, '..'), { recursive: true })
-        writeFileSync(dest, readFileSync(join(cwd, entry.relPath), 'utf8'), 'utf8')
+        writeFileSync(dest, readFileSync(join(cwd, entry.relPath)))
       }
     } catch (err) {
       throw new Error(

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { LEGACY_CODEX_LEAD, nativeAgentFilename, nativeAgentName } from '@/core/materializer/native-agent-path'
 import { openCodeV2ChoiceSchema } from '@/schema/opencode-v2'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
@@ -31,6 +32,47 @@ function openCodeModelScalar(raw: string): string {
   return value.replace(/[ \t]+#.*$/, '').trim()
 }
 
+/** Read scalar metadata without interpreting samples inside multiline prompts. */
+function codexMetadata(content: string) {
+  const root = new Map<string, string[]>()
+  const agent = new Map<string, string[]>()
+  let table = ''
+  let multiline = ''
+  let agentTables = 0
+  for (const line of content.split(/\r?\n/)) {
+    if (multiline) {
+      if (line.includes(multiline)) multiline = ''
+      continue
+    }
+    const assignment = line.match(/^\s*([a-z_]+)\s*=\s*(.*)$/)
+    if (assignment && (assignment[2].startsWith('"""') || assignment[2].startsWith("'''"))) {
+      if (['name', 'model', 'model_reasoning_effort'].includes(assignment[1])) throw new Error('Multiline metadata is unsupported')
+      const delimiter = assignment[2].slice(0, 3)
+      if (!assignment[2].slice(3).includes(delimiter)) multiline = delimiter
+      continue
+    }
+    const section = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/)
+    if (section) {
+      table = section[1]
+      if (table === 'agent' && ++agentTables > 1) throw new Error('Duplicate agent table')
+      continue
+    }
+    if (!assignment || !['name', 'model', 'model_reasoning_effort'].includes(assignment[1])) continue
+    const target = table === '' ? root : table === 'agent' ? agent : undefined
+    if (target) target.set(assignment[1], [...(target.get(assignment[1]) ?? []), assignment[2]])
+  }
+  if (multiline) throw new Error('Unterminated multiline string')
+  return { root, agent }
+}
+
+function codexScalar(values: string[] | undefined): string | undefined {
+  if (!values) return undefined
+  if (values.length !== 1) throw new Error('Duplicate metadata')
+  const token = values[0].match(/^("(?:[^"\\]|\\.)*"|'[^']*')\s*(?:#.*)?$/)?.[1]
+  if (!token) throw new Error('Malformed metadata')
+  return token.startsWith('"') ? JSON.parse(token) as string : token.slice(1, -1)
+}
+
 /** Parse only canonical role metadata. Ambiguous or malformed headers are never guessed. */
 export function captureNativeChoices(cwd: string, config: HarnessConfig) {
   const choices: Partial<
@@ -39,14 +81,17 @@ export function captureNativeChoices(cwd: string, config: HarnessConfig) {
   const missing: string[] = []
   const roles: AgentName[] = ['lead', 'explorer', 'consultant', 'builder', 'reviewer']
   for (const role of roles) {
-    const path =
+    let path =
       config.provider === 'claude-code'
         ? join(cwd, `.claude/agents/${role}.md`)
         : config.provider === 'codex-cli'
-          ? join(cwd, `.codex/agents/${role}.toml`)
+          ? join(cwd, `.codex/agents/${nativeAgentFilename(config.provider, role)}`)
           : (config.provider === 'cursor' || config.provider === 'opencode-v2')
             ? join(cwd, `${config.provider === 'cursor' ? '.cursor' : '.opencode'}/agents/${role}.md`)
             : ''
+    if (config.provider === 'codex-cli' && role === 'lead' && !existsSync(path)) {
+      path = join(cwd, LEGACY_CODEX_LEAD)
+    }
     if (!path || !existsSync(path)) {
       missing.push(role)
       continue
@@ -62,31 +107,19 @@ export function captureNativeChoices(cwd: string, config: HarnessConfig) {
         if (!parsed.success) missing.push(role); else choices[role] = parsed.data
       } catch { missing.push(role) }
     } else if (config.provider === 'codex-cli') {
-      const header = content.split(/^\s*\[/m, 1)[0]
-      const model = header.match(/^\s*model\s*=\s*["']([^"']+)["']\s*(?:#.*)?$/m)
-      const agentStart = content.search(/^\s*\[agent\]\s*$/m)
-      const agentBody =
-        agentStart < 0 ? '' : (content.slice(agentStart).split(/^\s*\[/m, 2)[1] ?? '')
-      const agentNames = agentBody.match(/^\s*name\s*=\s*["']([^"']+)["']\s*(?:#.*)?$/gm) ?? []
-      const agentName =
-        agentNames.length === 1
-          ? agentNames[0].match(/^[^=]+=[\s]*["']([^"']+)["']/)?.[1]
-          : undefined
-      const modelLines = header.match(/^\s*model\s*=/gm)?.length ?? 0
-      if (agentName !== role || modelLines > 1 || (modelLines === 1 && !model)) {
-        missing.push(role)
-        continue
-      }
-      const effort = header.match(/^\s*model_reasoning_effort\s*=\s*["']([^"']+)["']\s*(?:#.*)?$/m)
-      const effortLines = header.match(/^\s*model_reasoning_effort\s*=/gm)?.length ?? 0
-      if (effortLines > 1 || (effortLines === 1 && !effort)) {
-        missing.push(role)
-        continue
-      }
-      choices[role] = {
-        ...(model ? { model: model[1] } : {}),
-        ...(effort ? { effort: effort[1] } : {}),
-      }
+      try {
+        const { root, agent } = codexMetadata(content)
+        const flatName = codexScalar(root.get('name'))
+        const legacyName = codexScalar(agent.get('name'))
+        const expected = path.endsWith('lead.toml') ? role : nativeAgentName(config.provider, role)
+        if (flatName !== undefined ? flatName !== expected || legacyName !== undefined : legacyName !== role) {
+          throw new Error('Invalid role identity')
+        }
+        const model = codexScalar(root.get('model'))
+        const effort = codexScalar(root.get('model_reasoning_effort'))
+        if (model === '' || effort === '') throw new Error('Empty metadata')
+        choices[role] = { ...(model ? { model } : {}), ...(effort ? { effort } : {}) }
+      } catch { missing.push(role) }
     } else {
       const frontmatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
       const header = frontmatter?.[1]

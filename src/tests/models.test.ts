@@ -312,8 +312,9 @@ describe('runtime model catalogs', () => {
 
     assert.equal(
       roleConfig(byPath['.codex/agents/default.toml']),
-      roleConfig(byPath['.codex/agents/lead.toml'])
+      'model = "gpt-5.6-terra"\nmodel_reasoning_effort = "medium"'
     )
+    assert.equal(byPath['.codex/agents/lead.toml'], undefined)
     assert.match(byPath['.codex/agents/explorer.toml'], /^model = "gpt-5\.6-luna"$/m)
   })
 })
