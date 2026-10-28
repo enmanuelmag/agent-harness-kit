@@ -12,3 +12,5 @@ Split the request when it contains independent actor-goal-result scenarios. Expl
 Capture preconditions, main flow, alternatives, failures, business rules, boundaries, exclusions, observable outcome, and acceptance criteria. Persist a `use-case` draft with `specs.create`; real use cases are stored in `docs/use-cases/`. Save the first coherent draft before asking for explicit approval. Update it as the conversation refines it, validate after every write, and only transition it to `approved` after direct user approval.
 
 An approved use case can be linked from a functional `spec` through `sourceUseCases`. Offer `ahk-spec` when the user wants scope and requirements derived from approved use cases.
+
+The MCP assigns new documents a `YYYY-MM-DD-<slug>.md` filename using the UTC creation date. Use the returned `filePath` (relative to the configured docs directory) to locate the artifact; do not reconstruct or rename it. The prefix belongs only to the physical filename: keep the logical slug, title, source references, and relationships unchanged. Existing files retain their paths on every update.

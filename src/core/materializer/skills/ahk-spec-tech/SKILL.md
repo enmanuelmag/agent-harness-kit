@@ -8,3 +8,5 @@ Start by locating the approved `spec`, `feature`, or `fix` source. Research the 
 Read [the workflow](resources/workflow.md) and [the template](resources/template.md) before saving.
 
 Define boundaries, contracts, data flow, alternatives and rationale, compatibility, dependencies, rollout, risks, validation, and implementation phases. Create a `spec-tech` draft in `docs/specs/` with `sourceSpec`, validate after every write, and transition to approved only after explicit user confirmation. A `needs-reconciliation` technical spec cannot guide implementation until reconciled and approved again.
+
+The MCP assigns new documents a `YYYY-MM-DD-<slug>.md` filename using the UTC creation date. Use the returned `filePath` (relative to the configured docs directory) to locate the artifact; do not reconstruct or rename it. The prefix belongs only to the physical filename: keep the logical slug, title, source references, and relationships unchanged. Existing files retain their paths on every update.

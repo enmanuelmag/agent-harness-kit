@@ -25,3 +25,5 @@ Use an explicit request such as “Use `ahk-use-case` to define checkout recover
 4. The developer separately authorizes tracked implementation. The lead claims a task and coordinates explorer, consultant, builder, and reviewer through MCP.
 
 Document approval authorizes the next design stage. It does not authorize implementation.
+
+The MCP assigns new documents a `YYYY-MM-DD-<slug>.md` filename using the UTC creation date. Use the returned `filePath` (relative to the configured docs directory) to locate the artifact; do not reconstruct or rename it. The prefix belongs only to the physical filename: keep the logical slug, title, source references, and relationships unchanged. Existing files retain their paths on every update. This applies to all five document-creation workflows in the table.

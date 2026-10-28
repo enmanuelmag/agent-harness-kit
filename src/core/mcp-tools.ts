@@ -84,7 +84,7 @@ export const TOOLS = [
   {
     name: 'specs.create',
     description:
-      'Create a validated use case in docs/use-cases or specification in docs/specs from structured fields.',
+      'Create a validated use case or specification with a UTC YYYY-MM-DD filename prefix; returns docs-relative filePath outside metadata. Keep the logical slug unprefixed.',
     inputSchema: z.object({
       slug: recover(z.string(), recovery.str, 1),
       title: recover(z.string(), recovery.str, 2),

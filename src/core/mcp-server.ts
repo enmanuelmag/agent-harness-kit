@@ -271,7 +271,9 @@ async function execute(
       )
       return ok(
         JSON.stringify({
-          items: matches.slice(offset, offset + limit).map((doc) => doc.metadata),
+          items: matches
+            .slice(offset, offset + limit)
+            .map((doc) => ({ ...doc.metadata, filePath: specs.filePath(doc.metadata.slug) })),
           diagnostics: scan.diagnostics,
           nextOffset: offset + limit < matches.length ? offset + limit : null,
         })
@@ -286,6 +288,7 @@ async function execute(
       return ok(
         JSON.stringify({
           metadata: document.metadata,
+          filePath: specs.filePath(document.metadata.slug),
           content,
           truncated: nextOffset < document.content.length,
           nextOffset: nextOffset < document.content.length ? nextOffset : null,
@@ -310,6 +313,7 @@ async function execute(
         JSON.stringify({
           items: matches.slice(offset, offset + limit).map(({ document, excerpt }) => ({
             metadata: document.metadata,
+            filePath: specs.filePath(document.metadata.slug),
             excerpt,
           })),
           nextOffset: offset + limit < matches.length ? offset + limit : null,
@@ -328,6 +332,7 @@ async function execute(
           .filter((relation) => !relationships || relationships.includes(relation.relationship))
           .map((relation) => ({
             metadata: metadata.slug === slug ? specs.get(relation.slug).metadata : metadata,
+            filePath: specs.filePath(metadata.slug === slug ? relation.slug : metadata.slug),
             relationship: relation.relationship,
             direction: metadata.slug === slug ? 'outgoing' : 'incoming',
           }))
@@ -348,7 +353,12 @@ async function execute(
         relatedSpecs: [],
         content: str(args, 'content'),
       })
-      return ok(JSON.stringify({ metadata: document.metadata }))
+      return ok(
+        JSON.stringify({
+          metadata: document.metadata,
+          filePath: specs.filePath(document.metadata.slug),
+        })
+      )
     }
     case 'specs.update_metadata': {
       const changes: Partial<Omit<SpecMetadata, 'slug' | 'createdAt'>> = {}
@@ -359,18 +369,33 @@ async function execute(
       if ('sourceUseCases' in args)
         changes.sourceUseCases = optionalStringArray(args, 'sourceUseCases') ?? []
       const document = specs.updateMetadata(str(args, 'slug'), changes)
-      return ok(JSON.stringify({ metadata: document.metadata }))
+      return ok(
+        JSON.stringify({
+          metadata: document.metadata,
+          filePath: specs.filePath(document.metadata.slug),
+        })
+      )
     }
     case 'specs.update_content': {
       const document = specs.updateContent(str(args, 'slug'), str(args, 'content'))
-      return ok(JSON.stringify({ metadata: document.metadata }))
+      return ok(
+        JSON.stringify({
+          metadata: document.metadata,
+          filePath: specs.filePath(document.metadata.slug),
+        })
+      )
     }
     case 'specs.transition': {
       const document = specs.transition(
         str(args, 'slug'),
         str(args, 'status') as SpecMetadata['status']
       )
-      return ok(JSON.stringify({ metadata: document.metadata }))
+      return ok(
+        JSON.stringify({
+          metadata: document.metadata,
+          filePath: specs.filePath(document.metadata.slug),
+        })
+      )
     }
     case 'specs.link':
       specs.link(
@@ -556,9 +581,16 @@ async function execute(
       const status = args['status'] as string | undefined
       const includeArchived = args['includeArchived'] as boolean | undefined
       const tasks = status
-        ? await db.getTasks(status as TaskStatus, args.archivedOnly === true || (includeArchived ?? false))
+        ? await db.getTasks(
+            status as TaskStatus,
+            args.archivedOnly === true || (includeArchived ?? false)
+          )
         : await db.getTasks(undefined, args.archivedOnly === true || (includeArchived ?? false))
-      return ok(JSON.stringify(args.archivedOnly === true ? tasks.filter(task => task.archived_at !== null) : tasks))
+      return ok(
+        JSON.stringify(
+          args.archivedOnly === true ? tasks.filter((task) => task.archived_at !== null) : tasks
+        )
+      )
     }
 
     case 'health.run': {
@@ -597,7 +629,10 @@ async function execute(
     }
 
     case 'tasks.update': {
-      const id = typeof args.id === 'string' && /^[a-z][a-z0-9-]*$/.test(args.id) ? (await db.getTaskBySlug(args.id))?.id : num(args, 'id')
+      const id =
+        typeof args.id === 'string' && /^[a-z][a-z0-9-]*$/.test(args.id)
+          ? (await db.getTaskBySlug(args.id))?.id
+          : num(args, 'id')
       if (!id) return ok(JSON.stringify({ error: 'Task not found', taskId: args.id }), true)
       const status = str(args, 'status') as TaskStatus
       if (status === 'done') {
@@ -667,7 +702,10 @@ async function execute(
     }
 
     case 'tasks.edit': {
-      const id = typeof args.id === 'string' && /^[a-z][a-z0-9-]*$/.test(args.id) ? (await db.getTaskBySlug(args.id))?.id : num(args, 'id')
+      const id =
+        typeof args.id === 'string' && /^[a-z][a-z0-9-]*$/.test(args.id)
+          ? (await db.getTaskBySlug(args.id))?.id
+          : num(args, 'id')
       if (!id) return ok(JSON.stringify({ error: 'Task not found', taskId: args.id }), true)
       const title = args['title'] as string | undefined
       const description = args['description'] as string | null | undefined

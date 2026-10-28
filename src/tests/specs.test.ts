@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
-import { SpecStore } from '@/core/specs'
+import { SPEC_KINDS, SpecStore } from '@/core/specs'
 
 const roots: string[] = []
 function store(): SpecStore {
@@ -180,7 +189,7 @@ test('listing scan keeps valid documents and reports each invalid candidate with
   const specs = store()
   createProductSpec(specs, 'feature', 'alpha', 'draft')
   createUseCase(specs, 'zulu', 'draft')
-  const raw = readFileSync(join(specs.root, 'alpha.md'), 'utf8')
+  const raw = readFileSync(join(specs.root, '..', specs.filePath('alpha')), 'utf8')
   writeFileSync(join(specs.root, 'README.md'), '# Index')
   writeFileSync(join(specs.useCasesRoot, 'ReAdMe.md'), '# Index')
   writeFileSync(join(specs.root, 'index.md'), '# Ordinary Markdown')
@@ -230,7 +239,7 @@ test('duplicate paths exclude every twin, including a valid document with a malf
   mkdirSync(specs.root)
   writeFileSync(
     join(specs.root, 'duplicate.md'),
-    readFileSync(join(specs.useCasesRoot, 'duplicate.md'))
+    readFileSync(join(specs.root, '..', specs.filePath('duplicate')))
   )
   writeFileSync(join(specs.root, 'invalid-twin.md'), '# Malformed twin')
   const scan = specs.scanForListing()
@@ -248,7 +257,7 @@ test('duplicate paths exclude every twin, including a valid document with a malf
 test('invalid files still fail strict validation and guarded mutations leave bytes unchanged', () => {
   const specs = store()
   createProductSpec(specs, 'feature', 'source')
-  const sourcePath = join(specs.root, 'source.md')
+  const sourcePath = join(specs.root, '..', specs.filePath('source'))
   const brokenPath = join(specs.root, 'broken.md')
   const before = readFileSync(sourcePath, 'utf8')
   writeFileSync(brokenPath, '# Missing frontmatter')
@@ -273,4 +282,114 @@ test('invalid files still fail strict validation and guarded mutations leave byt
   assert.equal(readFileSync(sourcePath, 'utf8'), before)
   assert.equal(readFileSync(brokenPath, 'utf8'), '# Missing frontmatter')
   assert.equal(existsSync(join(specs.root, 'broken-tech.md')), false)
+})
+
+test('all kinds get a UTC creation-date filename while metadata identity and paths stay stable', (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-29T00:30:00.000Z') })
+  const specs = store()
+  createUseCase(specs, 'approved-source')
+  for (const specKind of SPEC_KINDS) {
+    const slug = `document-${specKind}`
+    const doc = specs.create({
+      slug,
+      title: 'Original title',
+      description: 'Description',
+      specKind,
+      status: 'draft',
+      sourceSpec:
+        specKind === 'technical' || specKind === 'spec-tech' ? 'approved-source' : undefined,
+      relatedSpecs: [],
+      content: 'Original content',
+    })
+    const expected = `${specKind === 'use-case' ? 'use-cases' : 'specs'}/2026-10-29-${slug}.md`
+    assert.equal(specs.filePath(slug), expected)
+    assert.equal(doc.metadata.slug, slug)
+    assert.equal(doc.metadata.title, 'Original title')
+    assert.equal('filePath' in doc.metadata, false)
+    assert.equal(doc.metadata.createdAt, '2026-10-29T00:30:00.000Z')
+  }
+  t.mock.timers.setTime(new Date('2026-11-03T00:00:00Z').getTime())
+  for (const { metadata } of specs.list()) {
+    if (metadata.slug === 'approved-source') continue
+    const before = specs.filePath(metadata.slug)
+    specs.updateContent(metadata.slug, 'Edited')
+    specs.updateMetadata(metadata.slug, { title: 'Edited title' })
+    specs.transition(metadata.slug, 'draft')
+    assert.equal(specs.filePath(metadata.slug), before)
+  }
+  assert.deepEqual(specs.validate(), [])
+})
+
+test('legacy basenames and legacy use-case directories survive edits, relations and invalidation', () => {
+  const specs = store()
+  createUseCase(specs, 'legacy')
+  createUseCase(specs, 'modern')
+  mkdirSync(specs.root)
+  renameSync(join(specs.root, '..', specs.filePath('legacy')), join(specs.root, 'legacy.md'))
+  specs.create({
+    slug: 'legacy-tech',
+    title: 'Tech',
+    description: 'Tech',
+    specKind: 'spec-tech',
+    status: 'approved',
+    sourceSpec: 'legacy',
+    relatedSpecs: [],
+    content: 'Design',
+  })
+  const techPath = specs.filePath('legacy-tech')
+  specs.link('legacy', 'modern', 'depends-on')
+  specs.unlink('legacy', 'modern', 'depends-on')
+  specs.updateMetadata('legacy', { title: 'Updated legacy' })
+  specs.updateContent('legacy', 'Updated body')
+  specs.transition('legacy', 'draft')
+  assert.equal(specs.filePath('legacy'), 'specs/legacy.md')
+  assert.equal(specs.filePath('legacy-tech'), techPath)
+  assert.equal(specs.get('legacy-tech').metadata.status, 'needs-reconciliation')
+  assert.equal(readdirSync(specs.useCasesRoot).length, 1)
+  assert.equal(readdirSync(specs.root).length, 2)
+  assert.deepEqual(specs.validate(), [])
+})
+
+test('different dates still reserve the same logical slug, even with a malformed twin', () => {
+  const specs = store()
+  createUseCase(specs, 'same')
+  const originalPath = join(specs.root, '..', specs.filePath('same'))
+  const original = readFileSync(originalPath, 'utf8')
+  mkdirSync(specs.root)
+  const twin = join(specs.root, '2000-01-01-same.md')
+  writeFileSync(twin, original)
+  assert.throws(() => specs.get('same'), /ambiguous/)
+  assert.throws(() => createUseCase(specs, 'same'), /already exists/)
+  assert.equal(specs.scanForListing().documents.length, 0)
+  assert.equal(specs.scanForListing().diagnostics.length, 2)
+  writeFileSync(twin, '# Broken twin')
+  assert.throws(() => specs.updateContent('same', 'Unsafe'), /ambiguous/)
+  assert.equal(readFileSync(originalPath, 'utf8'), original)
+  assert.equal(specs.scanForListing().documents.length, 0)
+})
+
+test('date-looking logical slugs remain distinct from physical prefixes and invalid dates are diagnostic', () => {
+  const specs = store()
+  createUseCase(specs, '2020-01-01-alpha', 'draft')
+  const dated = join(specs.root, '..', specs.filePath('2020-01-01-alpha'))
+  renameSync(dated, join(specs.useCasesRoot, '2020-01-01-alpha.md'))
+  createUseCase(specs, 'alpha', 'draft')
+  assert.equal(specs.get('2020-01-01-alpha').metadata.slug, '2020-01-01-alpha')
+  assert.equal(specs.scanForListing().documents.length, 2)
+  const alpha = join(specs.root, '..', specs.filePath('alpha'))
+  renameSync(alpha, join(specs.useCasesRoot, '2020-99-99-alpha.md'))
+  assert.match(specs.scanForListing().diagnostics[0].message, /filename and slug disagree/)
+})
+
+test('a date-looking legacy slug cannot be overwritten by a new physical filename collision', (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-28T00:00:00Z') })
+  const specs = store()
+  createUseCase(specs, '2026-10-28-alpha', 'draft')
+  const path = join(specs.useCasesRoot, '2026-10-28-alpha.md')
+  renameSync(join(specs.root, '..', specs.filePath('2026-10-28-alpha')), path)
+  const before = readFileSync(path, 'utf8')
+  assert.throws(() => createUseCase(specs, 'alpha', 'draft'), /filename.*already exists/)
+  assert.equal(readFileSync(path, 'utf8'), before)
+  assert.equal(specs.get('2026-10-28-alpha').metadata.slug, '2026-10-28-alpha')
+  assert.equal(specs.list().length, 1)
 })

@@ -74,25 +74,28 @@ const version = z.object({ current: string, latest: nullableString, outdated: z.
 const names = z.object({ missing: strings, ok: strings })
 export const OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
   'specs.list': z.object({
-    items: z.array(metadata),
+    items: z.array(metadata.extend({ filePath: string })),
     nextOffset: number.nullable(),
     diagnostics: z.array(z.object({ path: string, message: string })),
   }),
   'specs.get': z.object({
     metadata,
+    filePath: string,
     content: string,
     truncated: z.boolean(),
     nextOffset: number.nullable(),
   }),
-  'specs.search': page(z.object({ metadata, excerpt: string })),
+  'specs.search': page(z.object({ metadata, filePath: string, excerpt: string })),
   'specs.related': z.object({
     slug: string,
-    items: z.array(z.object({ metadata, relationship: string, direction: string })),
+    items: z.array(
+      z.object({ metadata, filePath: string, relationship: string, direction: string })
+    ),
   }),
-  'specs.create': z.object({ metadata }),
-  'specs.update_metadata': z.object({ metadata }),
-  'specs.update_content': z.object({ metadata }),
-  'specs.transition': z.object({ metadata }),
+  'specs.create': z.object({ metadata, filePath: string }),
+  'specs.update_metadata': z.object({ metadata, filePath: string }),
+  'specs.update_content': z.object({ metadata, filePath: string }),
+  'specs.transition': z.object({ metadata, filePath: string }),
   'specs.link': z.object({ linked: z.literal(true) }),
   'specs.unlink': z.object({ unlinked: z.literal(true) }),
   'specs.validate': z.object({ valid: z.boolean(), errors: strings }),

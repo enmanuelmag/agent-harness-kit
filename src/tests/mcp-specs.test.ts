@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, test } from 'node:test'
 
@@ -147,4 +147,39 @@ test('MCP listing returns partial results and all diagnostics across filters and
     () => dispatch('specs.get', { slug: 'broken' }, db, TMP, TMP, config),
     /YAML frontmatter/
   )
+})
+
+test('MCP returns actual docs-relative filePath outside metadata in discovery and mutation DTOs', async () => {
+  const call = (name: string, args: Record<string, unknown>) =>
+    dispatch(name, args, db, TMP, TMP, config)
+  const created = await call('specs.create', {
+    slug: 'located',
+    title: 'Original',
+    description: 'Description',
+    specKind: 'feature',
+    content: 'Searchable text',
+  })
+  const dto = body(created)
+  assert.match(dto.filePath as string, /^specs\/\d{4}-\d{2}-\d{2}-located\.md$/)
+  assert.equal(existsSync(join(TMP, dto.filePath as string)), true)
+  assert.equal('filePath' in (dto.metadata as object), false)
+  assert.equal((created.structuredContent as { filePath: string }).filePath, dto.filePath)
+  const legacy = 'specs/located.md'
+  renameSync(join(TMP, dto.filePath as string), join(TMP, legacy))
+  for (const [name, args] of [
+    ['specs.get', { slug: 'located' }],
+    ['specs.update_content', { slug: 'located', content: 'Updated searchable text' }],
+    ['specs.update_metadata', { slug: 'located', title: 'Updated' }],
+    ['specs.transition', { slug: 'located', status: 'draft' }],
+  ] as const) {
+    const result = await call(name, args)
+    assert.equal(body(result).filePath, legacy)
+    assert.deepEqual(result.structuredContent, body(result))
+  }
+  const listing = body(await call('specs.list', {}))
+  assert.equal((listing.items as { filePath: string }[])[0].filePath, legacy)
+  const search = await call('specs.search', { query: 'searchable' })
+  assert.equal((body(search).items as { filePath: string }[])[0].filePath, legacy)
+  assert.deepEqual(search.structuredContent, body(search))
+  assert.doesNotMatch(readFileSync(join(TMP, legacy), 'utf8'), /filePath|file_path/)
 })

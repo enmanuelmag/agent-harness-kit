@@ -265,6 +265,14 @@ test('real SDK tools/list and tools/call preserve recovery, mutations, errors, n
       },
     })
     assert.equal(createdSpec.isError, false)
+    const createdDocument = JSON.parse(text(createdSpec))
+    assert.match(createdDocument.filePath, /^use-cases\/\d{4}-\d{2}-\d{2}-presence\.md$/)
+    assert.equal(createdDocument.metadata.slug, 'presence')
+    assert.equal('filePath' in createdDocument.metadata, false)
+    assert.equal(
+      (createdSpec.structuredContent as { filePath: string }).filePath,
+      createdDocument.filePath
+    )
     const preserved = await client.callTool({
       name: 'specs.update_metadata',
       arguments: { slug: 'presence', extra: 'discard' },

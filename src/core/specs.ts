@@ -6,7 +6,7 @@ import {
   renameSync,
   writeFileSync,
 } from 'node:fs'
-import { join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 
 /** Legacy names remain readable so existing project documents never disappear. */
 export const SPEC_KINDS = ['use-case', 'spec', 'feature', 'fix', 'spec-tech', 'technical'] as const
@@ -214,6 +214,18 @@ function serialize(doc: SpecDocument) {
   return lines.concat(['---', '']).join('\n') + doc.content
 }
 const now = () => new Date().toISOString()
+function filenameSlugs(file: string) {
+  const stem = file.slice(0, -3)
+  const dated = /^(\d{4}-\d{2}-\d{2})-(.+)$/.exec(stem)
+  const date = dated && new Date(`${dated[1]}T00:00:00.000Z`)
+  return dated &&
+    date &&
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === dated[1]
+    ? [stem, dated[2]]
+    : [stem]
+}
+
 export class SpecStore {
   private readonly docsPath: string
   readonly root: string
@@ -228,15 +240,26 @@ export class SpecStore {
   }
   private paths(slug: string) {
     ensureSlug(slug)
-    return this.roots().map((root) => join(root, `${slug}.md`))
+    return this.candidates()
+      .filter(({ file, path }) => this.claimedSlugs(path, file).includes(slug))
+      .map(({ path }) => path)
   }
   private location(doc: SpecDocument) {
     return trueUseCase(doc.metadata.specKind) ? this.useCasesRoot : this.root
   }
   private write(doc: SpecDocument) {
-    mkdirSync(this.location(doc), { recursive: true })
-    const dest = join(this.location(doc), `${doc.metadata.slug}.md`),
-      tmp = `${dest}.${process.pid}.tmp`
+    const paths = this.paths(doc.metadata.slug)
+    if (paths.length > 1)
+      throw new Error(
+        `spec slug '${doc.metadata.slug}' is ambiguous across docs/use-cases and docs/specs`
+      )
+    const dest =
+      paths[0] ??
+      join(this.location(doc), `${doc.metadata.createdAt.slice(0, 10)}-${doc.metadata.slug}.md`)
+    if (!paths.length && existsSync(dest))
+      throw new Error(`spec filename '${basename(dest)}' already exists`)
+    mkdirSync(dirname(dest), { recursive: true })
+    const tmp = `${dest}.${process.pid}.tmp`
     writeFileSync(tmp, serialize(doc), 'utf8')
     renameSync(tmp, dest)
   }
@@ -247,10 +270,15 @@ export class SpecStore {
       throw new Error(`spec slug '${slug}' is ambiguous across docs/use-cases and docs/specs`)
     return paths[0]
   }
+  /** Physical path relative to the configured docs directory, never stored in metadata. */
+  filePath(slug: string) {
+    return relative(this.docsPath, this.located(slug)).split(sep).join('/')
+  }
   get(slug: string) {
     const path = this.located(slug),
       d = parseDocument(readFileSync(path, 'utf8'))
-    if (d.metadata.slug !== slug) throw new Error(`spec filename and slug disagree for '${slug}'`)
+    if (d.metadata.slug !== slug || !filenameSlugs(basename(path)).includes(slug))
+      throw new Error(`spec filename and slug disagree for '${slug}'`)
     this.validateRoot(path, d)
     return d
   }
@@ -264,9 +292,19 @@ export class SpecStore {
         : []
     )
   }
+  private claimedSlugs(path: string, file: string) {
+    const slugs = filenameSlugs(file)
+    try {
+      const { metadata } = parseDocument(readFileSync(path, 'utf8'))
+      if (slugs.includes(metadata.slug)) return [metadata.slug]
+    } catch {
+      /* A malformed twin must still reserve the identity claimed by its filename. */
+    }
+    return slugs
+  }
   private readCandidate(path: string, file: string) {
     const document = parseDocument(readFileSync(path, 'utf8'))
-    if (document.metadata.slug !== file.slice(0, -3))
+    if (!filenameSlugs(file).includes(document.metadata.slug))
       throw new Error(`spec filename and slug disagree for '${file}'`)
     this.validateRoot(path, document)
     return document
@@ -289,7 +327,9 @@ export class SpecStore {
   scanForListing(): SpecListingScan {
     const candidates = this.candidates()
     const counts = new Map<string, number>()
-    for (const { file } of candidates) counts.set(file, (counts.get(file) ?? 0) + 1)
+    for (const { file, path } of candidates)
+      for (const slug of this.claimedSlugs(path, file))
+        counts.set(slug, (counts.get(slug) ?? 0) + 1)
     const documents: SpecDocument[] = []
     const diagnostics: SpecListingDiagnostic[] = []
     for (const { file, path } of candidates) {
@@ -301,10 +341,9 @@ export class SpecStore {
         problems.push(error instanceof Error ? error.message : String(error))
       }
       // get() rejects both paths even if one twin has invalid frontmatter.
-      if (counts.get(file)! > 1)
-        problems.push(
-          `spec slug '${file.slice(0, -3)}' is ambiguous across docs/use-cases and docs/specs`
-        )
+      for (const slug of this.claimedSlugs(path, file))
+        if (counts.get(slug)! > 1)
+          problems.push(`spec slug '${slug}' is ambiguous across docs/use-cases and docs/specs`)
       if (problems.length)
         diagnostics.push({
           path: relative(this.docsPath, path).split(sep).join('/'),
@@ -344,12 +383,13 @@ export class SpecStore {
     ensureSlug(input.slug)
     if (this.paths(input.slug).some(existsSync))
       throw new Error(`spec '${input.slug}' already exists`)
+    const createdAt = now()
     const doc = {
       metadata: {
         ...input,
         sourceUseCases: input.sourceUseCases ?? [],
-        createdAt: now(),
-        lastUpdated: now(),
+        createdAt,
+        lastUpdated: createdAt,
       },
       content: input.content,
     }
@@ -475,7 +515,7 @@ export class SpecStore {
     if (changed.status !== 'approved') return
     const docs = this.list()
     const isRealUseCase =
-      trueUseCase(changed.specKind) && existsSync(join(this.useCasesRoot, `${changed.slug}.md`))
+      trueUseCase(changed.specKind) && dirname(this.located(changed.slug)) === this.useCasesRoot
     if (isRealUseCase) {
       current.metadata.status = 'needs-decision'
       for (const techDoc of docs)
