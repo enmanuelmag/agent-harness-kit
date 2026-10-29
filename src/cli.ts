@@ -9,7 +9,7 @@ import { runInit } from '@/commands/init'
 import { runMigrate } from '@/commands/migrate'
 import { runMigrateSpecs } from '@/commands/migrate-specs'
 import { runMigrateStorage } from '@/commands/migrate-storage'
-import { runModels } from '@/commands/models'
+import { runModelDefaults, runModels } from '@/commands/models'
 import { runReset } from '@/commands/reset'
 import { runServe } from '@/commands/serve'
 import { runStatus } from '@/commands/status'
@@ -282,12 +282,15 @@ notifications.command('uninstall').requiredOption('--provider <provider>', 'Prov
 program.command('notify').description('Emit an explicit workflow notification').command('attention').requiredOption('--request-id <id>', 'Stable identity for this request').action(async (opts: { requestId: string }) => { await notificationAttention(cwd, opts.requestId) })
 
 // ─── models ───────────────────────────────────────────────────────────────────
-program
+const modelsCommand = program
   .command('models')
   .description('Re-prompt per-role native model settings for Claude Code, Codex CLI, Cursor, or OpenCode V2')
   .action(async () => {
     await runModels(cwd)
   })
+modelsCommand.command('apply-defaults').description('Apply current provider default models without prompts').action(async () => {
+  await runModelDefaults(cwd)
+})
 
 // When the package is not available locally (and cwd is not the package's
 // own repo), the generated MCP config launches the bare `ahk serve`

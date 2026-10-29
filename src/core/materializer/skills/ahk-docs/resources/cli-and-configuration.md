@@ -8,6 +8,7 @@ Run commands from the project that contains `agent-harness-kit.config.*`.
 | `ahk build` | Reconcile generated files from configuration. `--force` overwrites existing agent files only after a backup. `--watch` rebuilds on config changes. |
 | `ahk sync` | Safely synchronize generated files. `--force` backs up agent files; `--keep-models` reuses saved choices; `--capture-models` imports current-provider metadata. |
 | `ahk models` | Re-prompt compatible per-role model settings for Claude Code, Codex CLI, Cursor, or OpenCode V2. |
+| `ahk models apply-defaults` | Apply current-provider role defaults without prompts, replacing saved choices with backups. |
 | `ahk health` | Run the configured native health script manually and statelessly. |
 | `ahk status` | Show tasks and active actions; `--json` is available. |
 | `ahk dashboard` | Serve the local dashboard; `--port` accepts 1–65535 and `--no-open` avoids opening a browser. |
@@ -25,6 +26,8 @@ Run commands from the project that contains `agent-harness-kit.config.*`.
 `task add`, `task list`, `task edit`, and `task done <id|slug>` are interactive or direct CLI helpers. `ahk export --json` writes JSON to stdout unless `--output` is provided. SQL export currently reports the direct-SQLite alternative instead of generating a dump. `ahk reset` clears SQLite workflow data transactionally after confirmation or with `--force`, preserves the DB file/inode/schema and writes a consistent JSON backup; `--provider <provider>` additionally offers removal of that provider's five role files. It does not reset remote databases. Storage maintenance refuses other live AHK owners, fences stale configurations/handles, and retains the original SQLite source after migration. Stop unmanaged native writers first; this is a snapshot migration, not ongoing replication.
 
 `ahk models` prompts current native choices for Claude Code, Codex CLI, Cursor, or OpenCode V2. `ahk sync --capture-models` reads those current provider role files into saved preferences; it cannot be combined with force or keep-models. `ahk sync --force --keep-models` reuses saved preferences and prompts only for missing roles before regenerating agent files with backups, except for OpenCode V2. OpenCode V2 init and provider migration use `inherit` for every role without prompting; build and sync retain saved choices and fill missing roles with `inherit` in all regeneration modes. Only `ahk models` asks for OpenCode V2 references (`provider/model` or `provider/model#variant`); blank input selects `inherit`.
+
+`ahk models apply-defaults` replaces all five choices for the current provider and regenerates role files with backups. It prints each choice and backup location. Codex discovers the current catalog and selects Sol for lead/consultant, Luna for explorer, and Terra for builder/reviewer unless Sol has a newer numeric version; missing families inherit and missing Terra falls back to Sol. Discovery errors stop before changes. Claude Code, Cursor and OpenCode V2 defaults are `inherit`; providers without policies return an error. It does not update model binaries.
 
 ## Configuration and generated files
 

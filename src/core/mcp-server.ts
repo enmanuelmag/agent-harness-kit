@@ -135,7 +135,7 @@ export function createMcpServer(
         }
       } else {
         outcome = await maintenance.execute(operation, args)
-        if (outcome.ok && ['init', 'models', 'migrate.provider.apply', 'sync.apply', 'migrate.storage.apply', 'reset.apply'].includes(operation)) await reload()
+        if (outcome.ok && ['init', 'models', 'models.apply_defaults', 'migrate.provider.apply', 'sync.apply', 'migrate.storage.apply', 'reset.apply'].includes(operation)) await reload()
         if (operation === 'status') outcome.data = { ...outcome.data, runtime: { mode: !config ? 'setup' : fenced || !db ? 'maintenance' : 'normal', databaseAvailable: !!db && !fenced, effectiveProvider: config?.provider ?? null, error: databaseError ?? null } }
       }
     } catch (cause) {

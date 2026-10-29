@@ -1,6 +1,6 @@
 name = "builder"
 sandbox_mode = "danger-full-access"
-model = "gpt-6.1-sol"
+model = "gpt-6.1-terra"
 model_reasoning_effort = "medium"
 
 description = """

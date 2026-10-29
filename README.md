@@ -106,6 +106,10 @@ A globally installed `ahk` command and global database storage are different set
 
 `ahk init` does not create a home-directory provider scaffold. Agent and skill files it creates stay in the current project. The detailed setup and provider guide ships with [`ahk-docs`](src/core/materializer/skills/ahk-docs/resources/setup-and-providers.md).
 
+For Codex model prompts, AHK recommends models from the live account catalog: the newest Sol for lead and consultant, the newest Luna for explorer, and the newest Terra for builder and reviewer. A strictly newer Sol takes precedence over Terra for those coding roles; equal versions favor Terra. Requested reasoning efforts are medium for lead, builder and reviewer, high for consultant, and low for explorer, falling back to the model's supported default if needed. Missing families inherit the project model; when Terra is absent, builder and reviewer use the available Sol. These are initial choices and can be changed in the prompt. Claude Code and Cursor initially offer inheritance, while OpenCode V2 uses inheritance without prompting during setup.
+
+Run `ahk models apply-defaults` or call MCP `ahk.models.apply_defaults` to apply the current provider's defaults without prompts. This replaces saved choices for all five roles and regenerates their files with backups, reporting the chosen models and backup path. Codex requires a live catalog; discovery failure leaves preferences and role files unchanged. Claude Code, Cursor and OpenCode V2 apply `inherit`; providers without a default policy report that they are unsupported. This configures role preferences and does not install or update model binaries.
+
 ## OpenCode V2
 
 Choose **OpenCode V2** in `ahk init`, or use `ahk migrate --to opencode-v2` for an existing project. The existing `opencode` provider remains v1. Both versions share the `opencode` executable and `.opencode` paths; choosing a provider neither installs a runtime nor isolates the two versions.

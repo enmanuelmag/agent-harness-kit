@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 import { applyConfigDefaults } from '../commands/init-helpers'
+import { loadConfig } from '../core/config'
 import { openDB } from '../core/db'
 import { SQLiteDriver } from '../core/drivers/sqlite'
 import { MaintenanceService } from '../core/maintenance/operations'
@@ -14,7 +15,9 @@ import { inputContracts } from '../core/mcp-contracts'
 import { assertNormalized } from '../core/mcp-normalizers'
 import { openSQLite } from '../core/sqlite-adapter'
 
-function fixture(provider: 'opencode' | 'claude-code' = 'opencode') {
+import type { Provider } from '../types'
+
+function fixture(provider: Provider = 'opencode') {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'ahk-maintenance-')))
   const homeDir = join(cwd, 'fake-home'); mkdirSync(homeDir)
   const config = applyConfigDefaults({ name: 'Fixture', description: 'Isolated fixture', provider, docsPath: './docs', scope: 'local' })
@@ -28,6 +31,92 @@ function bytes(root: string, prefix = ''): Record<string, string> {
     return entry.isDirectory() ? Object.entries(bytes(root, path)) : [[path, readFileSync(join(root, path)).toString('base64')]]
   }))
 }
+
+test('model defaults apply live Codex policy with backups and preserve other providers', async () => {
+  const f = fixture('codex-cli')
+  const catalog = [
+    { id: 'gpt-6.1-sol', label: 'Sol', supportedReasoningEfforts: ['medium', 'high'] },
+    { id: 'gpt-6.1-terra', label: 'Terra', supportedReasoningEfforts: ['medium'] },
+    { id: 'gpt-6-luna', label: 'Luna', supportedReasoningEfforts: ['low'] },
+  ]
+  const service = new MaintenanceService(f.cwd, { homeDir: f.homeDir, discoverCodexModels: async () => ({ ok: true, data: catalog }) })
+  try {
+    writeFileSync(join(f.cwd, 'agent-harness-kit.config.local.json'), JSON.stringify({ agentPreferences: { cursor: { lead: { model: 'keep' } } } }))
+    mkdirSync(join(f.cwd, '.codex', 'agents'), { recursive: true })
+    writeFileSync(join(f.cwd, '.codex', 'agents', 'builder.toml'), 'custom builder')
+    writeFileSync(join(f.cwd, '.codex', 'config.toml'), 'model = "gpt-old"\n')
+    const result = await service.execute('models.apply_defaults')
+    assert.equal(result.ok, true, result.message)
+    const choices = result.data!.choices as Record<string, { model: string; reasoningEffort?: string }>
+    assert.equal(choices.builder.model, 'gpt-6.1-terra')
+    assert.equal(choices.consultant.reasoningEffort, 'high')
+    assert.equal(readFileSync(join(String(result.data!.backupDir), '.codex', 'agents', 'builder.toml'), 'utf8'), 'custom builder')
+    assert.match(readFileSync(join(f.cwd, '.codex', 'agents', 'builder.toml'), 'utf8'), /gpt-6\.1-terra/)
+    assert.match(readFileSync(join(f.cwd, '.codex', 'config.toml'), 'utf8'), /^model = "gpt-6\.1-sol"$/m)
+    const saved = await loadConfig(f.cwd)
+    assert.deepEqual(saved.agentPreferences?.['codex-cli'], choices)
+    assert.equal(saved.agentPreferences?.cursor?.lead?.model, 'keep')
+    assert.equal((await service.execute('models.apply_defaults')).ok, true)
+  } finally { await service.dispose(); await f.cleanup() }
+  const missing = fixture('codex-cli')
+  const missingService = new MaintenanceService(missing.cwd, { homeDir: missing.homeDir, discoverCodexModels: async () => ({ ok: true, data: [{ id: 'gpt-6.1-terra', label: 'Terra', supportedReasoningEfforts: ['medium'] }] }) })
+  try {
+    mkdirSync(join(missing.cwd, '.codex'), { recursive: true })
+    writeFileSync(join(missing.cwd, '.codex', 'config.toml'), 'model = "user-choice"\nmodel_reasoning_effort = "xhigh"\n')
+    const result = await missingService.execute('models.apply_defaults')
+    assert.equal(result.ok, true, result.message)
+    const choices = result.data!.choices as Record<string, { model: string }>
+    assert.equal(choices.lead.model, 'inherit')
+    assert.equal(choices.builder.model, 'gpt-6.1-terra')
+    assert.match(readFileSync(join(missing.cwd, '.codex', 'config.toml'), 'utf8'), /^model_reasoning_effort = "xhigh"$/m)
+  } finally { await missingService.dispose(); await missing.cleanup() }
+})
+
+test('Codex defaults clear unsupported stale project effort when the selected model has no default', async () => {
+  const f = fixture('codex-cli')
+  const service = new MaintenanceService(f.cwd, { homeDir: f.homeDir, discoverCodexModels: async () => ({ ok: true, data: [{ id: 'gpt-6.1-sol', label: 'Sol', supportedReasoningEfforts: ['low'] }] }) })
+  try {
+    mkdirSync(join(f.cwd, '.codex'), { recursive: true })
+    const path = join(f.cwd, '.codex', 'config.toml')
+    writeFileSync(path, 'model = "old"\nmodel_reasoning_effort = "xhigh" # retain comment\n[profiles.custom]\nmodel_reasoning_effort = "high"\n')
+    const result = await service.execute('models.apply_defaults')
+    assert.equal(result.ok, true, result.message)
+    const config = readFileSync(path, 'utf8')
+    assert.match(config, /^model = "gpt-6\.1-sol"$/m)
+    assert.match(config, /# retain comment/)
+    assert.doesNotMatch(config.split('[profiles.custom]')[0], /^model_reasoning_effort\s*=/m)
+    assert.match(config, /\[profiles.custom\]\nmodel_reasoning_effort = "high"/)
+    assert.deepEqual((await loadConfig(f.cwd)).agentPreferences?.['codex-cli']?.lead, { model: 'gpt-6.1-sol' })
+  } finally { await service.dispose(); await f.cleanup() }
+})
+
+test('inherited provider policies replace stale effort and failures do not change files', async () => {
+  for (const provider of ['claude-code', 'cursor', 'opencode-v2'] as const) {
+    const f = fixture(provider)
+    try {
+      const previous = provider === 'opencode-v2' ? { model: 'team/model#high' } : { model: 'old', reasoningEffort: 'high' }
+      writeFileSync(join(f.cwd, 'agent-harness-kit.config.local.json'), JSON.stringify({ agentPreferences: { [provider]: { lead: previous } } }))
+      const result = await f.service.execute('models.apply_defaults')
+      assert.equal(result.ok, true, `${provider}: ${result.message}`)
+      assert.deepEqual((await loadConfig(f.cwd)).agentPreferences?.[provider]?.lead, { model: 'inherit' })
+    } finally { await f.cleanup() }
+  }
+  const f = fixture('codex-cli')
+  const service = new MaintenanceService(f.cwd, { homeDir: f.homeDir, discoverCodexModels: async () => ({ ok: false, error: 'offline' }) })
+  try {
+    const before = bytes(f.cwd)
+    assert.equal((await service.execute('models.apply_defaults', { provider: 'cursor' })).code, 'provider_mismatch')
+    assert.equal((await service.execute('models.apply_defaults')).code, 'catalog_unavailable')
+    assert.deepEqual(bytes(f.cwd), before)
+    await withMaintenanceLock(f.cwd, async () => assert.equal((await service.execute('models.apply_defaults')).code, 'maintenance_busy'))
+  } finally { await service.dispose(); await f.cleanup() }
+  const unsupported = fixture('opencode')
+  try {
+    const before = bytes(unsupported.cwd)
+    assert.equal((await unsupported.service.execute('models.apply_defaults')).code, 'unsupported_provider')
+    assert.deepEqual(bytes(unsupported.cwd), before)
+  } finally { await unsupported.cleanup() }
+})
 
 test('ambiguous populated storage candidates request the actual supported source field without writes', async () => {
   const f = fixture()

@@ -1,5 +1,6 @@
 import { loadConfig } from '@/core/config'
 import { updateManagedConfig } from '@/core/maintenance/config'
+import { resolveProviderModelDefaults } from '@/core/model-defaults'
 
 import type { AgentName } from '@/core/materializer/agent-restrictions'
 import type {
@@ -17,7 +18,9 @@ type PreferenceMap = Partial<Record<AgentName, { model: string; reasoningEffort?
 
 /** Setup inherits OpenCode's current model; explicit overrides belong to `ahk models`. */
 export function defaultOpenCodeV2AgentModels(provider: Provider): Partial<Record<AgentName, OpenCodeV2AgentModelChoice>> {
-  return provider === 'opencode-v2' ? Object.fromEntries(ROLES.map(role => [role, {}])) : {}
+  if (provider !== 'opencode-v2') return {}
+  const defaults = resolveProviderModelDefaults(provider)!
+  return Object.fromEntries(ROLES.map(role => [role, defaults[role].model === 'inherit' ? {} : { model: defaults[role].model }]))
 }
 
 export function toPreferences(

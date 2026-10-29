@@ -34,6 +34,7 @@ Use cases are `use-case` documents in `docs/use-cases/`. Functional `spec`, spec
 | build and permission sync | `ahk.build` with explicit `force`, `sync` and native choices |
 | sync, force/keep-models/capture-models | `ahk.sync.plan` then `ahk.sync.apply` |
 | models | `ahk.models` with explicit native role choices |
+| apply provider model defaults | `ahk.models.apply_defaults` resolves and applies current-provider defaults |
 | task add/list/edit/done | `tasks.add/get/edit/update`; `archivedOnly` maps archived listing, edit/update accept ID or slug, done retains final health |
 | status, health, doctor --db | `ahk.status`, stateless `ahk.health`, `ahk.doctor` with `db: true` |
 | provider/storage/specs migration | `ahk.migrate.provider/storage/specs.plan` then corresponding `.apply` |
@@ -54,6 +55,8 @@ The agent detects and communicates generated-skill drift, registered migration w
 Generated role defaults list diagnostic/status/plan operations and explicit attention for every role; lead and builder additionally receive maintenance mutations. Codex instructions distinguish server-owned bounded maintenance from arbitrary direct project edits, and Claude generated allow rules enumerate the registered tool names. Provider capabilities and trust controls differ; these defaults are not server-side identity authentication and do not grant arbitrary file writes. Existing personal/provider files are refreshed only by an explicit build/sync operation.
 
 `ahk.models` configures the current provider only. If an explicit provider differs, it returns `provider_mismatch` without changing preferences or role files; use the provider migration plan/apply flow to change providers.
+
+`ahk.models.apply_defaults` accepts an optional current provider and applies the same defaults as `ahk models apply-defaults`, returning all role choices, the file report and backup directory. It replaces existing role preferences and backs up regenerated files. Codex requires successful live discovery; Claude Code, Cursor and OpenCode V2 inherit. Providers without a policy return `unsupported_provider`.
 
 A valid configuration with a known busy/retired database can start MCP in maintenance mode. Database business tools return typed `database_busy`/`restart_required` outcomes; specifications, metadata diagnostics, plans and notification configuration remain usable. `ahk.serve` reports stored/effective provider and runtime mode. Once supported maintenance verifies the target, it reopens the database in the same session, including reconciliation of an already-current target. Invalid configuration and unrelated database errors do not silently enter this mode.
 

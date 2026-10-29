@@ -21,20 +21,25 @@ const MANUAL_MODEL = '__ahk_manual_model__'
 
 export async function promptCodexAgentModels(
   provider: Provider,
-  roles: AgentName[] = AGENTS.map(({ key }) => key)
+  roles: AgentName[] = AGENTS.map(({ key }) => key),
+  dependencies: { prompts: typeof p; discover: typeof discoverCodexModels } = {
+    prompts: p,
+    discover: discoverCodexModels,
+  }
 ): Promise<Partial<Record<AgentName, CodexAgentModelChoice>>> {
+  const prompts = dependencies.prompts
   const choices: Partial<Record<AgentName, CodexAgentModelChoice>> = {}
   if (provider !== 'codex-cli') return choices
 
-  const catalog = await discoverCodexModels()
+  const catalog = await dependencies.discover()
   const recommendations = catalog.ok ? selectCodexRoleDefaults(catalog.data) : {}
   if (!catalog.ok) {
-    p.log.warn(`Could not discover Codex models: ${catalog.error}`)
-    p.log.info('Choose inherit or enter a model ID and supported effort manually.')
+    prompts.log.warn(`Could not discover Codex models: ${catalog.error}`)
+    prompts.log.info('Choose inherit or enter a model ID and supported effort manually.')
   }
 
   for (const agent of AGENTS.filter(({ key }) => roles.includes(key))) {
-    const model = await p.select({
+    const model = await prompts.select({
       message: `Model for ${agent.label}`,
       options: [
         { value: 'inherit', label: 'inherit (use project default)' },
@@ -44,7 +49,7 @@ export async function promptCodexAgentModels(
       ],
       initialValue: recommendations[agent.key]?.model ?? 'inherit',
     })
-    if (p.isCancel(model)) cancel()
+    if (prompts.isCancel(model)) cancel()
 
     const selected = model as string
     if (selected === 'inherit') {
@@ -53,7 +58,7 @@ export async function promptCodexAgentModels(
     }
 
     const discovered = catalog.ok ? catalog.data.find(({ id }) => id === selected) : undefined
-    const modelId = discovered?.id ?? (await manualModelId(agent.label))
+    const modelId = discovered?.id ?? (await manualModelId(agent.label, prompts))
     if (!modelId) {
       choices[agent.key] = {}
       continue
@@ -63,46 +68,48 @@ export async function promptCodexAgentModels(
       ? await selectEffort(
           agent.label,
           discovered.supportedReasoningEfforts,
-          recommendations[agent.key]?.effort ?? discovered.defaultReasoningEffort
+          recommendations[agent.key]?.effort ?? discovered.defaultReasoningEffort,
+          prompts
         )
-      : await manualEffort(agent.label)
+      : await manualEffort(agent.label, prompts)
     choices[agent.key] = { model: modelId, ...(effort ? { effort } : {}) }
   }
   return choices
 }
 
-async function manualModelId(label: string): Promise<string> {
+async function manualModelId(label: string, prompts: typeof p): Promise<string> {
   while (true) {
-    const value = await p.text({ message: `Codex model ID for ${label}` })
-    if (p.isCancel(value)) cancel()
+    const value = await prompts.text({ message: `Codex model ID for ${label}` })
+    if (prompts.isCancel(value)) cancel()
     const modelId = value as string
     if (!modelId.trim() || !validateManualModelId(modelId)) return modelId
-    p.log.warn(validateManualModelId(modelId)!)
+    prompts.log.warn(validateManualModelId(modelId)!)
   }
 }
 
-async function manualEffort(label: string): Promise<string> {
+async function manualEffort(label: string, prompts: typeof p): Promise<string> {
   while (true) {
-    const value = await p.text({ message: `Reasoning effort for ${label} (optional)` })
-    if (p.isCancel(value)) cancel()
+    const value = await prompts.text({ message: `Reasoning effort for ${label} (optional)` })
+    if (prompts.isCancel(value)) cancel()
     const effort = value as string
     if (!effort.trim() || !validateManualReasoningEffort(effort)) return effort
-    p.log.warn(validateManualReasoningEffort(effort)!)
+    prompts.log.warn(validateManualReasoningEffort(effort)!)
   }
 }
 
 async function selectEffort(
   label: string,
   efforts: string[],
-  defaultEffort?: string
+  defaultEffort: string | undefined,
+  prompts: typeof p
 ): Promise<string | undefined> {
   if (efforts.length === 0) return undefined
-  const value = await p.select({
+  const value = await prompts.select({
     message: `Reasoning effort for ${label}`,
     options: efforts.map((effort) => ({ value: effort, label: effort })),
     initialValue: defaultEffort && efforts.includes(defaultEffort) ? defaultEffort : efforts[0],
   })
-  if (p.isCancel(value)) cancel()
+  if (prompts.isCancel(value)) cancel()
   return value as string
 }
 

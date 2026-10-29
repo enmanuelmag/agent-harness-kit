@@ -96,6 +96,25 @@ export async function runModels(cwd: string): Promise<void> {
   console.log('')
 }
 
+/** Apply current-provider defaults without prompting. */
+export async function runModelDefaults(cwd: string): Promise<void> {
+  const service = new MaintenanceService(cwd)
+  try {
+    const result = await service.execute('models.apply_defaults')
+    if (!result.ok) throw new Error(`${result.code}: ${result.message ?? ''}`)
+    console.log(`Applied ${String(result.data!.provider)} model defaults:`)
+    const choices = result.data!.choices as Record<string, { model: string; reasoningEffort?: string }>
+    for (const [role, choice] of Object.entries(choices)) {
+      console.log(`  ${role}: ${choice.model}${choice.reasoningEffort ? ` (${choice.reasoningEffort})` : ''}`)
+    }
+    const report = result.data!.report as WriteAgentFilesResult
+    for (const file of [...report.created, ...report.overwritten]) console.log(`  Updated: ${file}`)
+    if (result.data!.backupDir) console.log(`  Backup: ${String(result.data!.backupDir)}`)
+  } finally {
+    await service.dispose()
+  }
+}
+
 type Choice = string | ClaudeAgentModelChoice | CodexAgentModelChoice | CursorAgentModelChoice
 type ChoiceMap = Partial<Record<AgentName, Choice>>
 type ChoiceMapFor<T> = Partial<Record<AgentName, T>>

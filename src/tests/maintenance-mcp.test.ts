@@ -19,6 +19,28 @@ import { NotificationService } from '../core/notifications/runtime'
 import { ok } from '../core/result'
 import { withSQLiteMaintenance } from '../core/sqlite-ownership'
 
+test('MCP applies provider defaults and returns typed choices and backup report', async () => {
+  const cwd = mkdtempSync(join(process.cwd(), '.tmp-model-defaults-mcp-'))
+  const server = createMcpServer(undefined, cwd, undefined, undefined, { homeDir: join(cwd, 'home') })
+  const client = new Client({ name: 'defaults-test', version: '1' })
+  const [a, b] = InMemoryTransport.createLinkedPair()
+  try {
+    await server.connect(b); await client.connect(a)
+    const tool = (await client.listTools()).tools.find(item => item.name === 'ahk.models.apply_defaults')
+    assert.ok(tool?.outputSchema)
+    const choices = Object.fromEntries(['lead', 'explorer', 'consultant', 'builder', 'reviewer'].map(role => [role, { model: 'sonnet', reasoningEffort: 'high' }]))
+    const initialized = await client.callTool({ name: 'ahk.init', arguments: { name: 'Defaults', description: 'Fixture', provider: 'claude-code', storageScope: 'local', choices } })
+    assert.equal(initialized.isError, false, JSON.stringify(initialized.content))
+    const result = await client.callTool({ name: 'ahk.models.apply_defaults', arguments: { provider: 'claude-code' } })
+    assert.equal(result.isError, false, JSON.stringify(result.content))
+    const body = result.structuredContent as { ok: boolean; data: { provider: string; choices: Record<string, { model: string }>; backupDir: string; report: unknown } }
+    assert.equal(body.data.provider, 'claude-code')
+    assert.equal(body.data.choices.lead.model, 'inherit')
+    assert.ok(body.data.backupDir); assert.ok(body.data.report)
+    assert.deepEqual((await loadConfig(cwd)).agentPreferences?.['claude-code']?.lead, { model: 'inherit' })
+  } finally { await client.close(); await server.close(); rmSync(cwd, { recursive: true, force: true }) }
+})
+
 test('actual SDK exposes complete maintenance contracts, setup and typed safe errors without CLI subprocesses', async (t) => {
   const cwd = mkdtempSync(join(process.cwd(), '.tmp-maintenance-mcp-'))
   const server = createMcpServer(undefined, cwd, undefined, undefined, {homeDir:join(cwd,'.fake-home')})

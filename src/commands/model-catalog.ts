@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 
+import { compareModelVersions, resolveProviderModelDefaults } from '@/core/model-defaults'
+
 export interface CursorModel {
   id: string
   label: string
@@ -32,48 +34,13 @@ export type CodexRole = 'lead' | 'explorer' | 'consultant' | 'builder' | 'review
 export function selectCodexRoleDefaults(
   models: CodexModel[]
 ): Partial<Record<CodexRole, { model: string; effort?: string }>> {
-  const sol = newestCodexFamily(models, 'sol')
-  const luna = newestCodexFamily(models, 'luna')
-  const defaults: Partial<Record<CodexRole, { model: string; effort?: string }>> = {}
-  for (const role of ['lead', 'builder', 'reviewer'] as const) {
-    if (sol) defaults[role] = choiceWithEffort(sol, 'medium')
-  }
-  if (sol) defaults.consultant = choiceWithEffort(sol, 'high')
-  if (luna) defaults.explorer = choiceWithEffort(luna, 'low')
-  return defaults
-}
-
-function newestCodexFamily(models: CodexModel[], family: 'sol' | 'luna'): CodexModel | undefined {
-  return models
-    .filter((model) => new RegExp(`(?:^|[-_/])${family}(?:$|[-_/])`, 'i').test(model.id))
-    .sort(
-      (left, right) => compareCodexVersion(right.id, left.id) || left.id.localeCompare(right.id)
-    )[0]
-}
-
-function choiceWithEffort(
-  model: CodexModel,
-  requested: string
-): { model: string; effort?: string } {
-  const effort = model.supportedReasoningEfforts.includes(requested)
-    ? requested
-    : model.defaultReasoningEffort &&
-        model.supportedReasoningEfforts.includes(model.defaultReasoningEffort)
-      ? model.defaultReasoningEffort
-      : undefined
-  return { model: model.id, ...(effort ? { effort } : {}) }
-}
-
-function compareCodexVersion(left: string, right: string): number {
-  const parse = (id: string) =>
-    (id.match(/\d+(?:\.\d+)*/)?.[0] ?? '').split('.').filter(Boolean).map(Number)
-  const leftParts = parse(left)
-  const rightParts = parse(right)
-  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
-    const diff = (leftParts[index] ?? 0) - (rightParts[index] ?? 0)
-    if (diff) return diff
-  }
-  return 0
+  const defaults = resolveProviderModelDefaults('codex-cli', models)!
+  return Object.fromEntries(
+    Object.entries(defaults).flatMap(([role, value]) => value.model === 'inherit' ? [] : [[role, {
+      model: value.model,
+      ...(value.reasoningEffort ? { effort: value.reasoningEffort } : {}),
+    }]])
+  )
 }
 
 const GPT_FAMILY_ORDER = ['astra', 'sol', 'terra', 'luna']
@@ -95,7 +62,7 @@ export function orderCodexModels(models: CodexModel[]): CodexModel[] {
   return [...models].sort(
     (left, right) =>
       codexFamilyRank(left.id) - codexFamilyRank(right.id) ||
-      compareCodexVersion(right.id, left.id) ||
+      compareModelVersions(right.id, left.id) ||
       left.id.localeCompare(right.id)
   )
 }
@@ -192,7 +159,7 @@ function compareCursorModels(left: string, right: string): number {
 function compareCursorModel(left: CursorModel, right: CursorModel): number {
   const family = nativeModelRank(left.id) - nativeModelRank(right.id)
   if (family) return family
-  const version = compareCodexVersion(right.id, left.id)
+  const version = compareModelVersions(right.id, left.id)
   if (version) return version
   const effort = effortRank(left.id) - effortRank(right.id)
   return (
@@ -378,6 +345,13 @@ async function createCodexTransport(): Promise<JsonRpcTransport> {
     for (const { reject } of pending.values()) reject(error)
     pending.clear()
   }
+  // Bound discovery even if App Server starts but never responds. Killing it
+  // also releases the stdio transport; close() clears the timer on success.
+  const deadline = setTimeout(() => {
+    failAll(new Error('Codex model discovery timed out.'))
+    child.kill()
+  }, 30_000)
+  deadline.unref()
   child.stderr.on('data', (data: Buffer) => (startupError += data))
   child.once('error', (error) => failAll(error))
   child.once('close', (code) => {
@@ -436,6 +410,7 @@ async function createCodexTransport(): Promise<JsonRpcTransport> {
 
   const close = () => {
     closed = true
+    clearTimeout(deadline)
     lines.close()
     child.stdin.end()
     if (!child.killed) child.kill()

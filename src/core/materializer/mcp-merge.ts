@@ -406,6 +406,20 @@ export function setTomlTopLevelKey(content: string, key: string, value: string):
   return lines.join('\n')
 }
 
+/** Remove only a top-level scalar; leave section-specific settings and comments intact. */
+function removeTomlTopLevelKey(content: string, key: string): string {
+  const lines = content.split('\n')
+  const firstSection = lines.findIndex((line) => /^\s*\[/.test(line))
+  const end = firstSection === -1 ? lines.length : firstSection
+  const keyRe = new RegExp(`^\\s*${key}\\s*=\\s*[^#]*(#.*)?$`)
+  const index = lines.slice(0, end).findIndex((line) => keyRe.test(line))
+  if (index < 0) return content
+  const comment = lines[index].match(keyRe)?.[1]
+  if (comment) lines[index] = comment
+  else lines.splice(index, 1)
+  return lines.join('\n')
+}
+
 export function mergeCodexConfigToml(
   filePath: string,
   port: number,
@@ -435,6 +449,7 @@ export function mergeCodexConfigToml(
     content = setTomlTopLevelKey(content, 'model', leadChoice.model)
     if (leadChoice.effort)
       content = setTomlTopLevelKey(content, 'model_reasoning_effort', leadChoice.effort)
+    else content = removeTomlTopLevelKey(content, 'model_reasoning_effort')
   } else {
     content = ensureTomlTopLevelKey(content, 'model', 'gpt-5.6-terra')
     content = ensureTomlTopLevelKey(content, 'model_reasoning_effort', 'medium')

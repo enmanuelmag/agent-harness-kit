@@ -150,6 +150,17 @@ test('ahk models still prompts all OpenCode V2 roles and accepts Enter as inheri
   await assertInheritedV2(cwd)
 })
 
+test('ahk models apply-defaults applies inheritance without prompts', async () => {
+  const cwd = project('v2-apply-defaults')
+  writeFileSync(join(cwd, 'agent-harness-kit.config.json'), JSON.stringify({ provider: 'opencode-v2', project: { name: 'Models defaults', description: 'test', docsPath: './docs' } }))
+  const result = cli(['models', 'apply-defaults'], cwd)
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+  assert.match(result.stdout, /builder: inherit/)
+  assert.doesNotMatch(result.stdout, /OpenCode V2 model for/)
+  await assertInheritedV2(cwd)
+})
+
 test('capture retains original causes for sync throws and awaited non-Error rejections', async () => {
   const cause = { code: 'EXPECTED_REJECTION' }
   const synchronous = await capture(() => {

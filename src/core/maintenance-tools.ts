@@ -32,6 +32,7 @@ const operations: Array<[string, string, Record<string, z.ZodType>]> = [
   ['sync.plan', 'Inspect synchronization without writes; record a bounded expiring plan.', sync],
   ['sync.apply', 'Apply a server-owned synchronization plan after checking concurrent changes.', planId],
   ['models', 'Persist explicit provider role models and regenerate using shared maintenance services.', { provider: provider.optional(), choices }],
+  ['models.apply_defaults', 'Apply the current provider model defaults to all roles and regenerate with backups.', { provider: provider.optional() }],
   ['status', 'Report bounded workspace, task, action and DB status.', { limit: z.number().int().min(1).max(100).optional(), offset: z.number().int().nonnegative().optional(), archived: z.boolean().optional() }],
   ['health', 'Run stateless workspace health, distinct from task-scoped persisted health.run.', {}],
   ['serve', 'Report the active MCP host; never start a nested server.', { port: z.number().int().min(1).max(65535).optional() }],
@@ -73,6 +74,7 @@ function successData(operation: string): z.ZodType {
   if (operation === 'init') return z.object({ configPath: z.string(), provider, storageScope: z.enum(['local','global']), projectId: z.string() }).passthrough()
   if (operation === 'build') return z.object({ report, backupDir: z.string().optional(), permissionsSynced: z.boolean().optional() })
   if (operation === 'models') return z.object({ report: filesReport, backupDir: z.string().optional() }).passthrough()
+  if (operation === 'models.apply_defaults') return z.object({ provider, choices: z.object({ lead: roleChoice, explorer: roleChoice, consultant: roleChoice, builder: roleChoice, reviewer: roleChoice }), report: filesReport, backupDir: z.string().optional() }).passthrough()
   if (operation === 'sync.apply') return z.union([z.object({ report, backupDir: z.string().optional(), permissionsSynced: z.boolean().optional() }), z.object({ captured: strings, missing: strings })])
   if (operation === 'migrate.provider.apply') return z.union([z.object({ alreadyCurrent: z.literal(true) }), z.object({ provider, report, backupDir: z.string().optional() })])
   if (operation === 'migrate.storage.apply') return z.union([z.object({ alreadyCurrent: z.literal(true), configReconciled: z.boolean().optional(), scope: z.enum(['local','global']).optional() }), z.object({ source: z.string(), destination: z.string(), sourceRetained: z.literal(true), sourceBackup: z.string().optional(), destinationBackup: z.string().optional(), counts: z.record(z.string(), z.number()) }).passthrough()])

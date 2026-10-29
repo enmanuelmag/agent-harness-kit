@@ -7,19 +7,23 @@ import { fileURLToPath } from 'node:url'
 
 import { choicesFromPreferences, missingPreferenceRoles, ROLES, toPreferences } from '@/commands/agent-preferences'
 import { applyConfigDefaults } from '@/commands/init-helpers'
+import { discoverCodexModels } from '@/commands/model-catalog'
 import { filesFor } from '@/commands/models'
 import { findConfigFile, loadConfig } from '@/core/config'
 import { startDashboardServer } from '@/core/dashboard-server'
 import { HarnessDB, openDB, readStorageStateFile, resolveSqlitePath, resolveSqlitePathForScope } from '@/core/db'
 import { SQLiteDriver } from '@/core/drivers/sqlite'
 import { healthCommand, inspectHealthCheck } from '@/core/health-check'
+import { detectPackageManager } from '@/core/materializer/detect-package-manager'
 import { getMaterializer } from '@/core/materializer/index'
+import { mergeCodexConfigToml } from '@/core/materializer/mcp-merge'
 import { LEGACY_CODEX_LEAD, nativeAgentFilename } from '@/core/materializer/native-agent-path'
 import { opencodeV2AgentFiles, preflightOpenCodeV2 } from '@/core/materializer/opencode-v2'
 import { inspectOpenCodeConfig, writeOpenCodeV2Config } from '@/core/materializer/opencode-v2-config'
 import { slugify } from '@/core/materializer/scaffold-utils'
 import { writeAgentFiles } from '@/core/materializer/scaffold-utils'
 import { configCjs, configJson, configMjs, configTs } from '@/core/materializer/templates'
+import { providerDefaultCatalog, resolveProviderModelDefaults } from '@/core/model-defaults'
 import { inspectOpenCodeNotificationPlugin, installNotificationHooks,uninstallNotificationHooks } from '@/core/notifications/install'
 import { notificationCliPath } from '@/core/notifications/runtime'
 import { capture } from '@/core/result'
@@ -32,6 +36,7 @@ import { captureNativeChoices } from './native-model-capture'
 import { fileTree, PlanStore, revision, safePath, withMaintenanceLock } from './plans'
 
 import type { MaintenancePlan } from './plans'
+import type { CodexModel } from '@/commands/model-catalog'
 import type { FullExport } from '@/core/db'
 import type { AgentModelPreferences, HarnessConfig, Provider } from '@/types'
 
@@ -41,6 +46,7 @@ export interface MaintenanceOptions {
   beforeStorageChange?: () => Promise<void>
   afterStorageChange?: () => Promise<void>
   homeDir?: string
+  discoverCodexModels?: typeof discoverCodexModels
 }
 const PROVIDERS: Provider[] = ['claude-code', 'codex-cli', 'cursor', 'opencode', 'opencode-v2', 'grok-cli']
 const providerRoot = (p: Provider) => ({ 'claude-code': '.claude', 'codex-cli': '.codex', cursor: '.cursor', opencode: '.opencode', 'opencode-v2': '.opencode', 'grok-cli': '.grok' })[p]
@@ -74,6 +80,7 @@ export class MaintenanceService {
     if (operation === 'init') return withMaintenanceLock(this.cwd, () => this.initialize(args))
     if (operation.endsWith('.plan')) return this.plan(operation, args)
     if (operation.endsWith('.apply')) return withMaintenanceLock(this.cwd, () => this.apply(operation, args))
+    if (operation === 'models.apply_defaults') return withMaintenanceLock(this.cwd, () => this.applyModelDefaults(args))
     if (operation === 'build' || operation === 'models') return withMaintenanceLock(this.cwd, () => this.generate(operation, args))
     if (operation === 'export') return withMaintenanceLock(this.cwd, () => this.exportData(args))
     if (operation === 'status') return this.status(args)
@@ -127,6 +134,23 @@ export class MaintenanceService {
     if (provider === 'opencode-v2') for (const value of Object.values(roles)) { const checked = openCodeV2PreferenceSchema.safeParse(value); if (!checked.success) return failure('models', 'invalid_input', checked.error.message) }
     return success('models', { preferences: { [provider]: roles } })
   }
+  private async applyModelDefaults(args: Record<string, unknown>): Promise<MaintenanceOutcome> {
+    const operation = 'models.apply_defaults'
+    const config = await this.config()
+    if (args.provider !== undefined && args.provider !== config.provider) return failure(operation, 'provider_mismatch', `Current provider is ${config.provider}; requested ${String(args.provider)}.`)
+    const catalogType = providerDefaultCatalog(config.provider)
+    if (!catalogType) return failure(operation, 'unsupported_provider', `${config.provider} has no model default policy.`)
+    let models: CodexModel[]
+    if (catalogType === 'codex') {
+      const catalog = await (this.options.discoverCodexModels ?? discoverCodexModels)()
+      if (!catalog.ok) return failure(operation, 'catalog_unavailable', `Could not discover Codex models: ${catalog.error}`)
+      if (!catalog.data.length) return failure(operation, 'catalog_unavailable', 'Codex returned no models.')
+      models = catalog.data
+    } else models = []
+    const choices = resolveProviderModelDefaults(config.provider, models)!
+    const result = await this.generate('models', { provider: config.provider, choices })
+    return { ...result, operation, ...(result.ok ? { data: { ...result.data, provider: config.provider, choices } } : {}) }
+  }
   private async generate(operation: string, args: Record<string, unknown>): Promise<MaintenanceOutcome> {
     let config = await this.config()
     if (operation === 'models' && args.provider !== undefined && args.provider !== config.provider) return { ...failure(operation, 'provider_mismatch', `Current provider is ${config.provider}; requested ${String(args.provider)}. Models configure only the current provider. Use a provider migration plan to change providers.`), data: { currentProvider: config.provider, requestedProvider: args.provider } }
@@ -152,7 +176,10 @@ export class MaintenanceService {
       const native = choices.claudeAgentModels ?? choices.codexAgentModels ?? choices.cursorAgentModels ?? choices.opencodeV2AgentModels ?? {}
       const report = writeAgentFiles(this.cwd, filesFor(config, native), { force: true, backupRoot: join(this.cwd, config.storage.dir, 'backups') })
       // Codex project default and permissions are reconciled by the same materializer.
-      if (config.provider === 'codex-cli') await getMaterializer(config.provider).build(config, this.cwd, choices)
+      if (config.provider === 'codex-cli') {
+        await getMaterializer(config.provider).build(config, this.cwd, choices)
+        mergeCodexConfigToml(join(this.cwd, '.codex', 'config.toml'), config.tools.mcp.port, this.cwd, detectPackageManager(this.cwd), choices.codexAgentModels?.lead)
+      }
       return success(operation, { report, backupDir })
     }
     const report = await getMaterializer(config.provider).build(config, this.cwd, { force: args.force === true, ...choices })

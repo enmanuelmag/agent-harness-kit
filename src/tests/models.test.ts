@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, test } from 'node:test'
 
 import { claudeEffortsForModel } from '@/commands/claude-model-prompt'
+import { promptCodexAgentModels } from '@/commands/codex-model-prompt'
 import { applyConfigDefaults } from '@/commands/init-helpers'
 import { choicesForMigrationTarget } from '@/commands/migrate'
 import {
@@ -22,6 +23,7 @@ import { claudeAgentFiles } from '@/core/materializer/claude-code'
 import { codexAgentFiles } from '@/core/materializer/codex-cli'
 import { cursorAgentFiles } from '@/core/materializer/cursor'
 import { getMaterializer } from '@/core/materializer/index'
+import { resolveProviderModelDefaults } from '@/core/model-defaults'
 
 import type { BuildMaterializerOptions } from '@/core/materializer/index'
 import type { Provider } from '@/types'
@@ -298,6 +300,76 @@ describe('runtime model catalogs', () => {
         consultant: { model: 'gpt-6.1-sol', effort: 'high' },
       }
     )
+  })
+
+  test('prefers newest Terra for coding unless Sol has a strictly newer numeric version', () => {
+    const model = (id: string) => ({ id, label: id, supportedReasoningEfforts: ['medium'] })
+    for (const [sol, terra, expected] of [
+      ['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.1-terra'],
+      ['gpt-6.2-sol', 'gpt-6.1-terra', 'gpt-6.2-sol'],
+      ['gpt-5.9-sol', 'gpt-5.10-terra', 'gpt-5.10-terra'],
+      ['gpt-6-sol', 'gpt-6.0-terra', 'gpt-6.0-terra'],
+    ]) {
+      const catalog = [model(sol), model(terra)]
+      const before = structuredClone(catalog)
+      const choices = selectCodexRoleDefaults(catalog)
+      assert.equal(choices.builder?.model, expected)
+      assert.equal(choices.reviewer?.model, expected)
+      assert.deepEqual(catalog, before)
+    }
+    const onlyTerra = selectCodexRoleDefaults([model('gpt-6.1-terra')])
+    assert.equal(onlyTerra.builder?.model, 'gpt-6.1-terra')
+    assert.equal(onlyTerra.lead, undefined)
+    assert.deepEqual(selectCodexRoleDefaults([]), {})
+  })
+
+  test('provider policy returns complete inherited preferences and reports unsupported providers', () => {
+    for (const provider of ['claude-code', 'cursor', 'opencode-v2'] as const) {
+      assert.deepEqual(resolveProviderModelDefaults(provider), {
+        lead: { model: 'inherit' }, explorer: { model: 'inherit' },
+        consultant: { model: 'inherit' }, builder: { model: 'inherit' }, reviewer: { model: 'inherit' },
+      })
+    }
+    assert.equal(resolveProviderModelDefaults('opencode'), undefined)
+    const choices = resolveProviderModelDefaults('codex-cli', [{ id: 'gpt-6.1-terra', supportedReasoningEfforts: ['high'], defaultReasoningEffort: 'high' }])!
+    assert.deepEqual(choices.builder, { model: 'gpt-6.1-terra', reasoningEffort: 'high' })
+    assert.deepEqual(choices.lead, { model: 'inherit' })
+  })
+
+  test('Codex prompt presents role recommendations while preserving explicit choices and manual fallback', async () => {
+    type Dependencies = NonNullable<Parameters<typeof promptCodexAgentModels>[2]>
+    const makeModel = (id: string) => ({ id, label: id, supportedReasoningEfforts: ['medium'] })
+    for (const [sol, expected] of [['gpt-6.1-sol', 'gpt-6.1-terra'], ['gpt-6.2-sol', 'gpt-6.2-sol']]) {
+      const seen: Array<{ message: string; initialValue?: unknown }> = []
+      const prompts = {
+        select: async (options: { message: string; initialValue?: unknown }) => {
+          seen.push(options)
+          return options.message === 'Model for Reviewer' ? 'inherit' : options.initialValue
+        },
+        isCancel: () => false,
+      } as unknown as Dependencies['prompts']
+      const choices = await promptCodexAgentModels('codex-cli', ['builder', 'reviewer'], {
+        prompts,
+        discover: async () => ({ ok: true, data: [makeModel(sol), makeModel('gpt-6.1-terra')] }),
+      })
+      assert.equal(seen.find((item) => item.message === 'Model for Builder')?.initialValue, expected)
+      assert.equal(seen.find((item) => item.message === 'Model for Reviewer')?.initialValue, expected)
+      assert.deepEqual(choices.builder, { model: expected, effort: 'medium' })
+      assert.deepEqual(choices.reviewer, {})
+    }
+
+    const values = ['custom-model', 'high']
+    const prompts = {
+      select: async () => '__ahk_manual_model__',
+      text: async () => values.shift(),
+      isCancel: () => false,
+      log: { warn: () => {}, info: () => {} },
+    } as unknown as Dependencies['prompts']
+    const manual = await promptCodexAgentModels('codex-cli', ['builder'], {
+      prompts,
+      discover: async () => ({ ok: false, error: 'unavailable' }),
+    })
+    assert.deepEqual(manual.builder, { model: 'custom-model', effort: 'high' })
   })
 
   test('uses the lead choice unchanged for Codex default.toml', () => {
