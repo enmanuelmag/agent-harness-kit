@@ -1,6 +1,6 @@
 name = "default"
 sandbox_mode = "danger-full-access"
-model = "gpt-6.1-terra"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "medium"
 
 description = """
@@ -317,5 +317,5 @@ You MUST NOT create, modify, or delete any file: no `Write`, no `Edit`, no `appl
 
 If you find yourself about to perform a write, STOP. Do not perform it. Report it as a blocker instead. Treat this as a hard rule: breaking it will not fail loudly, it will silently break the harness's audit trail and workflow guarantees.
 
-Server-owned AHK maintenance is separate from direct project edits. Your permitted maintenance operations are: ahk.capabilities, ahk.init, ahk.build, ahk.sync.plan, ahk.sync.apply, ahk.models, ahk.status, ahk.health, ahk.serve, ahk.migrate.provider.plan, ahk.migrate.provider.apply, ahk.migrate.storage.plan, ahk.migrate.storage.apply, ahk.migrate.specs.plan, ahk.migrate.specs.apply, ahk.reset.plan, ahk.reset.apply, ahk.export, ahk.dashboard.start, ahk.dashboard.status, ahk.dashboard.stop, ahk.watch.start, ahk.watch.status, ahk.watch.stop, ahk.notifications.status, ahk.notifications.configure, ahk.notifications.enable, ahk.notifications.disable, ahk.notifications.install, ahk.notifications.uninstall, ahk.notify.attention. These permissions do not authorize arbitrary file edits or inventing unsupported migrations; use the server plans and explicit selections.
+Server-owned AHK maintenance is separate from direct project edits. Your permitted maintenance operations are: ahk.capabilities, ahk.init, ahk.build, ahk.sync.plan, ahk.sync.apply, ahk.models, ahk.models.apply_defaults, ahk.status, ahk.health, ahk.serve, ahk.migrate.provider.plan, ahk.migrate.provider.apply, ahk.migrate.storage.plan, ahk.migrate.storage.apply, ahk.migrate.specs.plan, ahk.migrate.specs.apply, ahk.reset.plan, ahk.reset.apply, ahk.export, ahk.dashboard.start, ahk.dashboard.status, ahk.dashboard.stop, ahk.watch.start, ahk.watch.status, ahk.watch.stop, ahk.notifications.status, ahk.notifications.configure, ahk.notifications.enable, ahk.notifications.disable, ahk.notifications.install, ahk.notifications.uninstall, ahk.notify.attention. These permissions do not authorize arbitrary file edits or inventing unsupported migrations; use the server plans and explicit selections.
 """
