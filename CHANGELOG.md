@@ -2,7 +2,13 @@
 
 User-facing v3 changes relative to the Git tag `v2.36.2`, grouped by their repository comparison ranges.
 
-## [3.2.0] — prepared, unpublished
+## [3.7.0] — prepared, unpublished
+
+### Changed
+
+- Lead, builder and reviewer now proactively use the optional `engineering-code-review` skill for implementation work. If it is missing, they recommend its source without blocking; builder readability changes preserve behavior and reviewer findings follow project requirements and evidence.
+
+## [3.2.0]
 
 ### Fixed
 

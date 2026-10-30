@@ -176,6 +176,12 @@ ${extraInitLines ? '\n' : ''}${extraInitLines}
 | builder | Implements the plan, writes files |
 | reviewer | Verifies acceptance criteria, approves or blocks |
 
+## Code quality guidance
+
+For implementation tasks, the lead asks the builder and reviewer to check whether the \`engineering-code-review\` skill is available. When available, read and apply it in the role's scope, following the project's instructions and conventions. If unavailable, recommend the skill name and its source once per task without blocking work or installing it automatically: https://github.com/agentara/skills/tree/main/skills/engineering/engineering-code-review.
+
+The builder evaluates the changed code for clear names, understandable conditions and flow, unnecessary nesting, mixed responsibilities, speculative abstractions, duplicated rules, and hidden effects. Make only in-scope improvements that preserve behavior; no change is required when the code is already clear. The reviewer checks concrete findings against requirements and evidence, and does not block solely on personal style preferences.
+
 ## What to read
 
 \`\`\`

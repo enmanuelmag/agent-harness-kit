@@ -47,7 +47,7 @@ Native installation can still require a working build toolchain. [Upstream issue
 
 ## Stable and release-candidate versions
 
-The v2 maintenance line is `release/v2`; select and backport fixes there without the v3 MCP migration. After publication, pin a stable v2 version such as `@cardor/agent-harness-kit@2.36.2`. The v3 line is `release/v3`, currently prepared at `3.2.0` in this repository; this version has not been published. After stable publication, install `@cardor/agent-harness-kit@3.2.0` or use `latest`. For release candidates, use `@cardor/agent-harness-kit@rc` or pin the full prerelease version. The isolated v2.36.2 cut changes only the package version from its shared committed baseline, retaining historical release tooling. Future v2 publication must specify `--tag v2` explicitly or selectively backport release guards, so a v2 patch cannot replace v3 stable at `latest`. Local release preparation and tags do not publish packages.
+The v2 maintenance line is `release/v2`; select and backport fixes there without the v3 MCP migration. Version `2.36.1` is published and `2.37.0` is prepared but not yet published. The v3 line is `release/v3`: version `3.6.0` is published on `latest` and `3.7.0` is prepared but not yet published. After publication, pin the intended version or use `latest` for stable v3. For release candidates, use `@cardor/agent-harness-kit@rc` or pin the full prerelease version. The prepared v2 release script uses the `v2` npm channel and marks its GitHub release `--latest=false`, so it does not replace v3 stable at `latest`. Preparing a release does not publish it.
 
 MCP input guidance and compiled tolerant admission are derived from one authored Zod registry. Compatibility recovery stays private and preserves existing numeric/string/JSON-array inputs, omitted keys and explicit null values. Successful responses keep their legacy text and add validated structured DTOs.
 
@@ -57,7 +57,7 @@ Keep generated-skill downgrade protection intact; generating v2 over a v3 tree i
 
 ## Windows health correction in 3.2.0
 
-After publication, update the AHK installation your project uses: `pnpm add -g @cardor/agent-harness-kit@3.2.0` for the global CLI, or `pnpm add -D @cardor/agent-harness-kit@3.2.0` for a project dependency. Restart the provider or reconnect its MCP server, then run `ahk health` again. Existing scripts and `health.scriptPath` stay unchanged; no `ahk init`, regeneration, or Claude repair prompt is needed for this fix. The corrected runner is used by manual/MCP health and task health gates automatically once the updated process is running. AHK only reports available updates; it does not install them automatically.
+To obtain the correction, update the AHK installation your project uses to published version 3.6.0 or later: `pnpm add -g @cardor/agent-harness-kit@3.6.0` for the global CLI, or `pnpm add -D @cardor/agent-harness-kit@3.6.0` for a project dependency. Restart the provider or reconnect its MCP server, then run `ahk health` again. Existing scripts and `health.scriptPath` stay unchanged; no `ahk init`, regeneration, or Claude repair prompt is needed for this fix. The corrected runner is used by manual/MCP health and task health gates automatically once the updated process is running. AHK only reports available updates; it does not install them automatically.
 
 The correction fixes Windows command quoting for `health.bat`, including paths with spaces and shell punctuation. A green `ahk doctor` validates setup artifacts but does not establish that the native health script passes.
 
