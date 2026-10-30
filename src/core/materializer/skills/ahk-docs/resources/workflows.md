@@ -24,4 +24,6 @@ Use an explicit request such as “Use `ahk-use-case` to define checkout recover
 3. `ahk-spec-tech` derives contracts, architecture, validation, and rollout from an approved functional source.
 4. The developer separately authorizes tracked implementation. The lead claims a task and coordinates explorer, consultant, builder, and reviewer through MCP.
 
+For implementation tasks, the lead asks the builder and reviewer to apply `engineering-code-review` when available. When it is missing, recommend [the skill and its source](https://github.com/agentara/skills/tree/main/skills/engineering/engineering-code-review) without blocking or installing it automatically. The builder evaluates changed code for clarity without changing behavior or expanding scope, and the reviewer reports evidence-backed findings rather than blocking for personal style.
+
 Document approval authorizes the next design stage. It does not authorize implementation.

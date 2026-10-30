@@ -2,9 +2,6 @@ name: Test & Publish
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - main
 
 jobs:
   publish:
@@ -12,74 +9,91 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # needed to push git tags
-      id-token: write # needed for npm OIDC trusted publishing
+      contents: write
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history required by semantic-version
+          fetch-depth: 0
 
-      - name: Generate Semantic Version
-        id: semantic_version
-        uses: paulhatch/semantic-version@v5.4.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          tag_prefix: 'v'
-          major_pattern: '/!:|BREAKING CHANGE:/'
-          minor_pattern: '/feat/'
-          bump_each_commit_patch_pattern: '/fix|bugfix|chore|refactor|style|docs|test|perf/'
-          version_format: '${major}.${minor}.${patch}'
-          enable_prerelease_mode: false
-          bump_each_commit: true
+          version: 11.1.2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Lint (src)
-        run: npm run lint:check
-
-      - name: Run tests
-        run: npm test
-
-      - name: Set version in package.json
+      - name: Validate v2 manifest, branch and immutable tag
+        id: release
+        env:
+          RELEASE_REF: ${{ github.ref }}
         run: |
-          VERSION="${{ steps.semantic_version.outputs.version }}"
-          echo "Publishing version: $VERSION"
-          npm pkg set version="$VERSION"
-
-      - name: Pack (dry run — verify bundle)
-        run: npm pack --dry-run
-
-      - name: Publish to npm
-        run: npm publish --access public --provenance
-
-      - name: Create and push git tag
-        run: |
-          VERSION="${{ steps.semantic_version.outputs.version }}"
-
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "Tag v${VERSION} already exists. Skipping."
-            exit 0
+          set -euo pipefail
+          if [[ "$RELEASE_REF" != refs/heads/release/v2 ]]; then
+            echo 'Only release/v2 can publish the v2 maintenance line.' >&2
+            exit 1
           fi
 
-          git config user.name "enmanuelmag"
-          git config user.email "enmanuelmag@cardor.dev"
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin "v${VERSION}"
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ ! "$VERSION" =~ ^2\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "A stable 2.x manifest version is required: $VERSION" >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          PREPARED_TAG=false
+          if git rev-parse --verify -q "refs/tags/$TAG" >/dev/null; then
+            TAG_COMMIT=$(git rev-parse "$TAG^{commit}")
+            HEAD_COMMIT=$(git rev-parse HEAD)
+            if [[ "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+              echo "Tag $TAG already points to a different commit." >&2
+              exit 1
+            fi
+            PREPARED_TAG=true
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prepared_tag=$PREPARED_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (src)
+        run: pnpm run lint:check
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Pack dry run
+        run: pnpm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance --tag v2
+
+      - name: Create and push immutable git tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          PREPARED_TAG: ${{ steps.release.outputs.prepared_tag }}
+        run: |
+          if [[ "$PREPARED_TAG" != true ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+          fi
+          git push origin "$TAG"
 
       - name: Log publish info
-        run: |
-          echo "🚀 Published @cardor/agent-harness-kit@${{ steps.semantic_version.outputs.version }}"
-          echo "   Branch: ${{ github.ref_name }}"
-          echo "   Commit: ${{ github.sha }}"
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: echo "Published @cardor/agent-harness-kit@$VERSION to npm tag v2"

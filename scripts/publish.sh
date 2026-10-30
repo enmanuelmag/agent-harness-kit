@@ -97,11 +97,11 @@ success "Build complete."
 # -- 7. Publish to npm --------------------------------------------------------
 info "Publishing $PACKAGE_NAME@$VERSION to npm..."
 if $DRY_RUN; then
-  pnpm publish --access public --dry-run
+  pnpm publish --access public --tag v2 --dry-run
   warn "Dry run complete — nothing was published to npm."
 else
   TARBALL=$(pnpm pack 2>/dev/null | tail -1)
-  npm publish "$TARBALL" --access public
+  npm publish "$TARBALL" --access public --tag v2
   rm -f "$TARBALL"
   success "Published $PACKAGE_NAME@$VERSION to npm."
 fi
@@ -146,7 +146,8 @@ if $DRY_RUN; then
 else
   gh release create "$TAG" \
     --title "$TAG" \
-    --notes "$RELEASE_BODY"
+    --notes "$RELEASE_BODY" \
+    --latest=false
   success "GitHub release $TAG created."
 fi
 

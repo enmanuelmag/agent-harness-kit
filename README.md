@@ -131,6 +131,8 @@ The provider should use the installed MCP tool descriptions for exact names and 
 
 The lead scopes and coordinates a tracked task. The explorer maps relevant code without editing it. The consultant advises after exploration. The builder implements the approved plan. The reviewer verifies acceptance criteria, health, and evidence, then either approves or sends a focused correction back through the lead's workflow.
 
+For implementation tasks, the lead asks the builder and reviewer to use the optional [`engineering-code-review` skill](https://github.com/agentara/skills/tree/main/skills/engineering/engineering-code-review) when available. If it is missing, the agent recommends its name and source without blocking the task. The builder evaluates the readability of changed code while preserving behavior; the reviewer reports evidence-backed issues without blocking on personal style.
+
 The health gate does not replace role verification. A green result proves only the native commands it ran. It does not prove deployment, a real device, an OTA update, a browser visual review, or any other unexecuted environment.
 
 ### Documents and approvals
@@ -140,6 +142,10 @@ Use `ahk-use-case` when the request needs discovery. One request may become seve
 Feature and fix skills remain direct functional-spec entry points. They are useful when the supplied request is already specific enough. Paste ticket content into the conversation; AHK has no built-in Jira connector.
 
 Draft persistence makes the evolving decision record reviewable. Explicit human approval moves a document forward. A developer still chooses when to authorize a task and implementation.
+
+## Release line
+
+Version `2.37.0` is prepared and has not yet been published. Published v2 version `2.36.1` remains available; v3 `3.6.0` is the npm `latest` version. The v2 release script publishes with npm `--tag v2` and creates the GitHub release with `--latest=false`, keeping v3 on the latest channel. The manual publish workflow uses the checked-in stable 2.x manifest version, requires the `release/v2` branch, checks immutable tags before publication and publishes to the npm `v2` channel.
 
 ## Maintenance
 

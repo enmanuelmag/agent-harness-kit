@@ -77,6 +77,10 @@ full harness pipeline for it; hand the builder the exact content and target path
 > **If in lightweight mode: skip Step 1 (Orient) entirely.** No health check, no MCP calls.
 
 ---
+## Code quality handoff
+
+For implementation tasks, explicitly ask the builder and reviewer to use the `engineering-code-review` skill when available. If it is unavailable, recommend `engineering-code-review` and its source once per task without blocking work or installing it automatically: https://github.com/agentara/skills/tree/main/skills/engineering/engineering-code-review. Ask the builder to evaluate readability in the changed code, preserving behavior, scope and project conventions. Ask the reviewer for evidence-backed findings; personal style alone must not block approval.
+
 ## Responsibilities
 
 - Pick and claim exactly one task per session
