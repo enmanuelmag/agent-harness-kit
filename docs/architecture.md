@@ -4,7 +4,7 @@
 
 ## System Architecture
 
-The agent-harness-kit is built on a structured multi-agent workflow that leverages the Model Communication Protocol (MCP) to coordinate AI agents in software development tasks. The system follows a defined pattern where each agent has distinct roles, responsibilities, and permissions.
+The agent-harness-kit is built on a structured multi-agent workflow that leverages the Model Context Protocol (MCP) to coordinate AI agents in software development tasks. The system follows a defined pattern where each agent has distinct roles, responsibilities, and permissions.
 
 ### Core Principles
 
